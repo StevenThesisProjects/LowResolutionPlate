@@ -205,3 +205,60 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+#### CRNN and STN
+# ── OS & IDE (repo-wide) ──
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# pyenv
+.python-version
+
+# Environment variants
+.env.*
+
+# ── crnn_and_stn: Dataset (~1.2GB — tải riêng, không push) ──
+crnn_and_stn/dataset/data/
+crnn_and_stn/dataset/Pa7a3Hin-test-public/
+crnn_and_stn/dataset/TKzFBtn7-test-blind/
+crnn_and_stn/dataset/val_tracks.json
+crnn_and_stn/dataset/**/*.jpg
+crnn_and_stn/dataset/**/*.jpeg
+crnn_and_stn/dataset/**/*.png
+crnn_and_stn/dataset/**/*.bmp
+crnn_and_stn/dataset/**/*.zip
+crnn_and_stn/dataset/**/*.tar
+crnn_and_stn/dataset/**/*.tar.gz
+crnn_and_stn/dataset/**/*.7z
+crnn_and_stn/dataset/
+
+crnn_and_stn/summary/
+
+# ── Model weights & checkpoints ──
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.safetensors
+*.bin
+*.h5
+*.pkl
+*.pickle
+
+# ── Training outputs ──
+crnn_and_stn/results/
+crnn_and_stn/experiments/
+crnn_and_stn/outputs/
+crnn_and_stn/logs/
+crnn_and_stn/runs/
+crnn_and_stn/lightning_logs/
+crnn_and_stn/wandb/
+submission_*.txt
+
+# ── Báo cáo / tài liệu nặng ──
+crnn_and_stn/report/
+*.pdf

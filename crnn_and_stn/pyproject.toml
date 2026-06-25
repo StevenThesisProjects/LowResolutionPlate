@@ -1,0 +1,30 @@
+[project]
+name = "crnn-stn-baseline"
+version = "1.0.0"
+description = "Baseline 1: Multi-Frame CRNN + STN cho ICPR 2026 LRLPR"
+requires-python = "==3.11.*"
+
+dependencies = [
+    "albumentations>=2.0.8",
+    "numpy>=1.26.0",
+    "opencv-python>=4.8.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "tqdm>=4.66.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.0.0",
+]
+
+# PyTorch build NVIDIA CUDA — dùng khi uv sync trên Linux + GPU
+# Khớp template EZYCLOUDX: nvidia/cuda:12.4.1-devel-ubuntu22.04
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
