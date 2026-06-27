@@ -81,12 +81,13 @@ class Trainer:
 
             with autocast("cuda", enabled=self.device.type == "cuda"):
                 preds = self.model(images)                    # [B, T, C]
-                # CTC yêu cầu input shape [T, B, C]
-                preds_permuted = preds.permute(1, 0, 2)
-                input_lengths = torch.full(
-                    (images.size(0),), preds.size(1), dtype=torch.long
-                )
-                loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
+
+            # CTC Loss trên CUDA không hỗ trợ float16/bfloat16, nên ép về float32.
+            preds_permuted = preds.float().permute(1, 0, 2)
+            input_lengths = torch.full(
+                (images.size(0),), preds.size(1), dtype=torch.long, device=targets.device
+            )
+            loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
 
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.optimizer)
@@ -125,9 +126,11 @@ class Trainer:
                 targets = targets.to(self.device)
                 preds = self.model(images)
 
-                input_lengths = torch.full((images.size(0),), preds.size(1), dtype=torch.long)
+                input_lengths = torch.full(
+                    (images.size(0),), preds.size(1), dtype=torch.long, device=targets.device
+                )
                 loss = self.criterion(
-                    preds.permute(1, 0, 2), targets, input_lengths, target_lengths
+                    preds.float().permute(1, 0, 2), targets, input_lengths, target_lengths
                 )
                 val_loss += loss.item()
 

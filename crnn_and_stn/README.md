@@ -84,34 +84,34 @@ python train.py --submission-mode
 
 ## Kết quả mong đợi (report Trang 50)
 
-| Model          | Accuracy   |
-| -------------- | ---------- |
-| CRNN           | 74.45%     |
+| Model | Accuracy |
+|-------|----------|
+| CRNN | 74.45% |
 | **CRNN + STN** | **77.00%** |
 
 ## Output
 
 Sau khi train, trong `results/`:
 
-| File                               | Mô tả                                          |
-| ---------------------------------- | ---------------------------------------------- |
-| `crnn_stn_baseline_best.pth`       | Checkpoint tốt nhất (theo val acc)             |
+| File | Mô tả |
+|------|-------|
+| `crnn_stn_baseline_best.pth` | Checkpoint tốt nhất (theo val acc) |
 | `submission_crnn_stn_baseline.txt` | Dự đoán validation: `track_id,text;confidence` |
 
 ## Mapping từ MultiFrame-LPR-main
 
-| File gốc                   | File trích xuất            | Ghi chú                                          |
-| -------------------------- | -------------------------- | ------------------------------------------------ |
-| `src/models/crnn.py`       | `src/models/crnn.py`       | Giữ nguyên, thêm comment                         |
+| File gốc | File trích xuất | Ghi chú |
+|----------|-----------------|---------|
+| `src/models/crnn.py` | `src/models/crnn.py` | Giữ nguyên, thêm comment |
 | `src/models/components.py` | `src/models/components.py` | Chỉ STN, CNN, Attention (bỏ ResNet, Transformer) |
-| `src/data/dataset.py`      | `src/data/dataset.py`      | + strip label, comment tiếng Việt                |
-| `src/data/transforms.py`   | `src/data/transforms.py`   | Giữ nguyên                                       |
-| `src/training/trainer.py`  | `src/training/trainer.py`  | Giữ nguyên                                       |
-| `src/utils/postprocess.py` | `src/utils/postprocess.py` | Giữ nguyên                                       |
-| `src/utils/common.py`      | `src/utils/common.py`      | Giữ nguyên                                       |
-| `configs/config.py`        | `configs/config.py`        | Chỉ CRNN, path → `dataset/`                      |
-| `train.py`                 | `train.py`                 | Bỏ ResTran, đơn giản hóa                         |
-| `src/models/restran.py`    | ❌ Không trích             | Baseline 2                                       |
-| `run_ablation.py`          | `run_ablation.py`          | Chỉ 2 exp CRNN (bỏ ResTran)                      |
+| `src/data/dataset.py` | `src/data/dataset.py` | + strip label, comment tiếng Việt |
+| `src/data/transforms.py` | `src/data/transforms.py` | Giữ nguyên |
+| `src/training/trainer.py` | `src/training/trainer.py` | Giữ nguyên |
+| `src/utils/postprocess.py` | `src/utils/postprocess.py` | Giữ nguyên |
+| `src/utils/common.py` | `src/utils/common.py` | Giữ nguyên |
+| `configs/config.py` | `configs/config.py` | Chỉ CRNN, path → `dataset/` |
+| `train.py` | `train.py` | Bỏ ResTran, đơn giản hóa |
+| `src/models/restran.py` | ❌ Không trích | Baseline 2 |
+| `run_ablation.py` | `run_ablation.py` | Chỉ 2 exp CRNN (bỏ ResTran) |
 
 Chi tiết: xem `summary/extraction_guide.md`

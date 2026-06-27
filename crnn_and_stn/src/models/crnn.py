@@ -1,90 +1,60 @@
-"""
-Baseline 1: Multi-Frame CRNN + STN.
+"""Multi-frame CRNN with optional STN and stacked-input SR."""
+from __future__ import annotations
 
-Pipeline đầy đủ (report Trang 39):
-  5 LR frames → STN → CNN (weight sharing) → Attention Fusion → BiLSTM → FC → CTC
-
-Nguồn gốc: MultiFrame-LPR-main/src/models/crnn.py
-"""
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from src.models.components import AttentionFusion, CNNBackbone, STNBlock
+from src.models.components import AttentionFusion, CNNBackbone, STNBlock, StackedSRNet
 
 
 class MultiFrameCRNN(nn.Module):
-    """
-    Multi-Frame CRNN với STN tùy chọn.
-
-    Input : [Batch, 5, 3, 32, 128]  — 5 frame RGB đã resize
-    Output: [Batch, SeqLen, NumClasses] log-probabilities cho CTC loss
-    """
-
     def __init__(
         self,
         num_classes: int,
         hidden_size: int = 256,
         rnn_dropout: float = 0.25,
         use_stn: bool = True,
-    ):
+        use_sr: bool = False,
+        sr_scale: int = 2,
+        num_frames: int = 5,
+    ) -> None:
         super().__init__()
-        self.cnn_channels = 512
         self.use_stn = use_stn
+        self.use_sr = use_sr
+        self.num_frames = num_frames
 
-        # Bước 1: STN — căn chỉnh hình học từng frame (nếu bật)
-        if self.use_stn:
-            self.stn = STNBlock(in_channels=3)
+        self.sr = StackedSRNet(num_frames=num_frames, target_size=(32, 128)) if use_sr else None
+        self.stn = STNBlock(in_channels=3) if use_stn else nn.Identity()
+        self.backbone = CNNBackbone(in_channels=3, out_channels=128)
+        self.fusion = AttentionFusion(channels=128)
 
-        # Bước 2: CNN backbone — trích feature (weight sharing qua 5 frame)
-        self.backbone = CNNBackbone(out_channels=self.cnn_channels)
-
-        # Bước 3: Attention Fusion — gộp 5 feature map thành 1
-        self.fusion = AttentionFusion(channels=self.cnn_channels)
-
-        # Bước 4: BiLSTM — mô hình hóa ngữ cảnh theo chiều ngang biển số
         self.rnn = nn.LSTM(
-            input_size=self.cnn_channels,
+            input_size=128 * 8,
             hidden_size=hidden_size,
             num_layers=2,
-            bidirectional=True,
             batch_first=True,
+            bidirectional=True,
             dropout=rnn_dropout,
         )
-
-        # Bước 5: FC head — chiếu sang 37 classes (36 ký tự + blank)
-        self.head = nn.Linear(hidden_size * 2, num_classes)
+        self.classifier = nn.Linear(hidden_size * 2, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: [B, Frames=5, C=3, H, W]
-        Returns:
-            log_probs: [B, SeqLen, NumClasses]
-        """
-        b, f, c, h, w = x.size()
+        # x: [B, F, C, H, W]
+        if self.sr is not None:
+            x = self.sr(x)
+            x = x.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)
 
-        # Gộp batch và frame để xử lý song song qua STN + CNN
-        x_flat = x.view(b * f, c, h, w)  # [B*5, 3, H, W]
+        feats = []
+        for i in range(x.size(1)):
+            frame = x[:, i]
+            frame = self.stn(frame)
+            feats.append(self.backbone(frame))
 
-        # --- STN: warp từng frame ---
-        if self.use_stn:
-            theta = self.stn(x_flat)                              # [B*5, 2, 3]
-            grid = F.affine_grid(theta, x_flat.size(), align_corners=False)
-            x_aligned = F.grid_sample(x_flat, grid, align_corners=False)
-        else:
-            x_aligned = x_flat
-
-        # --- CNN: trích feature (cùng weight cho cả 5 frame) ---
-        features = self.backbone(x_aligned)   # [B*5, 512, 1, W']
-
-        # --- Attention Fusion: 5 frame → 1 feature map ---
-        fused = self.fusion(features)         # [B, 512, 1, W']
-
-        # --- BiLSTM: [B, C, 1, W'] → [B, W', C] ---
-        seq_input = fused.squeeze(2).permute(0, 2, 1)
-        rnn_out, _ = self.rnn(seq_input)      # [B, W', hidden*2]
-
-        # --- FC + log_softmax cho CTC ---
-        out = self.head(rnn_out)              # [B, W', num_classes]
-        return out.log_softmax(2)
+        feats = torch.stack(feats, dim=1)
+        fused = self.fusion(feats)
+        b, c, h, w = fused.shape
+        seq = fused.permute(0, 3, 1, 2).contiguous().view(b, w, c * h)
+        seq, _ = self.rnn(seq)
+        logits = self.classifier(seq)
+        # CTC expects log-probabilities over classes at each time step.
+        return torch.log_softmax(logits, dim=2)
