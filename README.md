@@ -136,3 +136,38 @@ Sau nâng cấp này, mô hình kỳ vọng:
 ## Ghi chú
 
 Repo này là nhánh OCR chuyên cho bài toán biển số low-resolution, nên ưu tiên các quyết định thiết kế giúp tăng độ chính xác và độ ổn định hơn là tối ưu cho mô hình quá nhỏ.
+
+## Phân loại PR
+- [ ] Feature
+- [ ] Bugs
+- [ ] Hotfix
+
+## Mô tả ngắn
+Nâng cấp pipeline OCR biển số từ **CRNN + STN** sang **CRNN + STN với backbone ResBlock kiểu Super-Resolution** để tăng độ ổn định khi train và cải thiện khả năng giữ chi tiết trên ảnh low-resolution, 5-frame.
+
+## Đối chiếu tính năng đã làm theo yêu cầu
+- [x] Rà soát và nâng cấp backbone ResBlock theo hướng OCR-friendly
+- [x] Gắn backbone mới vào `MultiFrameCRNN` nhưng giữ nguyên luồng STN + attention fusion + BiLSTM + CTC
+- [x] Mở rộng CLI `train.py` với preset train mạnh, batch/epochs/grad accumulation và override backbone
+- [x] Tinh chỉnh `trainer.py` để train dài ổn định hơn, có warmup, min LR, clipping, early stopping, best checkpoint theo exact match
+- [x] Cập nhật `README.md` và summary/report để hướng dẫn sử dụng
+
+## Cách thực hiện
+- `src/models/components.py`: thêm `ResidualBlock`, `ResBackbone`, residual scaling và optional SE.
+- `src/models/crnn.py`: thay backbone CNN cũ bằng backbone ResBlock, giữ nguyên STN → fusion → BiLSTM → CTC.
+- `train.py`: thêm preset `debug` / `stable` / `strong`, hỗ trợ override backbone và tham số train từ CLI.
+- `src/training/trainer.py`: bổ sung warmup + cosine decay, gradient accumulation, clipping, early stopping, checkpoint theo exact match.
+- `src/utils/common.py` và `src/utils/postprocess.py`: làm rõ seed, normalize text, CER, exact match và decode helpers.
+
+## Phạm vi ảnh hưởng
+- Ảnh hưởng tới toàn bộ luồng train/eval/inference của OCR.
+- Có thể tác động đến tốc độ train, VRAM sử dụng và chất lượng exact match tùy preset backbone.
+
+## Kiểm tra
+- [x] Đã đọc lint sau khi chỉnh sửa.
+- [x] Không tạo lỗi cú pháp/IDE diagnostics trong các file đã thay đổi.
+
+## Liên kết issues liên quan
+- Issue/PR gốc: 
+- PR liên quan (nếu có): 
+
