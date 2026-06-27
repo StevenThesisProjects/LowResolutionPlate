@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""
-Entry point — Baseline 1: Multi-Frame CRNN + STN.
+"""Training entry point for the upgraded CRNN + STN OCR model.
 
-Chạy từ thư mục crnn_and_stn/:
-  python train.py                          # train CRNN+STN mặc định
-  python train.py --no-stn                 # ablation: CRNN không STN
-  python train.py --submission-mode        # train full + predict test public
-  python train.py --aug-level light        # augmentation nhẹ (debug nhanh)
-
-Nguồn gốc: MultiFrame-LPR-main/train.py (chỉ giữ phần CRNN)
+This script wires together the data pipeline, the residual backbone presets,
+and the trainer. It now supports longer/stabler training runs through CLI
+presets, backbone overrides, gradient accumulation, warmup, and early stopping.
 """
+
+from __future__ import annotations
+
 import argparse
 import os
 import sys
@@ -26,31 +24,121 @@ from src.training.trainer import Trainer
 from src.utils.common import seed_everything
 
 
+def _parse_int_tuple(value: str) -> tuple[int, ...]:
+    """Parse comma-separated stage presets from the command line."""
+
+    cleaned = value.replace("x", ",").replace(";", ",").replace(" ", "")
+    parts = [part for part in cleaned.split(",") if part]
+    if not parts:
+        raise argparse.ArgumentTypeError("Expected a comma-separated list of integers")
+    try:
+        return tuple(int(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Expected a comma-separated list of integers") from exc
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Baseline 1: Multi-Frame CRNN + STN")
+    parser = argparse.ArgumentParser(description="CRNN + STN with residual backbone")
     parser.add_argument("-n", "--experiment-name", type=str, default=None)
+    parser.add_argument("--preset", choices=["stable", "strong", "debug"], default=None)
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--lr", "--learning-rate", type=float, default=None, dest="learning_rate")
-    parser.add_argument("--data-root", type=str, default=None, help="Thư mục train (mặc định: dataset/data/train)")
-    parser.add_argument("--test-root", type=str, default=None, help="Thư mục test public")
+    parser.add_argument("--data-root", type=str, default=None)
+    parser.add_argument("--test-root", type=str, default=None)
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=None)
-    parser.add_argument("--hidden-size", type=int, default=None, help="BiLSTM hidden size (mặc định: 256)")
-    parser.add_argument("--rnn-dropout", type=float, default=None, help="BiLSTM dropout (mặc định: 0.25)")
+    parser.add_argument("--hidden-size", type=int, default=None)
+    parser.add_argument("--rnn-dropout", type=float, default=None)
+    parser.add_argument("--backbone-base-channels", type=int, default=None)
+    parser.add_argument("--backbone-channels", type=int, default=None)
+    parser.add_argument("--backbone-blocks", type=_parse_int_tuple, default=None, help="Comma-separated stage block counts, e.g. 2,2,3,3,4")
+    parser.add_argument("--backbone-stage-channels", type=_parse_int_tuple, default=None, help="Comma-separated stage channels, e.g. 64,128,256,256,512")
+    parser.add_argument("--backbone-res-scale", type=float, default=None)
+    parser.add_argument("--frame-dropout", type=float, default=None)
+    parser.add_argument("--fusion-dropout", type=float, default=None)
+    parser.add_argument("--grad-clip", type=float, default=None)
+    parser.add_argument("--grad-accum-steps", type=int, default=None)
+    parser.add_argument("--label-smoothing", type=float, default=None)
+    parser.add_argument("--warmup-ratio", type=float, default=None)
+    parser.add_argument("--min-lr-ratio", type=float, default=None)
+    parser.add_argument("--patience", type=int, default=None)
     parser.add_argument("--aug-level", choices=["full", "light"], default=None)
     parser.add_argument("--output-dir", type=str, default=None)
-    parser.add_argument("--no-stn", action="store_true", help="Tắt STN → chạy CRNN thuần")
-    parser.add_argument("--submission-mode", action="store_true", help="Train full data + tạo submission")
+    parser.add_argument("--no-stn", action="store_true")
+    parser.add_argument("--no-se", action="store_true")
+    parser.add_argument("--no-amp", action="store_true")
+    parser.add_argument("--no-cudnn-benchmark", action="store_true")
+    parser.add_argument("--submission-mode", action="store_true")
+    parser.add_argument("--full-train", action="store_true", help="Train on all data and skip validation split")
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-    config = Config()
+def _apply_preset(config: Config, preset: str) -> None:
+    # Presets are convenience bundles for common experiment styles.
+    if preset == "debug":
+        config.EXPERIMENT_NAME = f"{config.EXPERIMENT_NAME}_debug"
+        config.EPOCHS = 4
+        config.BATCH_SIZE = 8
+        config.LEARNING_RATE = 1e-3
+        config.NUM_WORKERS = 0
+        config.GRAD_ACCUM_STEPS = 1
+        config.WARMUP_RATIO = 0.0
+        config.MIN_LR_RATIO = 0.2
+        config.EARLY_STOPPING_PATIENCE = 2
+        config.BACKBONE_STAGE_BLOCKS = (1, 1, 1, 1, 1)
+        config.BACKBONE_STAGE_CHANNELS = (32, 64, 96, 128, 256)
+        config.BACKBONE_BASE_CHANNELS = 32
+        config.BACKBONE_CHANNELS = 256
+        config.BACKBONE_RES_SCALE = 0.15
+        config.FRAME_DROPOUT = 0.1
+        config.RNN_DROPOUT = 0.1
+        return
 
-    # Ghi đè config từ CLI
-    overrides = {
+    if preset == "stable":
+        config.EXPERIMENT_NAME = f"{config.EXPERIMENT_NAME}_stable"
+        config.EPOCHS = 80
+        config.BATCH_SIZE = 64
+        config.LEARNING_RATE = 8e-4
+        config.GRAD_ACCUM_STEPS = 1
+        config.WARMUP_RATIO = 0.05
+        config.MIN_LR_RATIO = 0.05
+        config.EARLY_STOPPING_PATIENCE = 18
+        config.BACKBONE_STAGE_BLOCKS = (2, 2, 2, 2, 2)
+        config.BACKBONE_STAGE_CHANNELS = (64, 128, 256, 256, 512)
+        config.BACKBONE_BASE_CHANNELS = 64
+        config.BACKBONE_CHANNELS = 512
+        config.BACKBONE_RES_SCALE = 0.1
+        config.FRAME_DROPOUT = 0.05
+        config.RNN_DROPOUT = 0.25
+        config.BACKBONE_USE_SE = True
+        return
+
+    if preset == "strong":
+        config.EXPERIMENT_NAME = f"{config.EXPERIMENT_NAME}_strong"
+        config.EPOCHS = 120
+        config.BATCH_SIZE = 96
+        config.LEARNING_RATE = 6e-4
+        config.GRAD_ACCUM_STEPS = 2
+        config.WARMUP_RATIO = 0.08
+        config.MIN_LR_RATIO = 0.03
+        config.EARLY_STOPPING_PATIENCE = 24
+        config.BACKBONE_STAGE_BLOCKS = (2, 2, 3, 3, 4)
+        config.BACKBONE_STAGE_CHANNELS = (64, 128, 256, 256, 512)
+        config.BACKBONE_BASE_CHANNELS = 64
+        config.BACKBONE_CHANNELS = 512
+        config.BACKBONE_RES_SCALE = 0.08
+        config.FRAME_DROPOUT = 0.08
+        config.RNN_DROPOUT = 0.2
+        config.BACKBONE_USE_SE = True
+        return
+
+
+def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
+    if args.preset is not None:
+        _apply_preset(config, args.preset)
+
+    mapping = {
         "experiment_name": "EXPERIMENT_NAME",
         "epochs": "EPOCHS",
         "batch_size": "BATCH_SIZE",
@@ -61,33 +149,72 @@ def main():
         "num_workers": "NUM_WORKERS",
         "hidden_size": "HIDDEN_SIZE",
         "rnn_dropout": "RNN_DROPOUT",
+        "backbone_base_channels": "BACKBONE_BASE_CHANNELS",
+        "backbone_channels": "BACKBONE_CHANNELS",
+        "backbone_res_scale": "BACKBONE_RES_SCALE",
+        "frame_dropout": "FRAME_DROPOUT",
+        "fusion_dropout": "FUSION_DROPOUT",
+        "grad_clip": "GRAD_CLIP",
+        "grad_accum_steps": "GRAD_ACCUM_STEPS",
+        "label_smoothing": "LABEL_SMOOTHING",
+        "warmup_ratio": "WARMUP_RATIO",
+        "min_lr_ratio": "MIN_LR_RATIO",
+        "patience": "EARLY_STOPPING_PATIENCE",
         "output_dir": "OUTPUT_DIR",
     }
-    for arg, attr in overrides.items():
-        val = getattr(args, arg, None)
-        if val is not None:
-            setattr(config, attr, val)
+    for arg_name, attr_name in mapping.items():
+        value = getattr(args, arg_name, None)
+        if value is not None:
+            setattr(config, attr_name, value)
 
-    if args.aug_level:
+    if args.backbone_blocks is not None:
+        config.BACKBONE_STAGE_BLOCKS = args.backbone_blocks
+    if args.backbone_stage_channels is not None:
+        config.BACKBONE_STAGE_CHANNELS = args.backbone_stage_channels
+        config.BACKBONE_CHANNELS = args.backbone_stage_channels[-1]
+
+    if args.aug_level is not None:
         config.AUGMENTATION_LEVEL = args.aug_level
     if args.no_stn:
         config.USE_STN = False
-        if args.experiment_name is None:
-            config.EXPERIMENT_NAME = "crnn_no_stn"
+        if args.experiment_name is None and args.preset is None:
+            config.EXPERIMENT_NAME = "crnn_resblock_no_stn"
+    if args.no_se:
+        config.BACKBONE_USE_SE = False
+    if args.no_amp:
+        config.USE_AMP = False
+    if args.no_cudnn_benchmark:
+        config.USE_CUDNN_BENCHMARK = False
+
+    if args.fusion_dropout is not None:
+        config.FUSION_DROPOUT = args.fusion_dropout
+
+
+def main() -> None:
+    args = parse_args()
+    config = Config()
+    _apply_overrides(config, args)
+
+    if args.full_train and not args.submission_mode:
+        args.submission_mode = True
 
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
-    seed_everything(config.SEED)
+    seed_everything(config.SEED, benchmark=config.USE_CUDNN_BENCHMARK)
 
-    print("=" * 60)
-    print("Baseline 1: Multi-Frame CRNN + STN")
-    print("=" * 60)
-    print(f"  Experiment : {config.EXPERIMENT_NAME}")
-    print(f"  STN        : {config.USE_STN}")
-    print(f"  Data       : {config.DATA_ROOT}")
-    print(f"  Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
-    print(f"  Device     : {config.DEVICE}")
-    print(f"  Submission : {args.submission_mode}")
-    print("=" * 60)
+    print("=" * 72)
+    print("CRNN + STN with ResBlock backbone")
+    print("=" * 72)
+    print(f"Experiment : {config.EXPERIMENT_NAME}")
+    print(f"Preset     : {args.preset or 'custom'}")
+    print(f"STN        : {config.USE_STN}")
+    print(f"SE         : {config.BACKBONE_USE_SE}")
+    print(f"Data       : {config.DATA_ROOT}")
+    print(f"Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
+    print(f"AMP        : {config.USE_AMP} | Grad Accum: {config.GRAD_ACCUM_STEPS}")
+    print(f"Device     : {config.DEVICE}")
+    print(f"Submission : {args.submission_mode}")
+    print(f"Backbone   : base={config.BACKBONE_BASE_CHANNELS}, blocks={config.BACKBONE_STAGE_BLOCKS}, channels={config.BACKBONE_STAGE_CHANNELS}, res_scale={config.BACKBONE_RES_SCALE}")
+    print("=" * 72)
 
     if not os.path.exists(config.DATA_ROOT):
         print(f"❌ Không tìm thấy data: {config.DATA_ROOT}")
@@ -103,22 +230,27 @@ def main():
         "augmentation_level": config.AUGMENTATION_LEVEL,
     }
 
-    test_loader = None
     val_loader = None
+    test_loader = None
 
     if args.submission_mode:
-        print("\n📌 SUBMISSION MODE: train toàn bộ data, không val\n")
         train_ds = MultiFrameDataset(config.DATA_ROOT, mode="train", full_train=True, **ds_params)
         if os.path.exists(config.TEST_DATA_ROOT):
             test_ds = MultiFrameDataset(
-                config.TEST_DATA_ROOT, mode="val",
-                img_height=config.IMG_HEIGHT, img_width=config.IMG_WIDTH,
-                char2idx=config.CHAR2IDX, is_test=True,
+                config.TEST_DATA_ROOT,
+                mode="val",
+                img_height=config.IMG_HEIGHT,
+                img_width=config.IMG_WIDTH,
+                char2idx=config.CHAR2IDX,
+                is_test=True,
             )
             test_loader = DataLoader(
-                test_ds, batch_size=config.BATCH_SIZE, shuffle=False,
+                test_ds,
+                batch_size=config.BATCH_SIZE,
+                shuffle=False,
                 collate_fn=MultiFrameDataset.collate_fn,
-                num_workers=config.NUM_WORKERS, pin_memory=True,
+                num_workers=config.NUM_WORKERS,
+                pin_memory=True,
             )
         else:
             print(f"⚠️ WARNING: Không tìm thấy test data tại {config.TEST_DATA_ROOT}")
@@ -127,9 +259,12 @@ def main():
         val_ds = MultiFrameDataset(config.DATA_ROOT, mode="val", **ds_params)
         if len(val_ds) > 0:
             val_loader = DataLoader(
-                val_ds, batch_size=config.BATCH_SIZE, shuffle=False,
+                val_ds,
+                batch_size=config.BATCH_SIZE,
+                shuffle=False,
                 collate_fn=MultiFrameDataset.collate_fn,
-                num_workers=config.NUM_WORKERS, pin_memory=True,
+                num_workers=config.NUM_WORKERS,
+                pin_memory=True,
             )
         else:
             print("⚠️ WARNING: Validation dataset rỗng.")
@@ -139,17 +274,28 @@ def main():
         sys.exit(1)
 
     train_loader = DataLoader(
-        train_ds, batch_size=config.BATCH_SIZE, shuffle=True,
+        train_ds,
+        batch_size=config.BATCH_SIZE,
+        shuffle=True,
         collate_fn=MultiFrameDataset.collate_fn,
-        num_workers=config.NUM_WORKERS, pin_memory=True,
+        num_workers=config.NUM_WORKERS,
+        pin_memory=True,
     )
 
-    # Khởi tạo model CRNN + STN
+    # Build the full OCR network from the config so command line overrides can
+    # change the backbone depth, channels, or regularization in one place.
     model = MultiFrameCRNN(
         num_classes=config.NUM_CLASSES,
         hidden_size=config.HIDDEN_SIZE,
         rnn_dropout=config.RNN_DROPOUT,
         use_stn=config.USE_STN,
+        backbone_channels=config.BACKBONE_CHANNELS,
+        backbone_base_channels=config.BACKBONE_BASE_CHANNELS,
+        backbone_blocks=config.BACKBONE_STAGE_BLOCKS,
+        backbone_stage_channels=config.BACKBONE_STAGE_CHANNELS,
+        use_se=config.BACKBONE_USE_SE,
+        residual_scale=config.BACKBONE_RES_SCALE,
+        frame_dropout=config.FRAME_DROPOUT,
     ).to(config.DEVICE)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -159,7 +305,6 @@ def main():
     trainer = Trainer(model, train_loader, val_loader, config, config.IDX2CHAR)
     trainer.fit()
 
-    # Inference test nếu submission mode
     if args.submission_mode and test_loader is not None:
         best_path = os.path.join(config.OUTPUT_DIR, f"{config.EXPERIMENT_NAME}_best.pth")
         if os.path.exists(best_path):

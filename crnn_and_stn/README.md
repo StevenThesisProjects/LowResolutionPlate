@@ -1,117 +1,138 @@
-# Baseline 1: Multi-Frame CRNN + STN
+# LowResolutionPlate OCR Project
 
-Trích xuất từ [MultiFrame-LPR-main](../MultiFrame-LPR-main/) — chỉ giữ phần **Baseline 1** (CRNN + STN), bỏ ResTran (Baseline 2).
+Project OCR biển số cho dataset ICPR 2026 LRLPR, tập trung vào pipeline **CRNN + STN + CTC** và bản nâng cấp backbone **ResBlock kiểu Super-Resolution** để cải thiện độ ổn định khi train trên dữ liệu low-resolution, 5-frame.
 
-Chạy trên dataset ICPR 2026 LRLPR trong thư mục `dataset/`.
+## Mục tiêu chính
 
-## Cấu trúc project
+- Giữ nguyên luồng OCR chuẩn: `STN → Backbone → Attention Fusion → BiLSTM → CTC`.
+- Tăng khả năng giữ chi tiết ký tự nhỏ bằng backbone ResBlock không BatchNorm, có residual scaling nhỏ.
+- Hỗ trợ train dài hơn, batch lớn hơn, gradient accumulation và early stopping theo exact match.
+- Cung cấp preset CLI để chạy nhanh các cấu hình `debug`, `stable`, `strong`.
 
-```
+## Những gì đã được nâng cấp
+
+- **`src/models/components.py`**
+  - Thêm backbone ResBlock OCR-friendly.
+  - Hỗ trợ `res_scale` và `Squeeze-Excitation` tùy chọn.
+  - Giữ feature map ổn định cho chuỗi 5 frame.
+
+- **`src/models/crnn.py`**
+  - Gắn backbone mới vào `MultiFrameCRNN`.
+  - Giữ nguyên STN, attention fusion, BiLSTM và CTC head.
+
+- **`src/training/trainer.py`**
+  - Warmup + cosine decay.
+  - Gradient accumulation.
+  - AMP + gradient clipping.
+  - Early stopping và checkpoint theo validation exact match.
+
+- **`train.py`**
+  - Thêm preset `debug`, `stable`, `strong`.
+  - Cho phép override backbone và tham số train ngay trên CLI.
+  - Hỗ trợ `--submission-mode` để train full data và tạo file dự đoán.
+
+- **`configs/config.py`**
+  - Bổ sung các tham số backbone và training ổn định hơn.
+
+- **`src/utils/common.py`** và **`src/utils/postprocess.py`**
+  - Làm rõ seed/reproducibility.
+  - Bổ sung normalize text, edit distance, CER, exact match và decode utilities.
+
+## Cấu trúc thư mục chính
+
+```text
 crnn_and_stn/
-├── train.py                    # Entry point — chạy train/inference
-├── configs/config.py           # Hyperparameters (report Trang 48)
+├── train.py
+├── configs/
+│   └── config.py
 ├── src/
 │   ├── models/
-│   │   ├── crnn.py             # MultiFrameCRNN — pipeline chính
-│   │   └── components.py       # STNBlock, CNNBackbone, AttentionFusion
-│   ├── data/
-│   │   ├── dataset.py          # Load 5 frame/track, synthetic LR
-│   │   └── transforms.py       # Augmentation + degradation
+│   │   ├── components.py
+│   │   └── crnn.py
 │   ├── training/
-│   │   └── trainer.py          # CTC loss, train/val loop
+│   │   └── trainer.py
 │   └── utils/
-│       ├── postprocess.py      # CTC decode + confidence
-│       └── common.py           # seed_everything
-├── dataset/                    # Dữ liệu ICPR LRLPR
-├── results/                    # Checkpoint + submission (tự tạo khi train)
-└── summary/                    # Tài liệu phân tích
+│       ├── common.py
+│       └── postprocess.py
+└── summary/
+    ├── resblock_ocr_upgrade_report.md
+    └── run_gpu.md
 ```
 
-## Pipeline model
+## Cách chạy nhanh
 
-```
-5 LR frames [B, 5, 3, 32, 128]
-    → STN Block          (căn chỉnh affine từng frame)
-    → CNN Backbone       (weight sharing — cùng CNN cho 5 frame)
-    → Attention Fusion   (gộp 5 feature map → 1)
-    → BiLSTM (2 layer)   (mô hình chuỗi)
-    → FC + CTC           (decode → "BAI8068")
-```
-
-## Cài đặt
-
-### Cách A — EZYCLOUDX template PyTorch (khuyến nghị, dễ nhất)
-
-Xem hướng dẫn đầy đủ: **[`summary/pytorch_template_run.md`](summary/pytorch_template_run.md)**
+### 1. Chạy preset ổn định
 
 ```bash
-# Trên container (torch CUDA có sẵn):
-pip install albumentations opencv-python tqdm numpy
-python train.py --experiment-name crnn_stn_pytorch --num-workers 8
+python crnn_and_stn/train.py --preset stable
 ```
 
-### Cách B — nvidia/cuda + uv (reproduce chuẩn hơn)
-
-Xem: [`summary/uv_setup.md`](summary/uv_setup.md)
+### 2. Chạy preset mạnh hơn
 
 ```bash
-uv python pin 3.11 && uv sync && uv run python train.py
+python crnn_and_stn/train.py --preset strong
 ```
 
-## Chạy training
+### 3. Chạy debug nhanh
 
 ```bash
-# CRNN + STN (mặc định — Baseline 1)
-uv run python train.py
-
-# Ablation tự động: CRNN vs CRNN+STN
-python run_ablation.py
-
-# Hoặc chạy thủ công
-python train.py --no-stn
-
-# Tùy chỉnh
-python train.py \
-    --experiment-name my_run \
-    --epochs 30 \
-    --batch-size 64 \
-    --lr 0.0005 \
-    --aug-level full
-
-# Train toàn bộ data + tạo submission test public
-python train.py --submission-mode
+python crnn_and_stn/train.py --preset debug
 ```
 
-## Kết quả mong đợi (report Trang 50)
+### 4. Custom backbone
 
-| Model          | Accuracy   |
-| -------------- | ---------- |
-| CRNN           | 74.45%     |
-| **CRNN + STN** | **77.00%** |
+```bash
+python crnn_and_stn/train.py \
+  --experiment-name crnn_resblock_custom \
+  --batch-size 64 \
+  --epochs 100 \
+  --lr 0.0006 \
+  --backbone-base-channels 64 \
+  --backbone-blocks 2,2,3,3,4 \
+  --backbone-stage-channels 64,128,256,256,512 \
+  --backbone-res-scale 0.08 \
+  --fusion-dropout 0.05 \
+  --frame-dropout 0.08
+```
 
-## Output
+### 5. Train full data và xuất submission
 
-Sau khi train, trong `results/`:
+```bash
+python crnn_and_stn/train.py \
+  --submission-mode \
+  --preset strong \
+  --experiment-name crnn_resblock_submission
+```
 
-| File                               | Mô tả                                          |
-| ---------------------------------- | ---------------------------------------------- |
-| `crnn_stn_baseline_best.pth`       | Checkpoint tốt nhất (theo val acc)             |
-| `submission_crnn_stn_baseline.txt` | Dự đoán validation: `track_id,text;confidence` |
+## Ý nghĩa của các preset
 
-## Mapping từ MultiFrame-LPR-main
+- **`debug`**: chạy rất nhanh để kiểm tra pipeline.
+- **`stable`**: cấu hình an toàn, phù hợp cho training chính.
+- **`strong`**: train lâu hơn, sâu hơn, hiệu quả hơn khi có đủ tài nguyên.
 
-| File gốc                   | File trích xuất            | Ghi chú                                          |
-| -------------------------- | -------------------------- | ------------------------------------------------ |
-| `src/models/crnn.py`       | `src/models/crnn.py`       | Giữ nguyên, thêm comment                         |
-| `src/models/components.py` | `src/models/components.py` | Chỉ STN, CNN, Attention (bỏ ResNet, Transformer) |
-| `src/data/dataset.py`      | `src/data/dataset.py`      | + strip label, comment tiếng Việt                |
-| `src/data/transforms.py`   | `src/data/transforms.py`   | Giữ nguyên                                       |
-| `src/training/trainer.py`  | `src/training/trainer.py`  | Giữ nguyên                                       |
-| `src/utils/postprocess.py` | `src/utils/postprocess.py` | Giữ nguyên                                       |
-| `src/utils/common.py`      | `src/utils/common.py`      | Giữ nguyên                                       |
-| `configs/config.py`        | `configs/config.py`        | Chỉ CRNN, path → `dataset/`                      |
-| `train.py`                 | `train.py`                 | Bỏ ResTran, đơn giản hóa                         |
-| `src/models/restran.py`    | ❌ Không trích             | Baseline 2                                       |
-| `run_ablation.py`          | `run_ablation.py`          | Chỉ 2 exp CRNN (bỏ ResTran)                      |
+## Vì sao dùng ResBlock kiểu Super-Resolution
 
-Chi tiết: xem `summary/extraction_guide.md`
+Ảnh biển số low-resolution thường mất nhiều chi tiết nhỏ. Backbone ResBlock không BatchNorm giúp:
+
+- giữ biên và nét ký tự tốt hơn,
+- ổn định hơn khi batch nhỏ,
+- phù hợp với train dài và dữ liệu nhiều nhiễu,
+- kết hợp tốt với STN và attention fusion trong pipeline 5-frame.
+
+## Kết quả kỳ vọng
+
+Sau nâng cấp này, mô hình kỳ vọng:
+
+- exact match tốt hơn trên track khó,
+- train ổn định hơn khi dùng batch lớn hoặc gradient accumulation,
+- dễ ablation hơn khi cần tắt STN hoặc SE,
+- có cấu hình rõ ràng để tái lập kết quả.
+
+## Tài liệu bổ sung
+
+- `crnn_and_stn/summary/resblock_ocr_upgrade_report.md`
+- `crnn_and_stn/summary/run_gpu.md`
+
+## Ghi chú
+
+Repo này là nhánh OCR chuyên cho bài toán biển số low-resolution, nên ưu tiên các quyết định thiết kế giúp tăng độ chính xác và độ ổn định hơn là tối ưu cho mô hình quá nhỏ.

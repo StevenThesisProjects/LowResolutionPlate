@@ -1,4 +1,7 @@
-"""Tiện ích dùng chung."""
+"""Utility helpers shared across the OCR training pipeline."""
+
+from __future__ import annotations
+
 import os
 import random
 
@@ -6,8 +9,14 @@ import numpy as np
 import torch
 
 
-def seed_everything(seed: int = 42, benchmark: bool = False) -> None:
-    """Đặt seed cho reproducibility (report: seed=42)."""
+def seed_everything(seed: int, benchmark: bool = False) -> None:
+    """Seed Python, NumPy, and PyTorch for repeatable OCR experiments.
+
+    The optional `benchmark` flag keeps the previous project behavior: enabling
+    cuDNN benchmark can improve speed, while disabling it makes runs more
+    deterministic.
+    """
+
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -16,10 +25,10 @@ def seed_everything(seed: int = 42, benchmark: bool = False) -> None:
     torch.cuda.manual_seed_all(seed)
 
     if benchmark:
-        print("⚡ CUDNN benchmark ON (nhanh hơn, ít reproducible hơn).")
+        # Faster convolutions, but slightly less reproducible across runs.
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
     else:
-        print("🔒 Deterministic mode ON (reproducible, seed=42).")
+        # Better reproducibility, useful for ablation and debugging.
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
