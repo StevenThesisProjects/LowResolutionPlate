@@ -169,5 +169,8 @@ Nâng cấp pipeline OCR biển số từ **CRNN + STN** sang **CRNN + STN với
 
 ## Liên kết issues liên quan
 - Issue/PR gốc: 
-- PR liên quan (nếu có): 
+- PR liên quan (nếu có):
+
+<img width="1604" height="174" alt="image" src="https://github.com/user-attachments/assets/f6ecc217-01c9-4431-95fd-700ced668673" />
+
 
