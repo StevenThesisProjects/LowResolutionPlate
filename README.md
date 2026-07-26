@@ -1,176 +1,20 @@
-# LowResolutionPlate OCR Project
+## J1. Đối chứng GroupNorm — KHÔNG SR. CHẠY TRƯỚC J2.
+## Bắt buộc: I-b cho thấy GroupNorm TỰ NÓ cải thiện hội tụ. Bỏ qua bước này thì nếu J2
+## vượt 76.68% sẽ KHÔNG THỂ biết công lao thuộc về SR hay GroupNorm.
+## => 76.88% (best epoch 60/80, early stop epoch 78). +0.20 so với baseline 76.68%.
+## GPU: RTX 4090, 1:31/epoch (nhanh ~5.9x so với V100 8:55/epoch).
+python train.py \
+ --preset stable \
+ --experiment-name crnn_resblock_groupnorm_nosr \
+ --backbone-norm group \
+ --num-workers 8 --aug-level full
 
-Project OCR biển số cho dataset ICPR 2026 LRLPR, tập trung vào pipeline **CRNN + STN + CTC** và bản nâng cấp backbone **ResBlock kiểu Super-Resolution** để cải thiện độ ổn định khi train trên dữ liệu low-resolution, 5-frame.
 
-## Mục tiêu chính
-
-- Giữ nguyên luồng OCR chuẩn: `STN → Backbone → Attention Fusion → BiLSTM → CTC`.
-- Tăng khả năng giữ chi tiết ký tự nhỏ bằng backbone ResBlock không BatchNorm, có residual scaling nhỏ.
-- Hỗ trợ train dài hơn, batch lớn hơn, gradient accumulation và early stopping theo exact match.
-- Cung cấp preset CLI để chạy nhanh các cấu hình `debug`, `stable`, `strong`.
-
-## Những gì đã được nâng cấp
-
-- **`src/models/components.py`**
-  - Thêm backbone ResBlock OCR-friendly.
-  - Hỗ trợ `res_scale` và `Squeeze-Excitation` tùy chọn.
-  - Giữ feature map ổn định cho chuỗi 5 frame.
-
-- **`src/models/crnn.py`**
-  - Gắn backbone mới vào `MultiFrameCRNN`.
-  - Giữ nguyên STN, attention fusion, BiLSTM và CTC head.
-
-- **`src/training/trainer.py`**
-  - Warmup + cosine decay.
-  - Gradient accumulation.
-  - AMP + gradient clipping.
-  - Early stopping và checkpoint theo validation exact match.
-
-- **`train.py`**
-  - Thêm preset `debug`, `stable`, `strong`.
-  - Cho phép override backbone và tham số train ngay trên CLI.
-  - Hỗ trợ `--submission-mode` để train full data và tạo file dự đoán.
-
-- **`configs/config.py`**
-  - Bổ sung các tham số backbone và training ổn định hơn.
-
-- **`src/utils/common.py`** và **`src/utils/postprocess.py`**
-  - Làm rõ seed/reproducibility.
-  - Bổ sung normalize text, edit distance, CER, exact match và decode utilities.
-
-## Cấu trúc thư mục chính
-
-```text
-crnn_and_stn/
-├── train.py
-├── configs/
-│   └── config.py
-├── src/
-│   ├── models/
-│   │   ├── components.py
-│   │   └── crnn.py
-│   ├── training/
-│   │   └── trainer.py
-│   └── utils/
-│       ├── common.py
-│       └── postprocess.py
-└── summary/
-    ├── resblock_ocr_upgrade_report.md
-    └── run_gpu.md
-```
-
-## Cách chạy nhanh
-
-### 1. Chạy preset ổn định
-
-```bash
-python crnn_and_stn/train.py --preset stable
-```
-
-### 2. Chạy preset mạnh hơn
-
-```bash
-python crnn_and_stn/train.py --preset strong
-```
-
-### 3. Chạy debug nhanh
-
-```bash
-python crnn_and_stn/train.py --preset debug
-```
-
-### 4. Custom backbone
-
-```bash
-python crnn_and_stn/train.py \
-  --experiment-name crnn_resblock_custom \
-  --batch-size 64 \
-  --epochs 100 \
-  --lr 0.0006 \
-  --backbone-base-channels 64 \
-  --backbone-blocks 2,2,3,3,4 \
-  --backbone-stage-channels 64,128,256,256,512 \
-  --backbone-res-scale 0.08 \
-  --fusion-dropout 0.05 \
-  --frame-dropout 0.08
-```
-
-### 5. Train full data và xuất submission
-
-```bash
-python crnn_and_stn/train.py \
-  --submission-mode \
-  --preset strong \
-  --experiment-name crnn_resblock_submission
-```
-
-## Ý nghĩa của các preset
-
-- **`debug`**: chạy rất nhanh để kiểm tra pipeline.
-- **`stable`**: cấu hình an toàn, phù hợp cho training chính.
-- **`strong`**: train lâu hơn, sâu hơn, hiệu quả hơn khi có đủ tài nguyên.
-
-## Vì sao dùng ResBlock kiểu Super-Resolution
-
-Ảnh biển số low-resolution thường mất nhiều chi tiết nhỏ. Backbone ResBlock không BatchNorm giúp:
-
-- giữ biên và nét ký tự tốt hơn,
-- ổn định hơn khi batch nhỏ,
-- phù hợp với train dài và dữ liệu nhiều nhiễu,
-- kết hợp tốt với STN và attention fusion trong pipeline 5-frame.
-
-## Kết quả kỳ vọng
-
-Sau nâng cấp này, mô hình kỳ vọng:
-
-- exact match tốt hơn trên track khó,
-- train ổn định hơn khi dùng batch lớn hoặc gradient accumulation,
-- dễ ablation hơn khi cần tắt STN hoặc SE,
-- có cấu hình rõ ràng để tái lập kết quả.
-
-## Tài liệu bổ sung
-
-- `crnn_and_stn/summary/resblock_ocr_upgrade_report.md`
-- `crnn_and_stn/summary/run_gpu.md`
-
-## Ghi chú
-
-Repo này là nhánh OCR chuyên cho bài toán biển số low-resolution, nên ưu tiên các quyết định thiết kế giúp tăng độ chính xác và độ ổn định hơn là tối ưu cho mô hình quá nhỏ.
-
-## Phân loại PR
-- [ ] Feature
-- [ ] Bugs
-- [ ] Hotfix
-
-## Mô tả ngắn
-Nâng cấp pipeline OCR biển số từ **CRNN + STN** sang **CRNN + STN với backbone ResBlock kiểu Super-Resolution** để tăng độ ổn định khi train và cải thiện khả năng giữ chi tiết trên ảnh low-resolution, 5-frame.
-
-## Đối chiếu tính năng đã làm theo yêu cầu
-- [x] Rà soát và nâng cấp backbone ResBlock theo hướng OCR-friendly
-- [x] Gắn backbone mới vào `MultiFrameCRNN` nhưng giữ nguyên luồng STN + attention fusion + BiLSTM + CTC
-- [x] Mở rộng CLI `train.py` với preset train mạnh, batch/epochs/grad accumulation và override backbone
-- [x] Tinh chỉnh `trainer.py` để train dài ổn định hơn, có warmup, min LR, clipping, early stopping, best checkpoint theo exact match
-- [x] Cập nhật `README.md` và summary/report để hướng dẫn sử dụng
-
-## Cách thực hiện
-- `src/models/components.py`: thêm `ResidualBlock`, `ResBackbone`, residual scaling và optional SE.
-- `src/models/crnn.py`: thay backbone CNN cũ bằng backbone ResBlock, giữ nguyên STN → fusion → BiLSTM → CTC.
-- `train.py`: thêm preset `debug` / `stable` / `strong`, hỗ trợ override backbone và tham số train từ CLI.
-- `src/training/trainer.py`: bổ sung warmup + cosine decay, gradient accumulation, clipping, early stopping, checkpoint theo exact match.
-- `src/utils/common.py` và `src/utils/postprocess.py`: làm rõ seed, normalize text, CER, exact match và decode helpers.
-
-## Phạm vi ảnh hưởng
-- Ảnh hưởng tới toàn bộ luồng train/eval/inference của OCR.
-- Có thể tác động đến tốc độ train, VRAM sử dụng và chất lượng exact match tùy preset backbone.
-
-## Kiểm tra
-- [x] Đã đọc lint sau khi chỉnh sửa.
-- [x] Không tạo lỗi cú pháp/IDE diagnostics trong các file đã thay đổi.
-
-## Liên kết issues liên quan
-- Issue/PR gốc: 
-- PR liên quan (nếu có):
-
-<img width="1604" height="174" alt="image" src="https://github.com/user-attachments/assets/f6ecc217-01c9-4431-95fd-700ced668673" />
+ <img width="1158" height="694" alt="image" src="https://github.com/user-attachments/assets/54a2759e-2e69-4290-ad14-b0ee3e7b1566" />
+<img width="1141" height="740" alt="image" src="https://github.com/user-attachments/assets/ed483bb3-e794-480c-857c-89e6a6b2e966" />
+<img width="1188" height="788" alt="image" src="https://github.com/user-attachments/assets/4c058dd4-c7bc-4ed1-9ebb-37b796f4dbfe" />
+<img width="1133" height="805" alt="image" src="https://github.com/user-attachments/assets/9464a457-046a-4dc0-8ec9-da93252c64f7" />
+<img width="1133" height="791" alt="image" src="https://github.com/user-attachments/assets/60446406-285f-435c-9c17-e89bf4aaf846" />
+<img width="1140" height="165" alt="image" src="https://github.com/user-attachments/assets/8b2b3855-5fc2-45f1-9f61-c69dee36f217" />
 
 
