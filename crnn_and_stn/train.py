@@ -55,6 +55,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backbone-blocks", type=_parse_int_tuple, default=None, help="Comma-separated stage block counts, e.g. 2,2,3,3,4")
     parser.add_argument("--backbone-stage-channels", type=_parse_int_tuple, default=None, help="Comma-separated stage channels, e.g. 64,128,256,256,512")
     parser.add_argument("--backbone-res-scale", type=float, default=None)
+    parser.add_argument(
+        "--backbone-norm", choices=["none", "group"], default=None,
+        help="'group' thêm GroupNorm thay BatchNorm đã bỏ — khuyến nghị khi bật --use-sr",
+    )
     parser.add_argument("--frame-dropout", type=float, default=None)
     parser.add_argument("--fusion-dropout", type=float, default=None)
     parser.add_argument("--grad-clip", type=float, default=None)
@@ -159,6 +163,7 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         "backbone_base_channels": "BACKBONE_BASE_CHANNELS",
         "backbone_channels": "BACKBONE_CHANNELS",
         "backbone_res_scale": "BACKBONE_RES_SCALE",
+        "backbone_norm": "BACKBONE_NORM",
         "frame_dropout": "FRAME_DROPOUT",
         "fusion_dropout": "FUSION_DROPOUT",
         "sr_scale": "SR_SCALE",
@@ -229,7 +234,7 @@ def main() -> None:
     print(f"AMP        : {config.USE_AMP} | Grad Accum: {config.GRAD_ACCUM_STEPS}")
     print(f"Device     : {config.DEVICE}")
     print(f"Submission : {args.submission_mode}")
-    print(f"Backbone   : base={config.BACKBONE_BASE_CHANNELS}, blocks={config.BACKBONE_STAGE_BLOCKS}, channels={config.BACKBONE_STAGE_CHANNELS}, res_scale={config.BACKBONE_RES_SCALE}")
+    print(f"Backbone   : base={config.BACKBONE_BASE_CHANNELS}, blocks={config.BACKBONE_STAGE_BLOCKS}, channels={config.BACKBONE_STAGE_CHANNELS}, res_scale={config.BACKBONE_RES_SCALE}, norm={config.BACKBONE_NORM}")
     print("=" * 72)
 
     if not os.path.exists(config.DATA_ROOT):
@@ -332,6 +337,7 @@ def main() -> None:
         sr_hidden_channels=config.SR_HIDDEN_CHANNELS,
         sr_num_blocks=config.SR_NUM_BLOCKS,
         sr_res_scale=config.SR_RES_SCALE,
+        backbone_norm=config.BACKBONE_NORM,
     ).to(config.DEVICE)
 
     total_params = sum(p.numel() for p in model.parameters())

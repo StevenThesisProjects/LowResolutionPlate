@@ -52,6 +52,9 @@ class Config:
     BACKBONE_STAGE_CHANNELS: Tuple[int, ...] = (64, 128, 256, 256, 512)
     BACKBONE_USE_SE: bool = True
     BACKBONE_RES_SCALE: float = 0.1
+    # "none" giữ đúng backbone ResBlock cũ (mốc 76.68%); "group" thêm GroupNorm
+    # thay cho BatchNorm đã bỏ — cần khi bật SR, nếu không gradient bùng nổ -> NaN.
+    BACKBONE_NORM: str = "none"
     FRAME_DROPOUT: float = 0.05
     FUSION_DROPOUT: float = 0.05
     LABEL_SMOOTHING: float = 0.0

@@ -64,6 +64,7 @@ class MultiFrameCRNN(nn.Module):
         sr_hidden_channels: int = 32,
         sr_num_blocks: int = 4,
         sr_res_scale: float = 0.1,
+        backbone_norm: str = "none",
     ) -> None:
         super().__init__()
         self.use_stn = use_stn
@@ -89,6 +90,7 @@ class MultiFrameCRNN(nn.Module):
                 num_blocks=sr_num_blocks,
                 scale=sr_scale,
                 res_scale=sr_res_scale,
+                norm=backbone_norm,
             )
 
         self.backbone = CNNBackbone(
@@ -98,6 +100,7 @@ class MultiFrameCRNN(nn.Module):
             stage_channels=stage_channels,
             res_scale=residual_scale,
             use_se=use_se,
+            norm=backbone_norm,
         )
 
         self.fusion = AttentionFusion(channels=self.cnn_channels, dropout=fusion_dropout)

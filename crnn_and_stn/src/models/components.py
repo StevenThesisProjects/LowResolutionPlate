@@ -37,12 +37,31 @@ class SqueezeExcitation(nn.Module):
         return x * scale
 
 
+def make_norm(norm: str, channels: int, groups: int = 8) -> nn.Module:
+    """Normalization factory for the backbone.
+
+    EDSR drops BatchNorm because BN clamps the dynamic range an SR decoder
+    needs to reconstruct RGB. That argument does not carry over to an OCR
+    backbone, whose output is a high-dimensional feature sequence feeding a
+    BiLSTM: with no normalization at all the feature scale drifts and the
+    gradients blow up (observed as NaN once the SR head doubles the spatial
+    size). GroupNorm restores stability without BatchNorm's small-batch
+    problems, since it normalizes per-sample.
+    """
+    if norm == "none":
+        return nn.Identity()
+    if norm == "group":
+        return nn.GroupNorm(num_groups=min(groups, channels), num_channels=channels)
+    raise ValueError(f"Unknown norm type: {norm!r} (expected 'none' or 'group')")
+
+
 class ResidualBlock(nn.Module):
-    """Residual block without BatchNorm for stable OCR feature learning.
+    """Residual block with optional GroupNorm for stable OCR feature learning.
 
     BatchNorm is often less suitable for OCR with small batches and repeated
     frame fusion, so this block uses plain convolutions + PReLU and a small
-    residual scale to keep updates well-behaved.
+    residual scale to keep updates well-behaved. `norm="group"` adds GroupNorm
+    back as the normalization that BatchNorm's removal left missing.
     """
 
     def __init__(
@@ -51,20 +70,25 @@ class ResidualBlock(nn.Module):
         expansion: int = 1,
         res_scale: float = 0.1,
         use_se: bool = False,
+        norm: str = "none",
     ) -> None:
         super().__init__()
         mid_channels = channels * expansion
         self.conv1 = nn.Conv2d(channels, mid_channels, kernel_size=3, padding=1, bias=True)
+        self.norm1 = make_norm(norm, mid_channels)
         self.act = nn.PReLU(mid_channels)
         self.conv2 = nn.Conv2d(mid_channels, channels, kernel_size=3, padding=1, bias=True)
+        self.norm2 = make_norm(norm, channels)
         self.res_scale = res_scale
         self.attn = SqueezeExcitation(channels) if use_se else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
         out = self.conv1(x)
+        out = self.norm1(out)
         out = self.act(out)
         out = self.conv2(out)
+        out = self.norm2(out)
         out = self.attn(out)
         # Residual scaling lowers the risk of feature explosion when the model
         # is trained for longer schedules or with a stronger backbone preset.
@@ -87,6 +111,7 @@ class ResBackbone(nn.Module):
         stage_channels: Sequence[int] = (64, 128, 256, 256, 512),
         res_scale: float = 0.1,
         use_se: bool = False,
+        norm: str = "none",
     ) -> None:
         super().__init__()
         if len(stage_blocks) != len(stage_channels):
@@ -112,7 +137,7 @@ class ResBackbone(nn.Module):
                 stage_layers.append(nn.Conv2d(in_ch, out_ch, kernel_size=1, bias=True))
                 stage_layers.append(nn.PReLU(out_ch))
             stage_layers.extend(
-                ResidualBlock(out_ch, res_scale=res_scale, use_se=use_se)
+                ResidualBlock(out_ch, res_scale=res_scale, use_se=use_se, norm=norm)
                 for _ in range(num_blocks)
             )
             if idx < len(downsample_strides):
@@ -120,6 +145,7 @@ class ResBackbone(nn.Module):
                 stage_layers.append(
                     nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=stride, padding=1, bias=True)
                 )
+                stage_layers.append(make_norm(norm, out_ch))
                 stage_layers.append(nn.PReLU(out_ch))
             in_ch = out_ch
             stages.append(nn.Sequential(*stage_layers))
@@ -130,8 +156,9 @@ class ResBackbone(nn.Module):
         # Final refinement gives the head a cleaner and more expressive feature
         # map before it is converted into a sequence.
         self.output_refine = nn.Sequential(
-            ResidualBlock(self.output_channels, res_scale=res_scale, use_se=use_se),
+            ResidualBlock(self.output_channels, res_scale=res_scale, use_se=use_se, norm=norm),
             nn.Conv2d(self.output_channels, self.output_channels, kernel_size=3, padding=1, bias=True),
+            make_norm(norm, self.output_channels),
             nn.PReLU(self.output_channels),
         )
 
@@ -193,13 +220,14 @@ class FrameSR(nn.Module):
         num_blocks: int = 4,
         scale: int = 2,
         res_scale: float = 0.1,
+        norm: str = "none",
     ) -> None:
         super().__init__()
         self.scale = scale
         self.head = nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1, bias=True)
         self.head_act = nn.PReLU(hidden_channels)
         self.body = nn.Sequential(
-            *[ResidualBlock(hidden_channels, res_scale=res_scale) for _ in range(num_blocks)]
+            *[ResidualBlock(hidden_channels, res_scale=res_scale, norm=norm) for _ in range(num_blocks)]
         )
         self.upsample = nn.Sequential(
             nn.Conv2d(hidden_channels, hidden_channels * scale * scale, kernel_size=3, padding=1, bias=True),

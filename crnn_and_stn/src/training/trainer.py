@@ -117,6 +117,7 @@ class Trainer:
         self.current_epoch = 0
         self.no_improve_epochs = 0
         self.global_step = 0
+        self.nan_batches = 0
 
     def _output_path(self, filename: str) -> str:
         os.makedirs(self.config.OUTPUT_DIR, exist_ok=True)
@@ -149,6 +150,8 @@ class Trainer:
         """Train 1 epoch — forward → CTC loss (+ SR loss nếu use_sr) → backward."""
         self.model.train()
         epoch_loss = 0.0
+        num_valid_steps = 0
+        self.nan_batches = 0
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1}/{self.config.EPOCHS}")
         self.optimizer.zero_grad(set_to_none=True)
 
@@ -170,12 +173,27 @@ class Trainer:
                 input_lengths = torch.full(
                     (images.size(0),), preds.size(1), dtype=torch.long, device=self.device
                 )
-                ctc_loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
+                # CTC is numerically fragile in fp16: the forward-backward pass
+                # accumulates over T timesteps and underflows, which shows up as
+                # NaN once T doubles (SR upscales the input). Always run it in
+                # fp32 regardless of the surrounding autocast region.
+                with autocast("cuda", enabled=False):
+                    ctc_loss = self.criterion(
+                        preds_permuted.float(), targets, input_lengths, target_lengths
+                    )
                 loss = ctc_loss
                 if self.use_sr:
                     sr_loss = self._sr_loss(sr_output, hr_targets, has_hr)
                     loss = loss + self.lambda_sr * sr_loss
                 loss = loss / self.grad_accum_steps
+
+            # A single bad batch would otherwise poison the epoch average and
+            # hide the fact that everything else trained fine.
+            if not torch.isfinite(loss):
+                self.nan_batches += 1
+                self.optimizer.zero_grad(set_to_none=True)
+                pbar.set_postfix(loss="skipped(nan)", nan=self.nan_batches)
+                continue
 
             self.scaler.scale(loss).backward()
             should_step = (step_idx % self.grad_accum_steps == 0) or (step_idx == len(self.train_loader))
@@ -183,13 +201,21 @@ class Trainer:
                 self._optimizer_step()
 
             epoch_loss += loss.item() * self.grad_accum_steps
+            num_valid_steps += 1
             current_lr = self.scheduler.get_last_lr()[0] if self.scheduler.get_last_lr() else self.config.LEARNING_RATE
             postfix = {"loss": f'{loss.item() * self.grad_accum_steps:.4f}', "lr": f"{current_lr:.2e}"}
             if self.use_sr:
                 postfix["sr"] = f"{sr_loss.item():.4f}"
+            if self.nan_batches:
+                postfix["nan"] = self.nan_batches
             pbar.set_postfix(**postfix)
 
-        return epoch_loss / len(self.train_loader)
+        if num_valid_steps == 0:
+            print("❌ Toàn bộ batch trong epoch đều NaN — training không tiến triển được.")
+            return float("nan")
+        if self.nan_batches:
+            print(f"⚠️ Bỏ qua {self.nan_batches} batch NaN trong epoch này.")
+        return epoch_loss / num_valid_steps
 
     def validate(self) -> Tuple[Dict[str, float], List[str]]:
         """
@@ -215,7 +241,7 @@ class Trainer:
 
                 input_lengths = torch.full((images.size(0),), preds.size(1), dtype=torch.long, device=self.device)
                 loss = self.criterion(
-                    preds.permute(1, 0, 2), targets, input_lengths, target_lengths
+                    preds.permute(1, 0, 2).float(), targets, input_lengths, target_lengths
                 )
                 val_loss += loss.item()
 
