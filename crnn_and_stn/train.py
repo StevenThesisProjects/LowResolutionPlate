@@ -76,6 +76,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sr-res-scale", type=float, default=None)
     parser.add_argument("--lambda-sr", type=float, default=None, help="Trọng số L_SR trong L_CTC + lambda*L_SR")
     parser.add_argument("--sr-edge-weight", type=float, default=None)
+    parser.add_argument("--sr-perceptual-weight", type=float, default=None, help=">0 bật perceptual loss VGG16")
+    parser.add_argument("--use-dcn", action="store_true", help="Bật DCNv2 alignment giữa các frame (Step 2)")
+    parser.add_argument("--dcn-hidden-channels", type=int, default=None)
+    parser.add_argument("--fusion-mode", choices=["attention", "avg", "max"], default=None, help="Ablation 2")
+    parser.add_argument("--num-frames", type=int, default=None, help="Ablation 3: số frame/track (1-5)")
+    parser.add_argument("--img-height", type=int, default=None, help="Ablation 4: chiều cao ảnh vào model")
+    parser.add_argument("--img-width", type=int, default=None, help="Ablation 4: chiều rộng ảnh vào model")
+    parser.add_argument("--lr-domain-match", action="store_true",
+                        help="Degrade HR ở đúng cỡ LR gốc trước resize (sửa Nguyên nhân #4)")
     parser.add_argument("--no-stn", action="store_true")
     parser.add_argument("--no-se", action="store_true")
     parser.add_argument("--no-amp", action="store_true")
@@ -172,6 +181,12 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         "sr_res_scale": "SR_RES_SCALE",
         "lambda_sr": "LAMBDA_SR",
         "sr_edge_weight": "SR_EDGE_WEIGHT",
+        "sr_perceptual_weight": "SR_PERCEPTUAL_WEIGHT",
+        "dcn_hidden_channels": "DCN_HIDDEN_CHANNELS",
+        "fusion_mode": "FUSION_MODE",
+        "num_frames": "NUM_FRAMES",
+        "img_height": "IMG_HEIGHT",
+        "img_width": "IMG_WIDTH",
         "grad_clip": "GRAD_CLIP",
         "grad_accum_steps": "GRAD_ACCUM_STEPS",
         "label_smoothing": "LABEL_SMOOTHING",
@@ -195,6 +210,10 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         config.AUGMENTATION_LEVEL = args.aug_level
     if args.use_sr:
         config.USE_SR = True
+    if args.use_dcn:
+        config.USE_DCN = True
+    if args.lr_domain_match:
+        config.LR_DOMAIN_MATCH = True
     if args.no_stn:
         config.USE_STN = False
         if args.experiment_name is None and args.preset is None:
@@ -228,7 +247,10 @@ def main() -> None:
     print(f"Preset     : {args.preset or 'custom'}")
     print(f"STN        : {config.USE_STN}")
     print(f"SE         : {config.BACKBONE_USE_SE}")
-    print(f"SR         : {config.USE_SR} (scale={config.SR_SCALE}, lambda_sr={config.LAMBDA_SR})")
+    print(f"SR         : {config.USE_SR} (scale={config.SR_SCALE}, lambda_sr={config.LAMBDA_SR}, "
+          f"edge={config.SR_EDGE_WEIGHT}, perceptual={config.SR_PERCEPTUAL_WEIGHT})")
+    print(f"DCN        : {config.USE_DCN} | Fusion: {config.FUSION_MODE} | Frames: {config.NUM_FRAMES}")
+    print(f"Image size : {config.IMG_HEIGHT}x{config.IMG_WIDTH} | LR domain match: {config.LR_DOMAIN_MATCH}")
     print(f"Data       : {config.DATA_ROOT}")
     print(f"Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
     print(f"AMP        : {config.USE_AMP} | Grad Accum: {config.GRAD_ACCUM_STEPS}")
@@ -249,6 +271,7 @@ def main() -> None:
         "val_split_file": config.VAL_SPLIT_FILE,
         "seed": config.SEED,
         "augmentation_level": config.AUGMENTATION_LEVEL,
+        "num_frames": config.NUM_FRAMES,
     }
 
     val_loader = None
@@ -261,6 +284,7 @@ def main() -> None:
             full_train=True,
             provide_sr_target=config.USE_SR,
             sr_scale=config.SR_SCALE,
+            lr_domain_match=config.LR_DOMAIN_MATCH,
             **ds_params,
         )
         if os.path.exists(config.TEST_DATA_ROOT):
@@ -271,6 +295,7 @@ def main() -> None:
                 img_width=config.IMG_WIDTH,
                 char2idx=config.CHAR2IDX,
                 is_test=True,
+                num_frames=config.NUM_FRAMES,
             )
             test_loader = DataLoader(
                 test_ds,
@@ -288,6 +313,7 @@ def main() -> None:
             mode="train",
             provide_sr_target=config.USE_SR,
             sr_scale=config.SR_SCALE,
+            lr_domain_match=config.LR_DOMAIN_MATCH,
             **ds_params,
         )
         # val_ds không cần HR target: validate() chỉ đo CTC/exact-match, không
@@ -338,6 +364,9 @@ def main() -> None:
         sr_num_blocks=config.SR_NUM_BLOCKS,
         sr_res_scale=config.SR_RES_SCALE,
         backbone_norm=config.BACKBONE_NORM,
+        use_dcn=config.USE_DCN,
+        dcn_hidden_channels=config.DCN_HIDDEN_CHANNELS,
+        fusion_mode=config.FUSION_MODE,
     ).to(config.DEVICE)
 
     total_params = sum(p.numel() for p in model.parameters())

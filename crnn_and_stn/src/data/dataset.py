@@ -47,6 +47,8 @@ class MultiFrameDataset(Dataset):
         full_train: bool = False,
         provide_sr_target: bool = False,
         sr_scale: int = 2,
+        lr_domain_match: bool = False,
+        num_frames: int = 5,
     ):
         """
         Args:
@@ -64,6 +66,9 @@ class MultiFrameDataset(Dataset):
                                   (chỉ dùng khi train với --use-sr; val/test giữ nguyên
                                   5-tuple cũ, không đổi hành vi)
             sr_scale            : Hệ số upscale của SR target (phải khớp model.sr_scale)
+            lr_domain_match     : True để degrade HR ở đúng cỡ LR gốc trước khi resize
+                                  (sửa Nguyên nhân #4 — domain gap synthetic/real LR)
+            num_frames          : Số frame dùng mỗi track (Ablation 3, mặc định 5 = toàn bộ)
         """
         self.mode = mode
         self.samples: List[Dict[str, Any]] = []
@@ -77,6 +82,8 @@ class MultiFrameDataset(Dataset):
         self.full_train = full_train
         self.provide_sr_target = provide_sr_target
         self.sr_scale = sr_scale
+        self.lr_domain_match = lr_domain_match
+        self.num_frames = num_frames
 
         # Chọn pipeline transform theo mode
         if mode == "train":
@@ -84,7 +91,7 @@ class MultiFrameDataset(Dataset):
                 self.transform = get_light_transforms(img_height, img_width)
             else:
                 self.transform = get_train_transforms(img_height, img_width)
-            self.degrade = get_degradation_transforms()
+            self.degrade = get_degradation_transforms(domain_match=lr_domain_match)
         else:
             self.transform = get_val_transforms(img_height, img_width)
             self.degrade = None
@@ -235,6 +242,19 @@ class MultiFrameDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
+    def _select_frames(self, paths: List[str]) -> List[str]:
+        """Chọn `num_frames` frame trải đều trong track (Ablation 3).
+
+        Trải đều thay vì lấy N frame đầu: với N=2 ta muốn frame đầu và cuối
+        (đa dạng nhất về góc/blur) chứ không phải 2 frame liên tiếp gần giống nhau.
+        """
+        if self.num_frames >= len(paths) or len(paths) == 0:
+            return paths
+        if self.num_frames == 1:
+            return [paths[len(paths) // 2]]  # frame giữa thường ổn định nhất
+        step = (len(paths) - 1) / (self.num_frames - 1)
+        return [paths[round(i * step)] for i in range(self.num_frames)]
+
     def __getitem__(self, idx: int):
         """
         Load 5 frame → tensor [5, 3, H, W].
@@ -256,8 +276,9 @@ class MultiFrameDataset(Dataset):
         images_list = []
         hr_list = [] if self.provide_sr_target else None
         has_hr_target = bool(self.provide_sr_target and item["is_synthetic"])
+        paths = self._select_frames(item["paths"])
 
-        for path in item["paths"]:
+        for path in paths:
             raw = cv2.imread(path, cv2.IMREAD_COLOR)
             raw = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
 
@@ -281,7 +302,7 @@ class MultiFrameDataset(Dataset):
                 hr_target = torch.stack(hr_list, dim=0)
             else:
                 hr_target = torch.zeros(
-                    len(item["paths"]), 3, self.img_height * self.sr_scale, self.img_width * self.sr_scale
+                    len(paths), 3, self.img_height * self.sr_scale, self.img_width * self.sr_scale
                 )
 
         if self.is_test:

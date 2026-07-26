@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.components import AttentionFusion, CNNBackbone, FrameSR, STNBlock
+from src.models.components import AttentionFusion, CNNBackbone, DCNAlignment, FrameSR, STNBlock
 
 
 def _normalize_stage_channels(
@@ -65,11 +65,15 @@ class MultiFrameCRNN(nn.Module):
         sr_num_blocks: int = 4,
         sr_res_scale: float = 0.1,
         backbone_norm: str = "none",
+        use_dcn: bool = False,
+        dcn_hidden_channels: int = 32,
+        fusion_mode: str = "attention",
     ) -> None:
         super().__init__()
         self.use_stn = use_stn
         self.frame_dropout = frame_dropout
         self.use_sr = use_sr
+        self.use_dcn = use_dcn
 
         stage_blocks = _normalize_stage_blocks(backbone_blocks)
         stage_channels = _normalize_stage_channels(backbone_channels, backbone_stage_channels)
@@ -79,6 +83,12 @@ class MultiFrameCRNN(nn.Module):
             # STN performs a light geometric normalization per frame before the
             # shared backbone extracts OCR features.
             self.stn = STNBlock(in_channels=3)
+
+        if self.use_dcn:
+            # Step 2 of the proposed pipeline: local (per-pixel) alignment across
+            # frames, catching the residual motion that STN's single affine warp
+            # per frame cannot express.
+            self.dcn = DCNAlignment(channels=3, hidden_channels=dcn_hidden_channels)
 
         if self.use_sr:
             # SR runs after STN (aligned frames are easier to upscale cleanly)
@@ -103,7 +113,9 @@ class MultiFrameCRNN(nn.Module):
             norm=backbone_norm,
         )
 
-        self.fusion = AttentionFusion(channels=self.cnn_channels, dropout=fusion_dropout)
+        self.fusion = AttentionFusion(
+            channels=self.cnn_channels, dropout=fusion_dropout, mode=fusion_mode
+        )
         self.rnn = nn.LSTM(
             input_size=self.cnn_channels,
             hidden_size=hidden_size,
@@ -139,8 +151,15 @@ class MultiFrameCRNN(nn.Module):
         batch_size, num_frames, channels, height, width = x.size()
         x_flat = x.view(batch_size * num_frames, channels, height, width)
 
+        # Step 1: global affine rectification, independently per frame.
         if self.use_stn:
             x_flat = self._apply_stn(x_flat)
+
+        # Step 2: local cross-frame alignment on the already-rectified frames.
+        if self.use_dcn:
+            x_flat = self.dcn(
+                x_flat.view(batch_size, num_frames, channels, height, width)
+            ).reshape(batch_size * num_frames, channels, height, width)
 
         sr_output = None
         if self.use_sr:

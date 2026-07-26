@@ -97,7 +97,8 @@ class Trainer:
         self.use_sr = bool(getattr(config, "USE_SR", False))
         self.lambda_sr = float(getattr(config, "LAMBDA_SR", 0.1))
         self.sr_loss_fn = SRPixelLoss(
-            edge_weight=float(getattr(config, "SR_EDGE_WEIGHT", 0.5))
+            edge_weight=float(getattr(config, "SR_EDGE_WEIGHT", 0.5)),
+            perceptual_weight=float(getattr(config, "SR_PERCEPTUAL_WEIGHT", 0.0)),
         ).to(self.device)
         self.optimizer = optim.AdamW(
             model.parameters(),
@@ -118,6 +119,7 @@ class Trainer:
         self.no_improve_epochs = 0
         self.global_step = 0
         self.nan_batches = 0
+        self.last_sr_loss = 0.0
 
     def _output_path(self, filename: str) -> str:
         os.makedirs(self.config.OUTPUT_DIR, exist_ok=True)
@@ -185,6 +187,7 @@ class Trainer:
                 if self.use_sr:
                     sr_loss = self._sr_loss(sr_output, hr_targets, has_hr)
                     loss = loss + self.lambda_sr * sr_loss
+                    self.last_sr_loss = sr_loss.item()
                 loss = loss / self.grad_accum_steps
 
             # A single bad batch would otherwise poison the epoch average and
@@ -255,6 +258,22 @@ class Trainer:
         val_acc = (total_correct / total_samples * 100) if total_samples > 0 else 0.0
         return {"loss": val_loss / len(self.val_loader), "acc": val_acc}, submission_data
 
+    def _log_epoch(self, epoch: int, train_loss: float, val_metrics: Dict[str, float], lr: float) -> None:
+        """Ghi lịch sử từng epoch ra CSV để vẽ training curve sau khi train xong.
+
+        Không có file này thì không thể vẽ lại đường cong hội tụ — mọi thứ chỉ
+        tồn tại trên stdout của phiên chạy và mất khi đóng terminal.
+        """
+        path = self._output_path(f"history_{self._exp_name()}.csv")
+        is_new = not os.path.exists(path) or epoch == 0
+        with open(path, "a") as handle:
+            if is_new:
+                handle.write("epoch,train_loss,val_loss,val_acc,lr,sr_loss,nan_batches\n")
+            handle.write(
+                f"{epoch + 1},{train_loss:.6f},{val_metrics['loss']:.6f},"
+                f"{val_metrics['acc']:.4f},{lr:.8f},{self.last_sr_loss:.6f},{self.nan_batches}\n"
+            )
+
     def save_model(self, path: str = None) -> None:
         if path is None:
             path = self._output_path(f"{self.config.EXPERIMENT_NAME}_best.pth")
@@ -286,6 +305,7 @@ class Trainer:
                 f"Val Acc: {val_metrics['acc']:.2f}% | "
                 f"LR: {current_lr:.2e}"
             )
+            self._log_epoch(epoch, train_loss, val_metrics, current_lr)
 
             improved = False
             if self.val_loader is not None and val_metrics["acc"] > self.best_acc:

@@ -175,17 +175,32 @@ class ResBackbone(nn.Module):
 
 
 class AttentionFusion(nn.Module):
-    """Fuse multiple frame features with learned frame attention."""
+    """Fuse multiple frame features.
 
-    def __init__(self, channels: int, hidden_ratio: int = 4, dropout: float = 0.0) -> None:
+    `mode` selects the fusion rule so Ablation 2 can compare them on equal
+    footing: "attention" learns per-frame reliability weights, while "avg" and
+    "max" are parameter-free baselines that ignore frame quality.
+    """
+
+    def __init__(
+        self,
+        channels: int,
+        hidden_ratio: int = 4,
+        dropout: float = 0.0,
+        mode: str = "attention",
+    ) -> None:
         super().__init__()
-        hidden = max(channels // hidden_ratio, 16)
-        self.scorer = nn.Sequential(
-            nn.Linear(channels, hidden),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(hidden, 1),
-        )
+        if mode not in {"attention", "avg", "max"}:
+            raise ValueError(f"Unknown fusion mode: {mode!r} (expected attention/avg/max)")
+        self.mode = mode
+        if mode == "attention":
+            hidden = max(channels // hidden_ratio, 16)
+            self.scorer = nn.Sequential(
+                nn.Linear(channels, hidden),
+                nn.ReLU(inplace=True),
+                nn.Dropout(dropout),
+                nn.Linear(hidden, 1),
+            )
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         # Accept a single feature map or a stack of frame features.
@@ -194,6 +209,11 @@ class AttentionFusion(nn.Module):
         if features.dim() != 5:
             raise ValueError(f"Expected 4D/5D tensor, got shape {tuple(features.shape)}")
 
+        if self.mode == "avg":
+            return features.mean(dim=1)
+        if self.mode == "max":
+            return features.max(dim=1).values
+
         batch_size, num_frames, channels, height, width = features.shape
         # Global pooling produces one descriptor per frame; the scorer then
         # learns which frames are most reliable for OCR decoding.
@@ -201,6 +221,72 @@ class AttentionFusion(nn.Module):
         scores = self.scorer(pooled).squeeze(-1)
         weights = torch.softmax(scores, dim=1).view(batch_size, num_frames, 1, 1, 1)
         return torch.sum(features * weights, dim=1)
+
+    def last_weights(self, features: torch.Tensor) -> torch.Tensor:
+        """Per-frame weights for visualization; uniform for the parameter-free modes."""
+        if features.dim() == 4:
+            features = features.unsqueeze(1)
+        batch_size, num_frames = features.shape[:2]
+        if self.mode != "attention":
+            return features.new_full((batch_size, num_frames), 1.0 / num_frames)
+        scores = self.scorer(features.mean(dim=(3, 4))).squeeze(-1)
+        return torch.softmax(scores, dim=1)
+
+
+class DCNAlignment(nn.Module):
+    """Deformable-conv alignment across frames (DCNv2, Step 2 of the pipeline).
+
+    STN can only apply one global affine warp per frame, so residual local
+    misalignment (motion blur, rolling shutter, plate bending) survives it.
+    Here each frame is aligned toward the middle reference frame: the offsets
+    are predicted from the concatenated (frame, reference) pair, then applied
+    with a modulated deformable convolution. Offsets start at zero so the
+    module begins as a near-identity op, the same way STN starts at identity.
+    """
+
+    def __init__(self, channels: int = 3, hidden_channels: int = 32, deform_groups: int = 1) -> None:
+        super().__init__()
+        from torchvision.ops import DeformConv2d
+
+        self.kernel_size = 3
+        self.deform_groups = deform_groups
+        offset_channels = deform_groups * 2 * self.kernel_size * self.kernel_size
+        mask_channels = deform_groups * self.kernel_size * self.kernel_size
+
+        self.offset_net = nn.Sequential(
+            nn.Conv2d(channels * 2, hidden_channels, kernel_size=3, padding=1, bias=True),
+            nn.PReLU(hidden_channels),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1, bias=True),
+            nn.PReLU(hidden_channels),
+        )
+        self.offset_head = nn.Conv2d(hidden_channels, offset_channels, kernel_size=3, padding=1, bias=True)
+        self.mask_head = nn.Conv2d(hidden_channels, mask_channels, kernel_size=3, padding=1, bias=True)
+        self.deform = DeformConv2d(
+            channels, channels, kernel_size=self.kernel_size, padding=1, groups=1, bias=True
+        )
+
+        # Zero-init the offset/mask heads so the very first forward is a plain
+        # 3x3 conv with uniform modulation - no random warping early on.
+        nn.init.zeros_(self.offset_head.weight)
+        nn.init.zeros_(self.offset_head.bias)
+        nn.init.zeros_(self.mask_head.weight)
+        nn.init.zeros_(self.mask_head.bias)
+
+    def forward(self, frames: torch.Tensor) -> torch.Tensor:
+        """frames: [B, F, C, H, W] -> aligned [B, F, C, H, W]."""
+        batch_size, num_frames, channels, height, width = frames.shape
+        reference = frames[:, num_frames // 2]  # middle frame as alignment target
+
+        aligned = []
+        for idx in range(num_frames):
+            current = frames[:, idx]
+            pair = torch.cat([current, reference], dim=1)
+            feat = self.offset_net(pair)
+            offset = self.offset_head(feat)
+            # Sigmoid*2 keeps modulation in [0,2] and equals 1.0 at zero-init.
+            mask = torch.sigmoid(self.mask_head(feat)) * 2.0
+            aligned.append(self.deform(current, offset, mask))
+        return torch.stack(aligned, dim=1)
 
 
 class FrameSR(nn.Module):

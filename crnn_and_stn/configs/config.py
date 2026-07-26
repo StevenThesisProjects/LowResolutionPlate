@@ -68,6 +68,21 @@ class Config:
     SR_RES_SCALE: float = 0.1
     LAMBDA_SR: float = 0.1
     SR_EDGE_WEIGHT: float = 0.5
+    # >0 bật perceptual loss VGG16 (issue #9 đề xuất L_Perceptual). Mặc định 0 vì
+    # với biển số, edge loss sát mục tiêu OCR hơn và không tốn thêm VRAM/download.
+    SR_PERCEPTUAL_WEIGHT: float = 0.0
+
+    # DCNv2 alignment (Step 2 pipeline issue #9) — căn chỉnh cục bộ giữa các frame
+    # sau STN, bắt phần chuyển động mà 1 affine toàn cục của STN không biểu diễn được.
+    USE_DCN: bool = False
+    DCN_HIDDEN_CHANNELS: int = 32
+
+    # Ablation 2: cơ chế gộp frame.
+    FUSION_MODE: str = "attention"  # attention | avg | max
+    # Ablation 3: số frame dùng mỗi track (5 = toàn bộ).
+    NUM_FRAMES: int = 5
+    # Nguyên nhân #4: degrade HR ở đúng cỡ LR gốc trước khi resize về IMG_SIZE.
+    LR_DOMAIN_MATCH: bool = False
 
     # Stability helpers for long training runs.
     WARMUP_RATIO: float = 0.05
