@@ -1,5 +1,5 @@
 ## J1. Đối chứng GroupNorm — KHÔNG SR. CHẠY TRƯỚC J2.
-## Bắt buộc: I-b cho thấy GroupNorm TỰ NÓ cải thiện hội tụ. Bỏ qua bước này thì nếu J2
+## Bắt buộc: GroupNorm TỰ NÓ cải thiện hội tụ. Bỏ qua bước này thì nếu J2
 ## vượt 76.68% sẽ KHÔNG THỂ biết công lao thuộc về SR hay GroupNorm.
 ## => 76.88% (best epoch 60/80, early stop epoch 78). +0.20 so với baseline 76.68%.
 ## GPU: RTX 4090, 1:31/epoch (nhanh ~5.9x so với V100 8:55/epoch).
