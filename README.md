@@ -113,6 +113,11 @@ Val loss chạm đáy ở epoch 15 (sớm hơn J1 — epoch 19) rồi tăng 39% 
 
 Trung bình `sr_loss` 10 epoch đầu: **0.804** → 10 epoch cuối: **0.674** (giảm ~16%). Module SR đang học đúng hướng tái tạo ảnh HR, xu hướng giảm chỉ bị che khuất nếu chỉ nhìn giá trị batch-cuối từng epoch (dao động 0.61–0.90) thay vì trung bình cả epoch.
 
+<img width="1552" height="789" alt="image" src="https://github.com/user-attachments/assets/bdd3b69a-d73f-4ff5-953b-7d758f505665" />
+<img width="1488" height="974" alt="image" src="https://github.com/user-attachments/assets/4b400f5e-b0f4-40ca-849d-bbc6d7a9dcdd" />
+<img width="1565" height="1250" alt="image" src="https://github.com/user-attachments/assets/e208fff5-e603-467b-93e1-2a26ba94a4c6" />
+
+
 ## 7. Kết luận & bước tiếp theo
 
 - J2 (77.18%) thoả điều kiện `J2 >= J1` → **đủ điều kiện chạy J3** (+ DCNv2) theo checklist.
