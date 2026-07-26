@@ -59,4 +59,62 @@ Dùng khi một run khác chạy ít epoch hơn 80 — so với đúng epoch tư
 
 <img width="1140" height="165" alt="image" src="https://github.com/user-attachments/assets/8b2b3855-5fc2-45f1-9f61-c69dee36f217" />
 
+# J2 — SR Per-Frame + Giám Sát Pixel-Level (Root Cause #1 & #2, issue #9)
+
+> Thí nghiệm chính của hướng fix issue #9 — so với đối chứng [J1 (GroupNorm, không SR)](groupnorm_ablation_j1.md). Xem tổng quan checklist tại [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+
+## 1. Mục tiêu
+
+Đo tác động thật của module SR per-frame + `L_CTC + λ·L_SR` (λ=0.1) khi đã cô lập khỏi lợi ích của GroupNorm (đo riêng ở J1). Đây là câu hỏi cốt lõi: SR có thực sự giúp OCR đọc biển số tốt hơn, hay chỉ tốn thêm 3.66x compute mà không đổi lại gì?
+
+## 2. Cấu hình
+
+```bash
+python train.py \
+ --preset stable \
+ --experiment-name crnn_resblock_sr_supervised \
+ --epochs 60 \
+ --batch-size 32 --grad-accum-steps 2 \
+ --use-sr --sr-scale 2 --lambda-sr 0.1 \
+ --backbone-norm group \
+ --num-workers 8 --aug-level full
+```
+
+Batch 32 + grad-accum 2 = effective batch 64 (giống J1), bắt buộc trên GPU 24GB vì SR phóng ảnh 32×128 → 64×256 (gấp 4 lần pixel) khiến batch 64 gốc bị OOM. Cùng seed 42, cùng preset `stable`, chỉ khác J1 ở `--use-sr --sr-scale 2 --lambda-sr 0.1`.
+
+## 3. Kết quả
+
+| Cấu hình | Val Exact Match | Epoch đạt | Chênh so với baseline |
+|---|---:|---:|---:|
+| Baseline ResBlock (`norm=none`, không SR) | 76.68% | — | — |
+| J1 — + GroupNorm (không SR, mốc 60-epoch) | 76.88% | 60 | +0.20 |
+| **J2 — + SR per-frame + giám sát** | **77.18%** | **57** | **+0.50** |
+
+J2 vượt J1 (+0.30) và vượt baseline (+0.50) trong lần chạy này.
+
+## 4. Caveat thống kê — quan trọng hơn con số 77.18%
+
+**Trước khi chạy được J2 hoàn chỉnh, cùng một cấu hình đã chạy 2 lần (lần đầu bị dừng giữa chừng do lỗi hạ tầng, không phải do model) — và 2 lần cho kết quả lệch nhau tới 6.5 điểm ở epoch 3** (42.64% vs 49.15%), dù giống hệt config + seed. Nguyên nhân: `cudnn.benchmark=True` khiến thuật toán convolution không xác định (nondeterministic), cộng thứ tự dataloader.
+
+Validation chỉ 999 sample → CI 95% ≈ ±2.7 điểm. Kết hợp cả 2 nguồn nhiễu này: **chênh lệch +0.30 giữa J2 và J1 không đủ để kết luận SR thực sự giúp ích** — có thể chỉ là may mắn của 1 lần chạy. Cần chạy **O1 (3 seed)** trước khi kết luận chắc chắn.
+
+## 5. Overfit — lặp lại đúng pattern của J1
+
+| Epoch | Train Loss | Val Loss | Val Acc |
+|---:|---:|---:|---:|
+| 15 | 0.1937 | **0.2773** ← đáy | 73.17% |
+| 30 | 0.1144 | 0.3465 | 73.87% |
+| 57 | 0.0754 | 0.3804 | **77.18%** ← best acc |
+| 60 | 0.0748 | 0.3856 | 76.18% |
+
+Val loss chạm đáy ở epoch 15 (sớm hơn J1 — epoch 19) rồi tăng 39% tới cuối, trong khi train loss gần 0. Cùng kết luận như J1: **80 (hay 60) epoch là dư, dư địa cải thiện nằm ở chống overfit chứ không phải kiến trúc**.
+
+## 6. SR loss có giảm thật, chỉ bị che bởi nhiễu batch-cuối
+
+Trung bình `sr_loss` 10 epoch đầu: **0.804** → 10 epoch cuối: **0.674** (giảm ~16%). Module SR đang học đúng hướng tái tạo ảnh HR, xu hướng giảm chỉ bị che khuất nếu chỉ nhìn giá trị batch-cuối từng epoch (dao động 0.61–0.90) thay vì trung bình cả epoch.
+
+## 7. Kết luận & bước tiếp theo
+
+- J2 (77.18%) thoả điều kiện `J2 >= J1` → **đủ điều kiện chạy J3** (+ DCNv2) theo checklist.
+- GroupNorm (J1) và SR (J2) đều cho dấu hiệu tích cực đứng riêng; ưu tiên xác nhận bằng multi-seed hơn là cộng dồn thêm module mới (DCNv2) vào một kết quả chưa chắc chắn.
 
