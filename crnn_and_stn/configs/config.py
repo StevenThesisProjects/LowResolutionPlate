@@ -56,6 +56,16 @@ class Config:
     FUSION_DROPOUT: float = 0.05
     LABEL_SMOOTHING: float = 0.0
 
+    # SR knobs — module SR nhẹ, per-frame, chạy sau STN (fix cho lỗi PR #7:
+    # stacked-input SR gộp 5 frame -> 1 -> nhân bản, chỉ học qua gradient CTC).
+    USE_SR: bool = False
+    SR_SCALE: int = 2
+    SR_HIDDEN_CHANNELS: int = 32
+    SR_NUM_BLOCKS: int = 4
+    SR_RES_SCALE: float = 0.1
+    LAMBDA_SR: float = 0.1
+    SR_EDGE_WEIGHT: float = 0.5
+
     # Stability helpers for long training runs.
     WARMUP_RATIO: float = 0.05
     MIN_LR_RATIO: float = 0.05

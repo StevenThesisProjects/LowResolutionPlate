@@ -176,6 +176,46 @@ class AttentionFusion(nn.Module):
         return torch.sum(features * weights, dim=1)
 
 
+class FrameSR(nn.Module):
+    """Lightweight per-frame super-resolution head.
+
+    Applied independently to each of the B*F flattened frames (never
+    channel-stacked across frames), so every frame keeps its own detail for
+    the attention fusion step later. The learned path is added on top of a
+    plain bilinear upscale (residual-style), which keeps early training
+    well-behaved the same way STN starts from an identity transform.
+    """
+
+    def __init__(
+        self,
+        in_channels: int = 3,
+        hidden_channels: int = 32,
+        num_blocks: int = 4,
+        scale: int = 2,
+        res_scale: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.scale = scale
+        self.head = nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1, bias=True)
+        self.head_act = nn.PReLU(hidden_channels)
+        self.body = nn.Sequential(
+            *[ResidualBlock(hidden_channels, res_scale=res_scale) for _ in range(num_blocks)]
+        )
+        self.upsample = nn.Sequential(
+            nn.Conv2d(hidden_channels, hidden_channels * scale * scale, kernel_size=3, padding=1, bias=True),
+            nn.PixelShuffle(scale),
+            nn.PReLU(hidden_channels),
+        )
+        self.tail = nn.Conv2d(hidden_channels, in_channels, kernel_size=3, padding=1, bias=True)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        base = F.interpolate(x, scale_factor=self.scale, mode="bilinear", align_corners=False)
+        feat = self.head_act(self.head(x))
+        feat = feat + self.body(feat)
+        feat = self.upsample(feat)
+        return self.tail(feat) + base
+
+
 class STNBlock(nn.Module):
     """Spatial transformer that predicts an affine warp for each frame."""
 

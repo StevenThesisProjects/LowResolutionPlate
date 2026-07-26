@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.components import AttentionFusion, CNNBackbone, STNBlock
+from src.models.components import AttentionFusion, CNNBackbone, FrameSR, STNBlock
 
 
 def _normalize_stage_channels(
@@ -59,10 +59,16 @@ class MultiFrameCRNN(nn.Module):
         residual_scale: float = 0.1,
         frame_dropout: float = 0.05,
         fusion_dropout: float = 0.05,
+        use_sr: bool = False,
+        sr_scale: int = 2,
+        sr_hidden_channels: int = 32,
+        sr_num_blocks: int = 4,
+        sr_res_scale: float = 0.1,
     ) -> None:
         super().__init__()
         self.use_stn = use_stn
         self.frame_dropout = frame_dropout
+        self.use_sr = use_sr
 
         stage_blocks = _normalize_stage_blocks(backbone_blocks)
         stage_channels = _normalize_stage_channels(backbone_channels, backbone_stage_channels)
@@ -72,6 +78,18 @@ class MultiFrameCRNN(nn.Module):
             # STN performs a light geometric normalization per frame before the
             # shared backbone extracts OCR features.
             self.stn = STNBlock(in_channels=3)
+
+        if self.use_sr:
+            # SR runs after STN (aligned frames are easier to upscale cleanly)
+            # and per-frame on the flattened B*F batch, so it never collapses
+            # the 5 frames into one image the way the old stacked-input SR did.
+            self.sr = FrameSR(
+                in_channels=3,
+                hidden_channels=sr_hidden_channels,
+                num_blocks=sr_num_blocks,
+                scale=sr_scale,
+                res_scale=sr_res_scale,
+            )
 
         self.backbone = CNNBackbone(
             in_channels=3,
@@ -102,11 +120,14 @@ class MultiFrameCRNN(nn.Module):
         grid = F.affine_grid(theta, frames.size(), align_corners=False)
         return F.grid_sample(frames, grid, align_corners=False, padding_mode="border")
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_sr: bool = False):
         """Return log-probabilities for CTC loss.
 
         Args:
             x: Tensor with shape [B, Frames, C, H, W]
+            return_sr: also return the per-frame SR output (flattened
+                [B*F, C, H*scale, W*scale]) so the trainer can compute an
+                auxiliary pixel-level loss against HR ground truth.
         """
 
         if x.dim() != 5:
@@ -117,6 +138,12 @@ class MultiFrameCRNN(nn.Module):
 
         if self.use_stn:
             x_flat = self._apply_stn(x_flat)
+
+        sr_output = None
+        if self.use_sr:
+            x_flat = self.sr(x_flat)
+            if return_sr:
+                sr_output = x_flat
 
         features = self.backbone(x_flat)
         features = features.view(batch_size, num_frames, self.cnn_channels, features.size(2), features.size(3))
@@ -132,4 +159,7 @@ class MultiFrameCRNN(nn.Module):
         seq_input = fused.squeeze(2).permute(0, 2, 1)
         rnn_out, _ = self.rnn(seq_input)
         logits = self.head(rnn_out)
-        return logits.log_softmax(2)
+        log_probs = logits.log_softmax(2)
+        if return_sr:
+            return log_probs, sr_output
+        return log_probs

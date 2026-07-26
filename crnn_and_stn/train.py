@@ -65,6 +65,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--patience", type=int, default=None)
     parser.add_argument("--aug-level", choices=["full", "light"], default=None)
     parser.add_argument("--output-dir", type=str, default=None)
+    parser.add_argument("--use-sr", action="store_true", help="Bật SR per-frame sau STN, có giám sát pixel-level")
+    parser.add_argument("--sr-scale", type=int, default=None)
+    parser.add_argument("--sr-hidden-channels", type=int, default=None)
+    parser.add_argument("--sr-num-blocks", type=int, default=None)
+    parser.add_argument("--sr-res-scale", type=float, default=None)
+    parser.add_argument("--lambda-sr", type=float, default=None, help="Trọng số L_SR trong L_CTC + lambda*L_SR")
+    parser.add_argument("--sr-edge-weight", type=float, default=None)
     parser.add_argument("--no-stn", action="store_true")
     parser.add_argument("--no-se", action="store_true")
     parser.add_argument("--no-amp", action="store_true")
@@ -154,6 +161,12 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         "backbone_res_scale": "BACKBONE_RES_SCALE",
         "frame_dropout": "FRAME_DROPOUT",
         "fusion_dropout": "FUSION_DROPOUT",
+        "sr_scale": "SR_SCALE",
+        "sr_hidden_channels": "SR_HIDDEN_CHANNELS",
+        "sr_num_blocks": "SR_NUM_BLOCKS",
+        "sr_res_scale": "SR_RES_SCALE",
+        "lambda_sr": "LAMBDA_SR",
+        "sr_edge_weight": "SR_EDGE_WEIGHT",
         "grad_clip": "GRAD_CLIP",
         "grad_accum_steps": "GRAD_ACCUM_STEPS",
         "label_smoothing": "LABEL_SMOOTHING",
@@ -175,6 +188,8 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
 
     if args.aug_level is not None:
         config.AUGMENTATION_LEVEL = args.aug_level
+    if args.use_sr:
+        config.USE_SR = True
     if args.no_stn:
         config.USE_STN = False
         if args.experiment_name is None and args.preset is None:
@@ -208,6 +223,7 @@ def main() -> None:
     print(f"Preset     : {args.preset or 'custom'}")
     print(f"STN        : {config.USE_STN}")
     print(f"SE         : {config.BACKBONE_USE_SE}")
+    print(f"SR         : {config.USE_SR} (scale={config.SR_SCALE}, lambda_sr={config.LAMBDA_SR})")
     print(f"Data       : {config.DATA_ROOT}")
     print(f"Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
     print(f"AMP        : {config.USE_AMP} | Grad Accum: {config.GRAD_ACCUM_STEPS}")
@@ -234,7 +250,14 @@ def main() -> None:
     test_loader = None
 
     if args.submission_mode:
-        train_ds = MultiFrameDataset(config.DATA_ROOT, mode="train", full_train=True, **ds_params)
+        train_ds = MultiFrameDataset(
+            config.DATA_ROOT,
+            mode="train",
+            full_train=True,
+            provide_sr_target=config.USE_SR,
+            sr_scale=config.SR_SCALE,
+            **ds_params,
+        )
         if os.path.exists(config.TEST_DATA_ROOT):
             test_ds = MultiFrameDataset(
                 config.TEST_DATA_ROOT,
@@ -255,7 +278,15 @@ def main() -> None:
         else:
             print(f"⚠️ WARNING: Không tìm thấy test data tại {config.TEST_DATA_ROOT}")
     else:
-        train_ds = MultiFrameDataset(config.DATA_ROOT, mode="train", **ds_params)
+        train_ds = MultiFrameDataset(
+            config.DATA_ROOT,
+            mode="train",
+            provide_sr_target=config.USE_SR,
+            sr_scale=config.SR_SCALE,
+            **ds_params,
+        )
+        # val_ds không cần HR target: validate() chỉ đo CTC/exact-match, không
+        # tính SR loss — giữ nguyên 5-tuple, không đổi hành vi baseline cũ.
         val_ds = MultiFrameDataset(config.DATA_ROOT, mode="val", **ds_params)
         if len(val_ds) > 0:
             val_loader = DataLoader(
@@ -296,6 +327,11 @@ def main() -> None:
         use_se=config.BACKBONE_USE_SE,
         residual_scale=config.BACKBONE_RES_SCALE,
         frame_dropout=config.FRAME_DROPOUT,
+        use_sr=config.USE_SR,
+        sr_scale=config.SR_SCALE,
+        sr_hidden_channels=config.SR_HIDDEN_CHANNELS,
+        sr_num_blocks=config.SR_NUM_BLOCKS,
+        sr_res_scale=config.SR_RES_SCALE,
     ).to(config.DEVICE)
 
     total_params = sum(p.numel() for p in model.parameters())

@@ -45,6 +45,8 @@ class MultiFrameDataset(Dataset):
         augmentation_level: str = "full",
         is_test: bool = False,
         full_train: bool = False,
+        provide_sr_target: bool = False,
+        sr_scale: int = 2,
     ):
         """
         Args:
@@ -58,6 +60,10 @@ class MultiFrameDataset(Dataset):
             augmentation_level : 'full' hoặc 'light'
             is_test            : True khi load test set (không có label)
             full_train         : True khi train toàn bộ data (submission mode)
+            provide_sr_target  : True để trả thêm ảnh HR sạch làm target giám sát SR
+                                  (chỉ dùng khi train với --use-sr; val/test giữ nguyên
+                                  5-tuple cũ, không đổi hành vi)
+            sr_scale            : Hệ số upscale của SR target (phải khớp model.sr_scale)
         """
         self.mode = mode
         self.samples: List[Dict[str, Any]] = []
@@ -69,6 +75,8 @@ class MultiFrameDataset(Dataset):
         self.augmentation_level = augmentation_level
         self.is_test = is_test
         self.full_train = full_train
+        self.provide_sr_target = provide_sr_target
+        self.sr_scale = sr_scale
 
         # Chọn pipeline transform theo mode
         if mode == "train":
@@ -80,6 +88,15 @@ class MultiFrameDataset(Dataset):
         else:
             self.transform = get_val_transforms(img_height, img_width)
             self.degrade = None
+
+        # Target SR: ảnh HR sạch (không degrade) resize lớn hơn model input theo
+        # sr_scale — dùng cùng ảnh HR gốc đã bị degrade thành input, nên vẫn
+        # pixel-aligned với input synthetic, chỉ khác là không bị suy giảm.
+        self.sr_target_transform = (
+            get_val_transforms(img_height * sr_scale, img_width * sr_scale)
+            if self.provide_sr_target
+            else None
+        )
 
         print(f"[{mode.upper()}] Quét dữ liệu: {root_dir}")
         abs_root = os.path.abspath(root_dir)
@@ -218,39 +235,73 @@ class MultiFrameDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, int, str, str]:
+    def __getitem__(self, idx: int):
         """
         Load 5 frame → tensor [5, 3, H, W].
 
-        Returns:
+        Returns (5-tuple mặc định, không đổi hành vi cũ):
             images_tensor : [5, 3, 32, 128]
             target        : indices CTC của plate_text
             target_len    : độ dài chuỗi nhãn
             label         : plate_text gốc (string)
             track_id      : tên folder track
+
+        Nếu `provide_sr_target=True` (chỉ bật khi train với --use-sr), trả thêm:
+            hr_target     : [5, 3, H*scale, W*scale] — ảnh HR sạch cùng track,
+                             chỉ có giá trị thật khi is_synthetic=True (input là
+                             HR degrade nên pixel-aligned); ngược lại là zero-pad.
+            has_hr_target : bool — có nên tính SR loss cho sample này không.
         """
         item = self.samples[idx]
         images_list = []
+        hr_list = [] if self.provide_sr_target else None
+        has_hr_target = bool(self.provide_sr_target and item["is_synthetic"])
 
         for path in item["paths"]:
-            image = cv2.imread(path, cv2.IMREAD_COLOR)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            raw = cv2.imread(path, cv2.IMREAD_COLOR)
+            raw = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+
+            if has_hr_target:
+                # Target SR = chính ảnh HR gốc (chưa degrade), resize lớn hơn —
+                # pixel-aligned với input vì cùng 1 ảnh raw trước khi degrade.
+                hr_list.append(self.sr_target_transform(image=raw)["image"])
 
             # Synthetic LR: degrade HR trước, rồi mới augment
             if item["is_synthetic"] and self.degrade:
-                image = self.degrade(image=image)["image"]
-
+                image = self.degrade(image=raw)["image"]
+            else:
+                image = raw
             image = self.transform(image=image)["image"]
             images_list.append(image)
 
         images_tensor = torch.stack(images_list, dim=0)
 
+        if self.provide_sr_target:
+            if has_hr_target:
+                hr_target = torch.stack(hr_list, dim=0)
+            else:
+                hr_target = torch.zeros(
+                    len(item["paths"]), 3, self.img_height * self.sr_scale, self.img_width * self.sr_scale
+                )
+
         if self.is_test:
+            if self.provide_sr_target:
+                return images_tensor, torch.tensor([0]), 1, "", item["track_id"], hr_target, has_hr_target
             return images_tensor, torch.tensor([0]), 1, "", item["track_id"]
 
         target = [self.char2idx[c] for c in item["label"] if c in self.char2idx]
         if not target:
             target = [0]
+        if self.provide_sr_target:
+            return (
+                images_tensor,
+                torch.tensor(target, dtype=torch.long),
+                len(target),
+                item["label"],
+                item["track_id"],
+                hr_target,
+                has_hr_target,
+            )
         return (
             images_tensor,
             torch.tensor(target, dtype=torch.long),
@@ -261,12 +312,21 @@ class MultiFrameDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        """Gom batch cho DataLoader — CTC cần targets nối liền."""
-        images, targets, target_lengths, labels_text, track_ids = zip(*batch)
-        return (
-            torch.stack(images, 0),
-            torch.cat(targets),
-            torch.tensor(target_lengths, dtype=torch.long),
-            labels_text,
-            track_ids,
-        )
+        """Gom batch cho DataLoader — CTC cần targets nối liền.
+
+        Tự nhận diện 5-tuple (mặc định) hay 7-tuple (kèm SR target) qua
+        zip(*batch), không cần biết trước dataset có bật provide_sr_target hay không.
+        """
+        elements = list(zip(*batch))
+        images = torch.stack(elements[0], 0)
+        targets = torch.cat(elements[1])
+        target_lengths = torch.tensor(elements[2], dtype=torch.long)
+        labels_text = elements[3]
+        track_ids = elements[4]
+
+        if len(elements) == 5:
+            return images, targets, target_lengths, labels_text, track_ids
+
+        hr_targets = torch.stack(elements[5], 0)
+        has_hr = torch.tensor(elements[6], dtype=torch.bool)
+        return images, targets, target_lengths, labels_text, track_ids, hr_targets, has_hr

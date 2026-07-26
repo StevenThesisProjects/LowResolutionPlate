@@ -23,6 +23,7 @@ from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.training.losses import SRPixelLoss
 from src.utils.common import seed_everything
 from src.utils.postprocess import decode_with_confidence
 
@@ -90,6 +91,14 @@ class Trainer:
 
         # CTC Loss: blank=0, zero_infinity=True tránh NaN khi input quá ngắn
         self.criterion = nn.CTCLoss(blank=0, zero_infinity=True, reduction="mean")
+
+        # Multi-task SR supervision (fix cho lỗi PR #7: SR trước đây chỉ học
+        # qua gradient CTC, không có ràng buộc pixel-level nào).
+        self.use_sr = bool(getattr(config, "USE_SR", False))
+        self.lambda_sr = float(getattr(config, "LAMBDA_SR", 0.1))
+        self.sr_loss_fn = SRPixelLoss(
+            edge_weight=float(getattr(config, "SR_EDGE_WEIGHT", 0.5))
+        ).to(self.device)
         self.optimizer = optim.AdamW(
             model.parameters(),
             lr=config.LEARNING_RATE,
@@ -129,25 +138,43 @@ class Trainer:
         self.optimizer.zero_grad(set_to_none=True)
         self.global_step += 1
 
+    def _sr_loss(self, sr_output: torch.Tensor, hr_targets: torch.Tensor, has_hr: torch.Tensor) -> torch.Tensor:
+        """hr_targets: [B, F, C, H', W'], has_hr: [B] -> mask flattened to [B*F]."""
+        batch_size, num_frames = hr_targets.shape[:2]
+        hr_flat = hr_targets.reshape(batch_size * num_frames, *hr_targets.shape[2:]).to(self.device)
+        mask_flat = has_hr.to(self.device).repeat_interleave(num_frames)
+        return self.sr_loss_fn(sr_output, hr_flat, mask_flat)
+
     def train_one_epoch(self) -> float:
-        """Train 1 epoch — forward → CTC loss → backward."""
+        """Train 1 epoch — forward → CTC loss (+ SR loss nếu use_sr) → backward."""
         self.model.train()
         epoch_loss = 0.0
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1}/{self.config.EPOCHS}")
         self.optimizer.zero_grad(set_to_none=True)
 
-        for step_idx, (images, targets, target_lengths, _, _) in enumerate(pbar, start=1):
+        for step_idx, batch in enumerate(pbar, start=1):
+            if self.use_sr:
+                images, targets, target_lengths, _, _, hr_targets, has_hr = batch
+            else:
+                images, targets, target_lengths, _, _ = batch
             images = images.to(self.device)
             targets = targets.to(self.device)
 
             with autocast("cuda", enabled=self.use_amp and self.device.type == "cuda"):
-                preds = self.model(images)                    # [B, T, C]
+                if self.use_sr:
+                    preds, sr_output = self.model(images, return_sr=True)
+                else:
+                    preds = self.model(images)                 # [B, T, C]
                 # CTC yêu cầu input shape [T, B, C]
                 preds_permuted = preds.permute(1, 0, 2)
                 input_lengths = torch.full(
                     (images.size(0),), preds.size(1), dtype=torch.long, device=self.device
                 )
-                loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
+                ctc_loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
+                loss = ctc_loss
+                if self.use_sr:
+                    sr_loss = self._sr_loss(sr_output, hr_targets, has_hr)
+                    loss = loss + self.lambda_sr * sr_loss
                 loss = loss / self.grad_accum_steps
 
             self.scaler.scale(loss).backward()
@@ -157,7 +184,10 @@ class Trainer:
 
             epoch_loss += loss.item() * self.grad_accum_steps
             current_lr = self.scheduler.get_last_lr()[0] if self.scheduler.get_last_lr() else self.config.LEARNING_RATE
-            pbar.set_postfix(loss=f'{loss.item() * self.grad_accum_steps:.4f}', lr=f"{current_lr:.2e}")
+            postfix = {"loss": f'{loss.item() * self.grad_accum_steps:.4f}', "lr": f"{current_lr:.2e}"}
+            if self.use_sr:
+                postfix["sr"] = f"{sr_loss.item():.4f}"
+            pbar.set_postfix(**postfix)
 
         return epoch_loss / len(self.train_loader)
 
