@@ -155,13 +155,17 @@ def _place_end_labels(ax, items, min_gap_frac: float = 0.085) -> None:
         placed.append(frac)
 
     for (y_value, x_value, label, color), frac in zip(ordered, placed):
+        # x cố định ở mép phải trục (axes fraction), KHÔNG lệ thuộc điểm cuối
+        # riêng của từng đường — nếu không, đường ngắn hơn (dừng sớm hơn) sẽ có
+        # nhãn nằm giữa biểu đồ, dễ đè lên annotation khác (vd. số % đỉnh).
         ax.annotate(
             label,
             xy=(x_value, y_value), xycoords="data",
-            xytext=(14, lo + frac * span), textcoords=("offset points", "data"),
+            xytext=(1.015, lo + frac * span), textcoords=("axes fraction", "data"),
             color=INK_2, fontsize=9, va="center", ha="left", zorder=6,
             arrowprops=dict(arrowstyle="-", color=color, linewidth=1.0,
-                            shrinkA=2, shrinkB=1, alpha=0.55),
+                            shrinkA=2, shrinkB=1, alpha=0.55,
+                            connectionstyle="arc3,rad=0.0"),
         )
 
 
@@ -236,9 +240,10 @@ def plot_curves(args: argparse.Namespace) -> None:
     ax_acc.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax_acc.tick_params(labelbottom=False)
     ax_acc.set_xlim(left=min(r[1]["epoch"][0] for r in runs))
-    # Chừa chỗ bên phải cho nhãn cuối đường, và chừa phía trên cho con số đỉnh.
-    ax_acc.margins(x=0.30)
-    ax_acc.set_ylim(top=max(peaks) * 1.10)
+    # Nhãn cuối đường giờ neo theo axes-fraction (ngoài vùng vẽ), không cần
+    # margin lớn để chừa chỗ trong data-space nữa — chỉ chừa chút cho đỉnh số liệu.
+    ax_acc.margins(x=0.04)
+    ax_acc.set_ylim(top=max(peaks) * 1.14)
 
     ax_acc.set_title("Độ chính xác validation theo epoch", color=INK,
                      fontsize=13, fontweight="bold", loc="left", pad=14)
