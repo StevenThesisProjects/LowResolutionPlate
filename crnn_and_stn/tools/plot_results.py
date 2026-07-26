@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+import re
 import sys
 
 try:
@@ -85,6 +86,42 @@ def save(fig, path: str) -> None:
     print(f"✅ Đã lưu: {path}")
 
 
+EPOCH_LINE = re.compile(
+    r"Epoch\s+(\d+)/\d+\s*\|\s*Train Loss:\s*([\d.naif-]+)\s*\|\s*"
+    r"Val Loss:\s*([\d.naif-]+)\s*\|\s*Val Acc:\s*([\d.]+)%\s*\|\s*LR:\s*([\d.e+-]+)",
+    re.IGNORECASE,
+)
+
+
+def read_log(path: str) -> dict[str, list[float]]:
+    """Dựng lại history từ stdout của training.
+
+    Dùng khi run được thực hiện bằng bản code chưa có phần ghi history CSV —
+    log text thì lúc nào cũng có, nên không mất dữ liệu đường cong.
+    """
+    cols: dict[str, list[float]] = {k: [] for k in
+                                    ("epoch", "train_loss", "val_loss", "val_acc", "lr")}
+    with open(path, errors="ignore") as handle:
+        for line in handle:
+            match = EPOCH_LINE.search(line)
+            if not match:
+                continue
+            epoch, train_loss, val_loss, val_acc, lr = match.groups()
+
+            def num(text: str) -> float:
+                try:
+                    return float(text)
+                except ValueError:
+                    return float("nan")
+
+            cols["epoch"].append(float(epoch))
+            cols["train_loss"].append(num(train_loss))
+            cols["val_loss"].append(num(val_loss))
+            cols["val_acc"].append(float(val_acc))
+            cols["lr"].append(num(lr))
+    return cols
+
+
 def read_history(path: str) -> dict[str, list[float]]:
     cols: dict[str, list[float]] = {}
     with open(path, newline="") as handle:
@@ -132,21 +169,24 @@ def _place_end_labels(ax, items, min_gap_frac: float = 0.085) -> None:
 # Chart 1: đường cong training
 # --------------------------------------------------------------------------
 def plot_curves(args: argparse.Namespace) -> None:
+    sources = [(p, False) for p in (args.history or [])] + [(p, True) for p in (args.from_log or [])]
     runs = []
-    for idx, path in enumerate(args.history):
+    for idx, (path, is_log) in enumerate(sources):
         if not os.path.exists(path):
             print(f"⚠️ Bỏ qua (không tồn tại): {path}")
             continue
-        data = read_history(path)
+        data = read_log(path) if is_log else read_history(path)
         if not data.get("epoch"):
             print(f"⚠️ Bỏ qua (rỗng/sai format): {path}")
             continue
         label = args.labels[idx] if args.labels and idx < len(args.labels) else \
-            os.path.basename(path).replace("history_", "").replace(".csv", "")
+            os.path.basename(path).replace("history_", "").rsplit(".", 1)[0]
         runs.append((label, data))
 
     if not runs:
-        print("❌ Không đọc được history nào. Chạy training trước để sinh results/history_*.csv")
+        print("❌ Không đọc được dữ liệu nào.\n"
+              "   --history : results/history_*.csv (trainer tự sinh)\n"
+              "   --from-log: file log stdout của training")
         sys.exit(1)
 
     # Accuracy và loss khác đơn vị hoàn toàn -> hai panel riêng, KHÔNG dùng 2 trục y
@@ -344,7 +384,10 @@ def parse_args() -> argparse.Namespace:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p1 = sub.add_parser("curves", help="Đường cong training theo epoch")
-    p1.add_argument("--history", type=str, nargs="+", required=True)
+    p1.add_argument("--history", type=str, nargs="+", default=None,
+                    help="File results/history_*.csv do trainer sinh ra")
+    p1.add_argument("--from-log", type=str, nargs="+", default=None,
+                    help="File log stdout của training (dùng khi chưa có history CSV)")
     p1.add_argument("--labels", type=str, nargs="+", default=None)
     p1.add_argument("--baseline", type=float, default=None)
     p1.add_argument("--title", type=str, default="Diễn biến huấn luyện — CRNN + STN + ResBlock")
