@@ -3,7 +3,6 @@
 ## vượt 76.68% sẽ KHÔNG THỂ biết công lao thuộc về SR hay GroupNorm.
 ## => 76.88% (best epoch 60/80, early stop epoch 78). +0.20 so với baseline 76.68%.
 ## GPU: RTX 4090, 1:31/epoch (nhanh ~5.9x so với V100 8:55/epoch).
-arser hoạt động, chart vẽ đúng dữ liệu J1 thật. Panel loss cho thấy overfit rất rõ: đường train (nét liền) chạm 0, đường val (nét đứt) chạm đáy quanh epoch 19 rồi đi ngang/nhích lên.
 
 Tóm tắt J1:
 
@@ -12,12 +11,8 @@ Baseline ResBlock	76.68%
 J1 — + GroupNorm	76.88% (+0.20)
 Nhưng phải nói thẳng: +0.20 nằm trong biên độ nhiễu (validation 999 sample → CI 95% ≈ ±2.7 điểm). Giá trị thật của J1 không nằm ở con số này mà ở chỗ nó là đối chứng — từ giờ J2 phải so với 76.88%, không phải 76.68%.
 
-Phát hiện quan trọng hơn con số accuracy — model overfit nặng:
+<img width="443" height="142" alt="image" src="https://github.com/user-attachments/assets/0214aa71-3807-4d58-85bf-ba2a35f86f26" />
 
-Epoch	Train Loss	Val Loss	Val Acc
-19	0.0788	0.2591 ← đáy	71.37%
-60	0.0074	0.3308	76.88%
-78	0.0042	0.3535	75.88%
 Train loss 0.0042 = gần như thuộc lòng tập train. Val loss tăng 36% từ đáy. Điều này khớp với bài học cũ (run E: 60 epoch tệ hơn 30 epoch) → dư địa cải thiện nằm ở chống overfit, không phải thêm tham số hay train lâu hơn. Đáng cân nhắc sau khi xong J2/J3.
 
 python train.py \
