@@ -1,24 +1,5 @@
 # Lệnh chạy training trên GPU + log kết quả
 
-Xem phân tích kiến trúc/thiết kế đi kèm tại [../baseline1_crnn_stn/](../baseline1_crnn_stn/).
-
-**Dọn lại 2026-07-26**: file này giờ chỉ để **active** những lệnh thuộc hướng đang làm — fix issue #9 (SR per-frame có giám sát + GroupNorm + DCNv2). Mọi lệnh của các hướng đã kết thúc được gói trong comment HTML `<!-- -->` để giữ lịch sử tham khảo, **số liệu của chúng được tóm tắt lại ở bảng ngay dưới đây** nên không cần mở comment ra mới biết mốc so sánh.
-
-## Mốc kết quả đã đo (dùng để đối chiếu)
-
-**Phân biệt quan trọng**: baseline chuẩn theo report ICPR của tác giả gốc là **CRNN + STN (77.00%)**. `ResBlock backbone (76.68%)` **không phải baseline** — đó là cải tiến backbone làm sau ở PR #8, dùng làm điểm xuất phát cho nhánh J1/J2/M/N/O bên dưới. Hai cột chênh lệch tách riêng để không nhầm "vượt ResBlock" thành "vượt baseline gốc".
-
-| Cấu hình                                        | Val Exact Match | Chênh vs baseline chuẩn (77.00%) | Ghi chú                                                   |
-| ------------------------------------------------ | --------------: | --------------------------------: | ---------------------------------------------------------- |
-| **CRNN + STN (baseline chuẩn, report ICPR)**     |      **77.00%** |                                — | Số liệu trong report, không phải đo trên dataset project    |
-| CRNN + STN (đo thực tế trên dataset project)     |          75.78% |                            −1.22 | batch 64, epochs 30, lr 5e-4                                |
-| CRNN + STN + AdamW tuning tốt nhất               |          76.28% |                            −0.72 | Backbone CNN+BatchNorm cũ, đã kết thúc hướng này            |
-| ResNet + Transformer + STN (report, tốt nhất)    |          78.70% |                            +1.70 | Kiến trúc khác hẳn (ResNet+Transformer), không so trực tiếp |
-| SR stacked-input v1 / v2                         | 49.25% / 55.06% |                     −27.75/−21.94 | Bản lỗi — bằng chứng cho Root cause #1 của issue #9         |
-| ResBlock backbone (cải tiến PR #8, **không phải baseline**) | 76.68% |                    −0.32 | **Mốc xuất phát của nhánh J1/J2/M/N/O bên dưới**            |
-| J1 — ResBlock + GroupNorm (không SR)             |          76.88% |                            −0.12 | +0.20 so với ResBlock — đối chứng cho J2                    |
-| **J2 — ResBlock + GroupNorm + SR per-frame**     |      **77.18%** |                        **+0.18** | +0.50 so với ResBlock, +0.30 so với J1 — 1 seed, chưa multi-seed |
-
 ## Setup môi trường GPU
 
 ```bash
