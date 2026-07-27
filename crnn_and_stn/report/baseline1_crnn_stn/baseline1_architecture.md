@@ -186,7 +186,6 @@ Không cần: `pandas`, `matplotlib`, `seaborn` (chỉ dùng cho analysis trong 
 
 Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thực tế của project — xem [training_runs/run_gpu.md](../training_runs/run_gpu.md)) là điểm khởi đầu cho 2 hướng nâng cấp đã/đang thử:
 
-1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, kết quả tốt nhất hiện tại ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
-2. **Super Resolution trước OCR** (nhiều hướng đã thử nghiệm, kết quả chưa vượt baseline ResBlock) — xem [super_resolution_experiments.md](super_resolution_experiments.md).
-
-Ngoài ra, xem [optimizer_adamw_verification.md](optimizer_adamw_verification.md) để đối chiếu chi tiết code Baseline 1 với source gốc và xác minh optimizer AdamW (đã là mặc định sẵn), kèm setup + lệnh chạy trên GPU thuê.
+1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
+2. **AdamW tuning trên backbone gốc** (đã kết thúc, mức trần 76.28%, bị ResBlock vượt qua) — xem [optimizer_adamw_verification.md](optimizer_adamw_verification.md).
+3. **Super Resolution per-frame + GroupNorm** (đang active — J2 = 77.18%, còn cần multi-seed để xác nhận có vượt baseline chuẩn 77.00% một cách chắc chắn hay không) — xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Lịch sử các hướng SR đã thử trước đó (kể cả hướng thất bại) xem [super_resolution_experiments.md](super_resolution_experiments.md).
