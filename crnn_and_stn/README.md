@@ -1,6 +1,6 @@
 # GroupNorm + SR Per-Frame — Ablation J1 & J2 (Root Cause #1, #2, #3 — issue #9)
 
-> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [report/training_runs/run_gpu.md](report/training_runs/run_gpu.md). Phân tích chi tiết: [report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md](report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
+> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 
 **Baseline chuẩn theo report ICPR của tác giả gốc là CRNN + STN (77.00%)** — không phải ResBlock backbone (76.68%, cải tiến làm sau ở PR #8). Mọi so sánh dưới đây tách rõ 2 mốc để không nhầm "vượt ResBlock" thành "vượt baseline gốc".
 
@@ -41,9 +41,7 @@ Cùng seed 42; J2 chỉ khác J1 ở 3 flag `--use-sr --sr-scale 2 --lambda-sr 0
 
 \* Kiến trúc khác hẳn (ResNet+Transformer), không so trực tiếp được với nhánh CRNN đang làm.
 
-J2 > J1 (+0.30) và > ResBlock (+0.50), nhưng so với **baseline chuẩn chỉ nhỉnh hơn +0.18** — và **J1 vẫn chưa vượt được baseline chuẩn**. So với mốc mạnh nhất trong report gốc (ResNet+Transformer+STN, 78.70%) J2 còn cách **1.52 điểm** — dù kiến trúc khác hẳn nên không so trực tiếp được, con số này cho thấy trần hiện tại của nhánh CRNN vẫn còn xa mốc cao nhất report từng đạt. Xem caveat thống kê ở mục 4 trước khi kết luận bất cứ điều gì từ các con số này.
-
-<img width="1140" height="165" alt="image" src="https://github.com/user-attachments/assets/8b2b3855-5fc2-45f1-9f61-c69dee36f217" />
+J2 > J1 (+0.30) và > ResBlock (+0.50), nhưng so với **baseline chuẩn chỉ nhỉnh hơn +0.18** — và **J1 vẫn chưa vượt được baseline chuẩn**. So với mốc mạnh nhất trong report gốc (ResNet+Transformer+STN, 78.70%) J2 còn cách **1.52 điểm** — dù kiến trúc khác hẳn nên không so trực tiếp được, con số này cho thấy trần hiện tại của nhánh CRNN vẫn còn xa mốc cao nhất report từng đạt. Xem caveat ở mục 4 trước khi kết luận bất cứ điều gì từ các con số này.
 
 ## 4. Caveat thống kê — quan trọng hơn mọi con số ở trên
 
@@ -64,14 +62,9 @@ Cả 2 run: val loss chạm đáy sớm rồi tăng dần trong khi train loss g
 
 Trung bình `sr_loss` 10 epoch đầu: 0.804 → 10 epoch cuối: 0.674 (giảm ~16%). Module SR học đúng hướng tái tạo ảnh HR; xu hướng giảm chỉ bị che nếu nhìn giá trị batch-cuối từng epoch (dao động 0.61–0.90) thay vì trung bình cả epoch.
 
-<img width="1552" height="789" alt="Training curves J1 vs J2" src="https://github.com/user-attachments/assets/bdd3b69a-d73f-4ff5-953b-7d758f505665" />
-<img width="1488" height="974" alt="Ablation comparison" src="https://github.com/user-attachments/assets/4b400f5e-b0f4-40ca-849d-bbc6d7a9dcdd" />
-<img width="1565" height="1250" alt="Accuracy vs compute cost" src="https://github.com/user-attachments/assets/e208fff5-e603-467b-93e1-2a26ba94a4c6" />
-
 ## 7. Kết luận & bước tiếp theo
 
 - GroupNorm sửa đúng Root Cause #3 (hết NaN), gần như miễn phí compute (+15K params, FLOPs không đổi).
-- SR per-frame + giám sát cho tín hiệu tích cực (+0.30 so với J1) nhưng tốn **3.66x FLOPs / latency** — xem bảng chi phí trong `report/training_runs/run_gpu.md`.
+- SR per-frame + giám sát cho tín hiệu tích cực (+0.30 so với J1) nhưng tốn **3.66x FLOPs / latency** — xem bảng chi phí trong `run_gpu.md`.
 - **Chưa cấu hình nào (J1 lẫn J2) vượt rõ ràng baseline chuẩn của tác giả (77.00%)** khi tính đến biên độ nhiễu — đây là điều quan trọng nhất cần nêu khi báo cáo, không nên nói "đã vượt baseline". Càng chưa gần mốc mạnh nhất report gốc (78.70%, ResNet+Transformer+STN — còn cách 1.52 điểm).
-- Bước tiếp theo: chạy J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện J2 ≥ J1 để chạy J3
-
+- Bước tiếp theo: chạy **O1 (multi-seed)** trước khi đầu tư thêm vào J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện `J2 ≥ J1` để chạy J3, nhưng xây tiếp trên một kết quả 1-seed chưa xác nhận là rủi ro không đáng.
