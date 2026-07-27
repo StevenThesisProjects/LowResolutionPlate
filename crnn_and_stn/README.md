@@ -73,4 +73,5 @@ Trung bình `sr_loss` 10 epoch đầu: 0.804 → 10 epoch cuối: 0.674 (giảm 
 - GroupNorm sửa đúng Root Cause #3 (hết NaN), gần như miễn phí compute (+15K params, FLOPs không đổi).
 - SR per-frame + giám sát cho tín hiệu tích cực (+0.30 so với J1) nhưng tốn **3.66x FLOPs / latency** — xem bảng chi phí trong `report/training_runs/run_gpu.md`.
 - **Chưa cấu hình nào (J1 lẫn J2) vượt rõ ràng baseline chuẩn của tác giả (77.00%)** khi tính đến biên độ nhiễu — đây là điều quan trọng nhất cần nêu khi báo cáo, không nên nói "đã vượt baseline". Càng chưa gần mốc mạnh nhất report gốc (78.70%, ResNet+Transformer+STN — còn cách 1.52 điểm).
-- Bước tiếp theo: chạy **O1 (multi-seed)** trước khi đầu tư thêm vào J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện `J2 ≥ J1` để chạy J3, nhưng xây tiếp trên một kết quả 1-seed chưa xác nhận là rủi ro không đáng.
+- Bước tiếp theo: chạy J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện J2 ≥ J1 để chạy J3
+
