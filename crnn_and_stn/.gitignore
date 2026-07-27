@@ -57,7 +57,7 @@ submission_*.txt
 *.log
 
 # ── Báo cáo / tài liệu nặng ──
-report/
+# report/
 *.pdf
 
 # ── Build & cache ──
