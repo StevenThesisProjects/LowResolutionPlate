@@ -63,7 +63,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fusion-dropout", type=float, default=None)
     parser.add_argument("--grad-clip", type=float, default=None)
     parser.add_argument("--grad-accum-steps", type=int, default=None)
-    parser.add_argument("--label-smoothing", type=float, default=None)
     parser.add_argument("--warmup-ratio", type=float, default=None)
     parser.add_argument("--min-lr-ratio", type=float, default=None)
     parser.add_argument("--patience", type=int, default=None)
@@ -77,8 +76,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lambda-sr", type=float, default=None, help="Trọng số L_SR trong L_CTC + lambda*L_SR")
     parser.add_argument("--sr-edge-weight", type=float, default=None)
     parser.add_argument("--sr-perceptual-weight", type=float, default=None, help=">0 bật perceptual loss VGG16")
+    parser.add_argument("--sr-single-frame", action="store_true",
+                        help="Ablation: SR độc lập từng frame thay vì multi-frame (Step 3)")
     parser.add_argument("--use-dcn", action="store_true", help="Bật DCNv2 alignment giữa các frame (Step 2)")
     parser.add_argument("--dcn-hidden-channels", type=int, default=None)
+    parser.add_argument("--decode", choices=["greedy", "constrained"], default=None,
+                        help="'constrained' ép layout biển số [A-Z]{3}[0-9][A-Z0-9][0-9]{2}")
+    parser.add_argument("--beam-width", type=int, default=None)
+    parser.add_argument("--plate-layouts", type=str, default=None,
+                        help="Danh sách layout ngăn cách dấu phẩy, vd 'LLLNLNN,LLLNNNN'")
+    parser.add_argument("--stn-pool", type=_parse_int_tuple, default=None,
+                        help="Kích thước pool của localization STN, vd 4,8")
+    parser.add_argument("--width-downsample", type=int, choices=[4, 8], default=None,
+                        help="4 => T=32 timestep cho CTC mà không cần bật SR")
+    parser.add_argument("--use-ema", action="store_true", help="Trung bình trượt trọng số khi validate/lưu")
+    parser.add_argument("--ema-decay", type=float, default=None)
     parser.add_argument("--fusion-mode", choices=["attention", "avg", "max"], default=None, help="Ablation 2")
     parser.add_argument("--num-frames", type=int, default=None, help="Ablation 3: số frame/track (1-5)")
     parser.add_argument("--img-height", type=int, default=None, help="Ablation 4: chiều cao ảnh vào model")
@@ -189,7 +201,11 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         "img_width": "IMG_WIDTH",
         "grad_clip": "GRAD_CLIP",
         "grad_accum_steps": "GRAD_ACCUM_STEPS",
-        "label_smoothing": "LABEL_SMOOTHING",
+        "decode": "DECODE_MODE",
+        "beam_width": "BEAM_WIDTH",
+        "plate_layouts": "PLATE_LAYOUTS",
+        "width_downsample": "WIDTH_DOWNSAMPLE",
+        "ema_decay": "EMA_DECAY",
         "warmup_ratio": "WARMUP_RATIO",
         "min_lr_ratio": "MIN_LR_RATIO",
         "patience": "EARLY_STOPPING_PATIENCE",
@@ -205,11 +221,19 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
     if args.backbone_stage_channels is not None:
         config.BACKBONE_STAGE_CHANNELS = args.backbone_stage_channels
         config.BACKBONE_CHANNELS = args.backbone_stage_channels[-1]
+    if args.stn_pool is not None:
+        if len(args.stn_pool) != 2:
+            raise SystemExit("--stn-pool cần đúng 2 số, ví dụ 4,8")
+        config.STN_POOL = tuple(args.stn_pool)
 
     if args.aug_level is not None:
         config.AUGMENTATION_LEVEL = args.aug_level
     if args.use_sr:
         config.USE_SR = True
+    if args.sr_single_frame:
+        config.SR_MULTI_FRAME = False
+    if args.use_ema:
+        config.USE_EMA = True
     if args.use_dcn:
         config.USE_DCN = True
     if args.lr_domain_match:
@@ -248,8 +272,13 @@ def main() -> None:
     print(f"STN        : {config.USE_STN}")
     print(f"SE         : {config.BACKBONE_USE_SE}")
     print(f"SR         : {config.USE_SR} (scale={config.SR_SCALE}, lambda_sr={config.LAMBDA_SR}, "
-          f"edge={config.SR_EDGE_WEIGHT}, perceptual={config.SR_PERCEPTUAL_WEIGHT})")
+          f"edge={config.SR_EDGE_WEIGHT}, perceptual={config.SR_PERCEPTUAL_WEIGHT}, "
+          f"multi_frame={config.SR_MULTI_FRAME})")
     print(f"DCN        : {config.USE_DCN} | Fusion: {config.FUSION_MODE} | Frames: {config.NUM_FRAMES}")
+    print(f"STN pool   : {tuple(config.STN_POOL)} | Width /{config.WIDTH_DOWNSAMPLE} "
+          f"-> T={config.IMG_WIDTH * (config.SR_SCALE if config.USE_SR else 1) // config.WIDTH_DOWNSAMPLE}")
+    print(f"Decode     : {config.DECODE_MODE} (layouts={config.PLATE_LAYOUTS}, beam={config.BEAM_WIDTH})")
+    print(f"EMA        : {config.USE_EMA} (decay={config.EMA_DECAY})")
     print(f"Image size : {config.IMG_HEIGHT}x{config.IMG_WIDTH} | LR domain match: {config.LR_DOMAIN_MATCH}")
     print(f"Data       : {config.DATA_ROOT}")
     print(f"Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
@@ -367,6 +396,9 @@ def main() -> None:
         use_dcn=config.USE_DCN,
         dcn_hidden_channels=config.DCN_HIDDEN_CHANNELS,
         fusion_mode=config.FUSION_MODE,
+        sr_multi_frame=config.SR_MULTI_FRAME,
+        stn_pool=config.STN_POOL,
+        width_downsample=config.WIDTH_DOWNSAMPLE,
     ).to(config.DEVICE)
 
     total_params = sum(p.numel() for p in model.parameters())

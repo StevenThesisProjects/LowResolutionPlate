@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from configs.config import Config
 from src.data.dataset import MultiFrameDataset
 from src.models.crnn import MultiFrameCRNN
-from src.utils.postprocess import decode_with_confidence
+from src.utils.postprocess import PlateLayout, decode_batch
 
 
 def denormalize(tensor: torch.Tensor) -> np.ndarray:
@@ -102,6 +102,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sr-scale", type=int, default=None)
     parser.add_argument("--num-frames", type=int, default=None)
     parser.add_argument("--data-root", type=str, default=None)
+    parser.add_argument("--decode", choices=["greedy", "constrained"], default=None)
+    parser.add_argument("--width-downsample", type=int, choices=[4, 8], default=None)
     parser.add_argument("--cpu", action="store_true")
     return parser.parse_args()
 
@@ -119,6 +121,7 @@ def main() -> None:
     for attr, value in [
         ("BACKBONE_NORM", args.backbone_norm), ("FUSION_MODE", args.fusion_mode),
         ("SR_SCALE", args.sr_scale), ("NUM_FRAMES", args.num_frames), ("DATA_ROOT", args.data_root),
+        ("DECODE_MODE", args.decode), ("WIDTH_DOWNSAMPLE", args.width_downsample),
     ]:
         if value is not None:
             setattr(config, attr, value)
@@ -136,7 +139,8 @@ def main() -> None:
         sr_hidden_channels=config.SR_HIDDEN_CHANNELS, sr_num_blocks=config.SR_NUM_BLOCKS,
         sr_res_scale=config.SR_RES_SCALE, backbone_norm=config.BACKBONE_NORM,
         use_dcn=config.USE_DCN, dcn_hidden_channels=config.DCN_HIDDEN_CHANNELS,
-        fusion_mode=config.FUSION_MODE,
+        fusion_mode=config.FUSION_MODE, sr_multi_frame=config.SR_MULTI_FRAME,
+        stn_pool=config.STN_POOL, width_downsample=config.WIDTH_DOWNSAMPLE,
     ).to(device)
     model.load_state_dict(torch.load(args.checkpoint, map_location=device))
     model.eval()
@@ -161,9 +165,10 @@ def main() -> None:
         batch = images.unsqueeze(0).to(device)
 
         with torch.no_grad():
+            num_frames = images.size(0)
             if config.USE_SR:
-                log_probs, sr_output = model(batch, return_sr=True)
-                sr_frames = sr_output.view(1, images.size(0), *sr_output.shape[1:])[0]
+                log_probs, sr_output, _, _ = model(batch, return_sr=True)
+                sr_frames = sr_output.view(1, num_frames, *sr_output.shape[1:])[0]
             else:
                 log_probs, sr_frames = model(batch), None
 
@@ -172,16 +177,19 @@ def main() -> None:
             if model.fusion.mode == "attention":
                 flat = batch.view(-1, *batch.shape[2:])
                 if model.use_stn:
-                    flat = model._apply_stn(flat)
+                    flat, _ = model._apply_stn(flat)
                 if model.use_dcn:
-                    flat = model.dcn(flat.view(1, images.size(0), *flat.shape[1:])).reshape(flat.shape)
+                    flat = model.dcn(flat.view(1, num_frames, *flat.shape[1:])).reshape(flat.shape)
                 if model.use_sr:
-                    flat = model.sr(flat)
+                    flat = model.sr(flat, num_frames=num_frames)
                 feats = model.backbone(flat)
-                feats = feats.view(1, images.size(0), model.cnn_channels, feats.size(2), feats.size(3))
+                feats = feats.view(1, num_frames, model.cnn_channels, feats.size(2), feats.size(3))
                 weights = model.fusion.last_weights(feats)[0].cpu().tolist()
 
-        pred, conf = decode_with_confidence(log_probs, config.IDX2CHAR)[0]
+        pred, conf = decode_batch(
+            log_probs, config.IDX2CHAR, mode=config.DECODE_MODE,
+            layout=PlateLayout.from_spec(config.PLATE_LAYOUTS),
+        )[0]
         if args.only_errors and pred == truth:
             continue
 

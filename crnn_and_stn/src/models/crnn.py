@@ -68,6 +68,9 @@ class MultiFrameCRNN(nn.Module):
         use_dcn: bool = False,
         dcn_hidden_channels: int = 32,
         fusion_mode: str = "attention",
+        sr_multi_frame: bool = True,
+        stn_pool: Sequence[int] = (4, 8),
+        width_downsample: int = 8,
     ) -> None:
         super().__init__()
         self.use_stn = use_stn
@@ -82,7 +85,7 @@ class MultiFrameCRNN(nn.Module):
         if self.use_stn:
             # STN performs a light geometric normalization per frame before the
             # shared backbone extracts OCR features.
-            self.stn = STNBlock(in_channels=3)
+            self.stn = STNBlock(in_channels=3, pool_size=tuple(stn_pool))
 
         if self.use_dcn:
             # Step 2 of the proposed pipeline: local (per-pixel) alignment across
@@ -101,6 +104,7 @@ class MultiFrameCRNN(nn.Module):
                 scale=sr_scale,
                 res_scale=sr_res_scale,
                 norm=backbone_norm,
+                multi_frame=sr_multi_frame,
             )
 
         self.backbone = CNNBackbone(
@@ -111,6 +115,7 @@ class MultiFrameCRNN(nn.Module):
             res_scale=residual_scale,
             use_se=use_se,
             norm=backbone_norm,
+            width_downsample=width_downsample,
         )
 
         self.fusion = AttentionFusion(
@@ -130,10 +135,11 @@ class MultiFrameCRNN(nn.Module):
             nn.Linear(hidden_size * 2, num_classes),
         )
 
-    def _apply_stn(self, frames: torch.Tensor) -> torch.Tensor:
+    def _apply_stn(self, frames: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         theta = self.stn(frames)
         grid = F.affine_grid(theta, frames.size(), align_corners=False)
-        return F.grid_sample(frames, grid, align_corners=False, padding_mode="border")
+        warped = F.grid_sample(frames, grid, align_corners=False, padding_mode="border")
+        return warped, theta
 
     def forward(self, x: torch.Tensor, return_sr: bool = False):
         """Return log-probabilities for CTC loss.
@@ -141,8 +147,13 @@ class MultiFrameCRNN(nn.Module):
         Args:
             x: Tensor with shape [B, Frames, C, H, W]
             return_sr: also return the per-frame SR output (flattened
-                [B*F, C, H*scale, W*scale]) so the trainer can compute an
-                auxiliary pixel-level loss against HR ground truth.
+                [B*F, C, H*scale, W*scale]) **and the STN transform** so the
+                trainer can compute an auxiliary pixel-level loss against HR
+                ground truth. The transform matters: SR runs after STN, so the
+                SR output lives in the rectified frame while the HR target does
+                not. Without warping the target by the same theta the loss
+                compares two different geometries and the SR head can only
+                learn to blur.
         """
 
         if x.dim() != 5:
@@ -152,8 +163,9 @@ class MultiFrameCRNN(nn.Module):
         x_flat = x.view(batch_size * num_frames, channels, height, width)
 
         # Step 1: global affine rectification, independently per frame.
+        theta = None
         if self.use_stn:
-            x_flat = self._apply_stn(x_flat)
+            x_flat, theta = self._apply_stn(x_flat)
 
         # Step 2: local cross-frame alignment on the already-rectified frames.
         if self.use_dcn:
@@ -161,11 +173,15 @@ class MultiFrameCRNN(nn.Module):
                 x_flat.view(batch_size, num_frames, channels, height, width)
             ).reshape(batch_size * num_frames, channels, height, width)
 
+        # Step 3: multi-frame super-resolution over the aligned frames.
         sr_output = None
+        sr_base = None
         if self.use_sr:
-            x_flat = self.sr(x_flat)
             if return_sr:
+                x_flat, sr_base = self.sr(x_flat, num_frames=num_frames, return_base=True)
                 sr_output = x_flat
+            else:
+                x_flat = self.sr(x_flat, num_frames=num_frames)
 
         features = self.backbone(x_flat)
         features = features.view(batch_size, num_frames, self.cnn_channels, features.size(2), features.size(3))
@@ -183,5 +199,5 @@ class MultiFrameCRNN(nn.Module):
         logits = self.head(rnn_out)
         log_probs = logits.log_softmax(2)
         if return_sr:
-            return log_probs, sr_output
+            return log_probs, sr_output, sr_base, theta
         return log_probs

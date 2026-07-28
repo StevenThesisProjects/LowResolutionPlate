@@ -12,12 +12,14 @@ Nguồn gốc: MultiFrame-LPR-main/src/training/trainer.py
 """
 from __future__ import annotations
 
+import copy
 import math
 import os
 from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
@@ -25,7 +27,36 @@ from tqdm import tqdm
 
 from src.training.losses import SRPixelLoss
 from src.utils.common import seed_everything
-from src.utils.postprocess import decode_with_confidence
+from src.utils.postprocess import PlateLayout, decode_batch, decode_with_confidence
+
+
+class ModelEMA:
+    """Exponential moving average of the weights.
+
+    Validation accuracy bounces by ~1 point between neighbouring epochs while
+    the underlying model barely changes, so whichever epoch happens to peak is
+    partly luck. Averaging the trajectory keeps the part that is actually
+    learned and drops the per-step jitter, which matters here because the
+    validation set is only 999 tracks and cannot resolve small differences.
+    """
+
+    def __init__(self, model: nn.Module, decay: float = 0.999) -> None:
+        self.decay = decay
+        self.module = copy.deepcopy(model).eval()
+        for param in self.module.parameters():
+            param.requires_grad_(False)
+
+    @torch.no_grad()
+    def update(self, model: nn.Module, step: int) -> None:
+        # Ramp the decay in so the average is not anchored to the random init.
+        decay = min(self.decay, (1.0 + step) / (10.0 + step))
+        ema_state = self.module.state_dict()
+        for key, value in model.state_dict().items():
+            shadow = ema_state[key]
+            if shadow.dtype.is_floating_point:
+                shadow.mul_(decay).add_(value.detach(), alpha=1.0 - decay)
+            else:
+                shadow.copy_(value)
 
 
 class WarmupCosineScheduler:
@@ -96,10 +127,26 @@ class Trainer:
         # qua gradient CTC, không có ràng buộc pixel-level nào).
         self.use_sr = bool(getattr(config, "USE_SR", False))
         self.lambda_sr = float(getattr(config, "LAMBDA_SR", 0.1))
-        self.sr_loss_fn = SRPixelLoss(
-            edge_weight=float(getattr(config, "SR_EDGE_WEIGHT", 0.5)),
-            perceptual_weight=float(getattr(config, "SR_PERCEPTUAL_WEIGHT", 0.0)),
-        ).to(self.device)
+        self.sr_loss_fn = (
+            SRPixelLoss(
+                edge_weight=float(getattr(config, "SR_EDGE_WEIGHT", 0.5)),
+                perceptual_weight=float(getattr(config, "SR_PERCEPTUAL_WEIGHT", 0.0)),
+            ).to(self.device)
+            if self.use_sr
+            else None
+        )
+
+        # Decoding: greedy stays the default so previously reported numbers keep
+        # their meaning; every run logs both so the comparison is free.
+        self.decode_mode = str(getattr(config, "DECODE_MODE", "greedy"))
+        self.plate_layout = PlateLayout.from_spec(
+            str(getattr(config, "PLATE_LAYOUTS", "LLLNLNN,LLLNNNN"))
+        )
+        self.beam_width = int(getattr(config, "BEAM_WIDTH", 16))
+
+        self.ema = ModelEMA(model, decay=float(getattr(config, "EMA_DECAY", 0.999))) if bool(
+            getattr(config, "USE_EMA", False)
+        ) else None
         self.optimizer = optim.AdamW(
             model.parameters(),
             lr=config.LEARNING_RATE,
@@ -119,7 +166,12 @@ class Trainer:
         self.no_improve_epochs = 0
         self.global_step = 0
         self.nan_batches = 0
-        self.last_sr_loss = 0.0
+        # Epoch mean, not the last batch: the per-batch value swings 0.6-0.9 and
+        # hides whether the SR head is actually converging.
+        self.epoch_sr_loss = 0.0
+        self.epoch_sr_base_loss = 0.0
+        self._sr_base_loss = 0.0
+        self.last_greedy_acc = 0.0
 
     def _output_path(self, filename: str) -> str:
         os.makedirs(self.config.OUTPUT_DIR, exist_ok=True)
@@ -140,18 +192,65 @@ class Trainer:
             self.scheduler.step()
         self.optimizer.zero_grad(set_to_none=True)
         self.global_step += 1
+        if self.ema is not None:
+            self.ema.update(self.model, self.global_step)
 
-    def _sr_loss(self, sr_output: torch.Tensor, hr_targets: torch.Tensor, has_hr: torch.Tensor) -> torch.Tensor:
-        """hr_targets: [B, F, C, H', W'], has_hr: [B] -> mask flattened to [B*F]."""
-        batch_size, num_frames = hr_targets.shape[:2]
-        hr_flat = hr_targets.reshape(batch_size * num_frames, *hr_targets.shape[2:]).to(self.device)
-        mask_flat = has_hr.to(self.device).repeat_interleave(num_frames)
-        return self.sr_loss_fn(sr_output, hr_flat, mask_flat)
+    def _sr_loss(
+        self,
+        sr_output: torch.Tensor,
+        sr_base: Optional[torch.Tensor],
+        hr_targets: Optional[torch.Tensor],
+        hr_index: torch.Tensor,
+        theta: Optional[torch.Tensor],
+        batch_size: int,
+        num_frames: int,
+    ) -> torch.Tensor:
+        """Pixel loss between the SR output and the matching HR frames.
+
+        `hr_targets` is [M, F, C, H', W'] for the M samples that have one, and
+        `hr_index` says where those sit in the batch. The SR output is selected
+        down to the same M samples rather than the target being padded up.
+        """
+        if hr_targets is None or hr_index.numel() == 0:
+            return sr_output.new_zeros(())
+
+        channels, height, width = sr_output.shape[1:]
+        index = hr_index.to(self.device)
+        selected = sr_output.view(batch_size, num_frames, channels, height, width)[index]
+        selected = selected.reshape(-1, channels, height, width)
+        hr_flat = hr_targets.to(self.device).reshape(-1, *hr_targets.shape[2:])
+
+        if theta is not None:
+            # SR runs after STN, so its output lives in the rectified frame.
+            # Warp the target by the same transform, otherwise the loss compares
+            # two different geometries. Detached: the SR objective should sharpen
+            # the image, not pull the STN toward whatever is easiest to rebuild.
+            theta_sel = theta.view(batch_size, num_frames, 2, 3)[index].reshape(-1, 2, 3)
+            grid = F.affine_grid(
+                theta_sel.detach().to(hr_flat.dtype), hr_flat.size(), align_corners=False
+            )
+            hr_flat = F.grid_sample(hr_flat, grid, align_corners=False, padding_mode="border")
+
+        # Reference score for the same target: what a plain bilinear upscale
+        # already achieves. `sr_loss` alone cannot tell whether the learned path
+        # contributes anything, and that is the only question that justifies the
+        # SR head's 3.66x compute.
+        if sr_base is not None:
+            with torch.no_grad():
+                base_sel = sr_base.view(batch_size, num_frames, channels, height, width)[index]
+                self._sr_base_loss = self.sr_loss_fn(
+                    base_sel.reshape(-1, channels, height, width), hr_flat
+                ).item()
+
+        return self.sr_loss_fn(selected, hr_flat)
 
     def train_one_epoch(self) -> float:
         """Train 1 epoch — forward → CTC loss (+ SR loss nếu use_sr) → backward."""
         self.model.train()
         epoch_loss = 0.0
+        sr_loss_total = 0.0
+        sr_base_total = 0.0
+        sr_loss_steps = 0
         num_valid_steps = 0
         self.nan_batches = 0
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1}/{self.config.EPOCHS}")
@@ -159,7 +258,7 @@ class Trainer:
 
         for step_idx, batch in enumerate(pbar, start=1):
             if self.use_sr:
-                images, targets, target_lengths, _, _, hr_targets, has_hr = batch
+                images, targets, target_lengths, _, _, hr_targets, hr_index = batch
             else:
                 images, targets, target_lengths, _, _ = batch
             images = images.to(self.device)
@@ -167,7 +266,7 @@ class Trainer:
 
             with autocast("cuda", enabled=self.use_amp and self.device.type == "cuda"):
                 if self.use_sr:
-                    preds, sr_output = self.model(images, return_sr=True)
+                    preds, sr_output, sr_base, theta = self.model(images, return_sr=True)
                 else:
                     preds = self.model(images)                 # [B, T, C]
                 # CTC yêu cầu input shape [T, B, C]
@@ -185,9 +284,19 @@ class Trainer:
                     )
                 loss = ctc_loss
                 if self.use_sr:
-                    sr_loss = self._sr_loss(sr_output, hr_targets, has_hr)
+                    sr_loss = self._sr_loss(
+                        sr_output,
+                        sr_base,
+                        hr_targets,
+                        hr_index,
+                        theta,
+                        batch_size=images.size(0),
+                        num_frames=images.size(1),
+                    )
                     loss = loss + self.lambda_sr * sr_loss
-                    self.last_sr_loss = sr_loss.item()
+                    sr_loss_total += sr_loss.item()
+                    sr_base_total += self._sr_base_loss
+                    sr_loss_steps += 1
                 loss = loss / self.grad_accum_steps
 
             # A single bad batch would otherwise poison the epoch average and
@@ -213,6 +322,8 @@ class Trainer:
                 postfix["nan"] = self.nan_batches
             pbar.set_postfix(**postfix)
 
+        self.epoch_sr_loss = sr_loss_total / sr_loss_steps if sr_loss_steps else 0.0
+        self.epoch_sr_base_loss = sr_base_total / sr_loss_steps if sr_loss_steps else 0.0
         if num_valid_steps == 0:
             print("❌ Toàn bộ batch trong epoch đều NaN — training không tiến triển được.")
             return float("nan")
@@ -220,18 +331,26 @@ class Trainer:
             print(f"⚠️ Bỏ qua {self.nan_batches} batch NaN trong epoch này.")
         return epoch_loss / num_valid_steps
 
+    def _eval_model(self) -> nn.Module:
+        """The EMA weights are what gets scored and saved once EMA is enabled."""
+        return self.ema.module if self.ema is not None else self.model
+
     def validate(self) -> Tuple[Dict[str, float], List[str]]:
         """
         Đánh giá trên validation set.
 
         Metric: Exact Match — chuỗi dự đoán phải khớp hoàn toàn ground truth.
+        Luôn chấm cả greedy lẫn decode chính (`DECODE_MODE`) để bảng so sánh
+        trong báo cáo có sẵn cả hai cột mà không tốn thêm một lần train.
         """
         if self.val_loader is None:
-            return {"loss": 0.0, "acc": 0.0}, []
+            return {"loss": 0.0, "acc": 0.0, "acc_greedy": 0.0}, []
 
-        self.model.eval()
+        model = self._eval_model()
+        model.eval()
         val_loss = 0.0
         total_correct = 0
+        greedy_correct = 0
         total_samples = 0
         submission_data: List[str] = []
 
@@ -240,7 +359,7 @@ class Trainer:
                 images = images.to(self.device)
                 targets = targets.to(self.device)
                 target_lengths = target_lengths.to(self.device)
-                preds = self.model(images)
+                preds = model(images)
 
                 input_lengths = torch.full((images.size(0),), preds.size(1), dtype=torch.long, device=self.device)
                 loss = self.criterion(
@@ -248,15 +367,32 @@ class Trainer:
                 )
                 val_loss += loss.item()
 
-                decoded_list = decode_with_confidence(preds, self.idx2char)
+                greedy_list = decode_with_confidence(preds, self.idx2char)
+                if self.decode_mode == "greedy":
+                    decoded_list = greedy_list
+                else:
+                    decoded_list = decode_batch(
+                        preds,
+                        self.idx2char,
+                        mode=self.decode_mode,
+                        layout=self.plate_layout,
+                        beam_width=self.beam_width,
+                    )
+
                 for i, (pred_text, conf) in enumerate(decoded_list):
                     if pred_text == labels_text[i]:
                         total_correct += 1
+                    if greedy_list[i][0] == labels_text[i]:
+                        greedy_correct += 1
                     submission_data.append(f"{track_ids[i]},{pred_text};{conf:.4f}")
                 total_samples += len(labels_text)
 
         val_acc = (total_correct / total_samples * 100) if total_samples > 0 else 0.0
-        return {"loss": val_loss / len(self.val_loader), "acc": val_acc}, submission_data
+        self.last_greedy_acc = (greedy_correct / total_samples * 100) if total_samples > 0 else 0.0
+        return (
+            {"loss": val_loss / len(self.val_loader), "acc": val_acc, "acc_greedy": self.last_greedy_acc},
+            submission_data,
+        )
 
     def _log_epoch(self, epoch: int, train_loss: float, val_metrics: Dict[str, float], lr: float) -> None:
         """Ghi lịch sử từng epoch ra CSV để vẽ training curve sau khi train xong.
@@ -265,19 +401,26 @@ class Trainer:
         tồn tại trên stdout của phiên chạy và mất khi đóng terminal.
         """
         path = self._output_path(f"history_{self._exp_name()}.csv")
-        is_new = not os.path.exists(path) or epoch == 0
-        with open(path, "a") as handle:
-            if is_new:
-                handle.write("epoch,train_loss,val_loss,val_acc,lr,sr_loss,nan_batches\n")
+        # Truncate on the first epoch instead of appending: a re-run used to
+        # leave the previous run's rows and a second header inside the same file.
+        mode = "w" if epoch == 0 else "a"
+        with open(path, mode) as handle:
+            if mode == "w":
+                handle.write(
+                    "epoch,train_loss,val_loss,val_acc,val_acc_greedy,lr,"
+                    "sr_loss,sr_loss_bilinear,nan_batches\n"
+                )
             handle.write(
                 f"{epoch + 1},{train_loss:.6f},{val_metrics['loss']:.6f},"
-                f"{val_metrics['acc']:.4f},{lr:.8f},{self.last_sr_loss:.6f},{self.nan_batches}\n"
+                f"{val_metrics['acc']:.4f},{val_metrics.get('acc_greedy', 0.0):.4f},"
+                f"{lr:.8f},{self.epoch_sr_loss:.6f},{self.epoch_sr_base_loss:.6f},"
+                f"{self.nan_batches}\n"
             )
 
     def save_model(self, path: str = None) -> None:
         if path is None:
             path = self._output_path(f"{self.config.EXPERIMENT_NAME}_best.pth")
-        torch.save(self.model.state_dict(), path)
+        torch.save(self._eval_model().state_dict(), path)
 
     def save_submission(self, data: List[str]) -> None:
         path = self._output_path(f"submission_{self.config.EXPERIMENT_NAME}.txt")
@@ -298,11 +441,15 @@ class Trainer:
             val_metrics, submission_data = self.validate()
 
             current_lr = self.scheduler.get_last_lr()[0]
+            decode_note = (
+                "" if self.decode_mode == "greedy"
+                else f" (greedy: {val_metrics['acc_greedy']:.2f}%)"
+            )
             print(
                 f"Epoch {epoch + 1}/{self.config.EPOCHS} | "
                 f"Train Loss: {train_loss:.4f} | "
                 f"Val Loss: {val_metrics['loss']:.4f} | "
-                f"Val Acc: {val_metrics['acc']:.2f}% | "
+                f"Val Acc: {val_metrics['acc']:.2f}%{decode_note} | "
                 f"LR: {current_lr:.2e}"
             )
             self._log_epoch(epoch, train_loss, val_metrics, current_lr)
@@ -354,13 +501,22 @@ class Trainer:
         Returns:
             List of (track_id, predicted_text, confidence)
         """
-        self.model.eval()
+        model = self._eval_model()
+        model.eval()
         results: List[Tuple[str, str, float]] = []
         with torch.no_grad():
-            for images, _, _, _, track_ids in tqdm(loader, desc="Inference"):
+            for batch in tqdm(loader, desc="Inference"):
+                images, track_ids = batch[0], batch[4]
                 images = images.to(self.device)
-                preds = self.model(images)
-                for i, (pred_text, conf) in enumerate(decode_with_confidence(preds, self.idx2char)):
+                preds = model(images)
+                decoded = decode_batch(
+                    preds,
+                    self.idx2char,
+                    mode=self.decode_mode,
+                    layout=self.plate_layout,
+                    beam_width=self.beam_width,
+                )
+                for i, (pred_text, conf) in enumerate(decoded):
                     results.append((track_ids[i], pred_text, conf))
         return results
 

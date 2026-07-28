@@ -45,15 +45,16 @@ class VGGPerceptualLoss(nn.Module):
 
 
 class SRPixelLoss(nn.Module):
-    """L1 + Sobel-edge L1 (+ optional VGG perceptual) between SR output and HR.
+    """Pixel loss between the SR output and the matching HR frame.
 
-    Implements `L_SR = L1 + alpha * L_edge + beta * L_perceptual`. The edge term
-    is the OCR-oriented default: plates are read from stroke geometry, so
-    preserving edges matters more than perceptual realism. The perceptual term
-    is available for the ablation the issue asks for.
+    Implements the issue #9 formula `L_SR = L1 + alpha * L_perceptual`, which is
+    what the default configuration runs. `edge_weight` adds a Sobel-edge L1 term
+    that the issue does not specify - plates are read from stroke geometry, so it
+    is plausible it helps, but it stays off by default so it gets measured as its
+    own ablation instead of being folded into the proposed method.
     """
 
-    def __init__(self, edge_weight: float = 0.5, perceptual_weight: float = 0.0) -> None:
+    def __init__(self, edge_weight: float = 0.0, perceptual_weight: float = 0.0) -> None:
         super().__init__()
         self.edge_weight = edge_weight
         self.perceptual_weight = perceptual_weight
@@ -68,21 +69,21 @@ class SRPixelLoss(nn.Module):
         gray = x.mean(dim=1, keepdim=True)
         return F.conv2d(gray, self.sobel_kernel.to(dtype=gray.dtype), padding=1)
 
-    def forward(self, pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            pred/target: [N, 3, H, W], N = flattened batch*frame.
-            mask: [N] bool — only samples with a pixel-aligned HR target
-                (synthetic LR degraded from HR) contribute to the loss; real
-                LR frames have no matching HR pixels and are excluded.
+            pred/target: [N, 3, H, W], N = flattened (selected samples)*frame.
+                Only samples with a pixel-aligned HR target reach this point;
+                the selection happens in the collate function so real LR frames
+                are never materialized as zeros in the first place.
         """
-        if not torch.any(mask):
+        if pred.numel() == 0:
             return pred.new_zeros(())
 
-        pred_m = pred[mask]
-        target_m = target[mask].to(dtype=pred_m.dtype)
-        loss = F.l1_loss(pred_m, target_m)
-        loss = loss + self.edge_weight * F.l1_loss(self._edges(pred_m), self._edges(target_m))
+        target = target.to(dtype=pred.dtype)
+        loss = F.l1_loss(pred, target)
+        if self.edge_weight > 0:
+            loss = loss + self.edge_weight * F.l1_loss(self._edges(pred), self._edges(target))
         if self.perceptual is not None:
-            loss = loss + self.perceptual_weight * self.perceptual(pred_m, target_m)
+            loss = loss + self.perceptual_weight * self.perceptual(pred, target)
         return loss

@@ -47,6 +47,9 @@ def build_model(config: Config) -> MultiFrameCRNN:
         use_dcn=config.USE_DCN,
         dcn_hidden_channels=config.DCN_HIDDEN_CHANNELS,
         fusion_mode=config.FUSION_MODE,
+        sr_multi_frame=config.SR_MULTI_FRAME,
+        stn_pool=config.STN_POOL,
+        width_downsample=config.WIDTH_DOWNSAMPLE,
     )
 
 
@@ -135,8 +138,12 @@ def print_table(rows: list[dict]) -> None:
             f"{row['latency_ms']:>12.2f} {ratio:>9.2f}x"
         )
     print("-" * 92)
-    print(f"Params tăng so với baseline: "
-          f"{', '.join(f'{r['label']}={r['params'] - baseline_params:+,}' for r in rows[1:])}")
+    # Nested quote cùng loại trong f-string chỉ hợp lệ từ Python 3.12; tách ra
+    # để tool còn chạy được trên máy GPU thuê (thường 3.10/3.11).
+    deltas = ", ".join(
+        "{}={:+,}".format(row["label"], row["params"] - baseline_params) for row in rows[1:]
+    )
+    print(f"Params tăng so với baseline: {deltas}")
 
 
 def main() -> None:

@@ -112,10 +112,13 @@ class ResBackbone(nn.Module):
         res_scale: float = 0.1,
         use_se: bool = False,
         norm: str = "none",
+        width_downsample: int = 8,
     ) -> None:
         super().__init__()
         if len(stage_blocks) != len(stage_channels):
             raise ValueError("stage_blocks and stage_channels must have the same length")
+        if width_downsample not in (4, 8):
+            raise ValueError(f"width_downsample must be 4 or 8, got {width_downsample}")
 
         # Stem keeps the first feature projection small and stable before the
         # deeper residual stages start refining OCR-specific details.
@@ -125,8 +128,18 @@ class ResBackbone(nn.Module):
         )
 
         # The width-preserving downsampling pattern keeps enough temporal steps
-        # for CTC while still reducing height aggressively.
-        downsample_strides = [(2, 2), (2, 2), (2, 2), (2, 1), (2, 1)]
+        # for CTC while still reducing height aggressively. Height always ends at
+        # 1 row; only the width schedule changes.
+        #
+        # width_downsample=8 gives T = W/8 = 16 steps for a 128px input, i.e. 2.3
+        # steps for each of the 7 characters - workable but tight, and it is the
+        # hidden reason the SR runs looked better: doubling the input width also
+        # doubled T. `4` buys the same T = 32 without paying for an SR head, so
+        # the two effects can finally be measured apart.
+        if width_downsample == 8:
+            downsample_strides = [(2, 2), (2, 2), (2, 2), (2, 1), (2, 1)]
+        else:
+            downsample_strides = [(2, 2), (2, 2), (2, 1), (2, 1), (2, 1)]
         stages: list[nn.Sequential] = []
         in_ch = base_channels
         for idx, (num_blocks, out_ch) in enumerate(zip(stage_blocks, stage_channels)):
@@ -265,12 +278,26 @@ class DCNAlignment(nn.Module):
             channels, channels, kernel_size=self.kernel_size, padding=1, groups=1, bias=True
         )
 
-        # Zero-init the offset/mask heads so the very first forward is a plain
-        # 3x3 conv with uniform modulation - no random warping early on.
+        # Zero-init the offset/mask heads so no random warping happens early on.
         nn.init.zeros_(self.offset_head.weight)
         nn.init.zeros_(self.offset_head.bias)
         nn.init.zeros_(self.mask_head.weight)
         nn.init.zeros_(self.mask_head.bias)
+        # ...and identity-init the deformable kernel itself. Zeroing only the
+        # offsets is not enough: with a default (random) kernel the very first
+        # forward replaces the RGB frame with a random 3x3 mixture, i.e. the
+        # module starts by destroying the image instead of passing it through.
+        self._init_identity_kernel()
+
+    def _init_identity_kernel(self) -> None:
+        """Make the deformable conv an identity map at initialization."""
+        weight = self.deform.weight  # [out_c, in_c, kH, kW]
+        nn.init.zeros_(weight)
+        centre_h, centre_w = self.kernel_size // 2, self.kernel_size // 2
+        for channel in range(min(weight.size(0), weight.size(1))):
+            weight.data[channel, channel, centre_h, centre_w] = 1.0
+        if self.deform.bias is not None:
+            nn.init.zeros_(self.deform.bias)
 
     def forward(self, frames: torch.Tensor) -> torch.Tensor:
         """frames: [B, F, C, H, W] -> aligned [B, F, C, H, W]."""
@@ -290,13 +317,20 @@ class DCNAlignment(nn.Module):
 
 
 class FrameSR(nn.Module):
-    """Lightweight per-frame super-resolution head.
+    """Multi-frame super-resolution head (Step 3 of the proposed pipeline).
 
-    Applied independently to each of the B*F flattened frames (never
-    channel-stacked across frames), so every frame keeps its own detail for
-    the attention fusion step later. The learned path is added on top of a
-    plain bilinear upscale (residual-style), which keeps early training
-    well-behaved the same way STN starts from an identity transform.
+    Never channel-stacks the raw frames the way the failed PR #7 module did, but
+    it is not blind to them either: shallow features are extracted per frame,
+    then pooled across the 5 frames and concatenated back onto each frame before
+    the residual body runs. That temporal context is the whole point - single
+    image SR cannot add information it never received, it can only hallucinate,
+    and at ~6.6 pixels per character hallucination is indistinguishable from a
+    reading error. Five frames with sub-pixel jitter genuinely carry more signal
+    than one, and this is where that extra signal enters.
+
+    Set `multi_frame=False` to recover the strictly per-frame variant for the
+    fusion ablation. The learned path is added on top of a plain bilinear
+    upscale, so the module starts near-identity like the STN does.
     """
 
     def __init__(
@@ -307,11 +341,20 @@ class FrameSR(nn.Module):
         scale: int = 2,
         res_scale: float = 0.1,
         norm: str = "none",
+        multi_frame: bool = True,
     ) -> None:
         super().__init__()
         self.scale = scale
+        self.multi_frame = multi_frame
         self.head = nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1, bias=True)
         self.head_act = nn.PReLU(hidden_channels)
+        if multi_frame:
+            # Merges [own features | temporal context] back down to the working
+            # width, so the body below stays exactly as cheap as before.
+            self.temporal_fuse = nn.Sequential(
+                nn.Conv2d(hidden_channels * 2, hidden_channels, kernel_size=1, bias=True),
+                nn.PReLU(hidden_channels),
+            )
         self.body = nn.Sequential(
             *[ResidualBlock(hidden_channels, res_scale=res_scale, norm=norm) for _ in range(num_blocks)]
         )
@@ -322,34 +365,77 @@ class FrameSR(nn.Module):
         )
         self.tail = nn.Conv2d(hidden_channels, in_channels, kernel_size=3, padding=1, bias=True)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        base = F.interpolate(x, scale_factor=self.scale, mode="bilinear", align_corners=False)
+    def forward(self, x: torch.Tensor, num_frames: int = 1, return_base: bool = False):
+        """x: [B*F, C, H, W] -> [B*F, C, H*scale, W*scale].
+
+        `return_base` also yields the plain bilinear upscale the learned path is
+        added to. Comparing both against HR answers the only question that
+        matters for this module: does the learned residual beat interpolation at
+        all? If it does not, the SR head is paying 3.66x compute for nothing.
+        """
+        if self.scale > 1:
+            base = F.interpolate(x, scale_factor=self.scale, mode="bilinear", align_corners=False)
+        else:
+            base = x
+
         feat = self.head_act(self.head(x))
+        if self.multi_frame and num_frames > 1:
+            flat, channels, height, width = feat.shape
+            grouped = feat.view(flat // num_frames, num_frames, channels, height, width)
+            # Mean over frames is the alignment-agnostic context: after STN (and
+            # optionally DCN) the frames are already registered, so averaging
+            # them is exactly the sub-pixel accumulation SR wants.
+            context = grouped.mean(dim=1, keepdim=True).expand_as(grouped)
+            feat = self.temporal_fuse(
+                torch.cat([grouped, context], dim=2).reshape(flat, channels * 2, height, width)
+            )
+
         feat = feat + self.body(feat)
         feat = self.upsample(feat)
-        return self.tail(feat) + base
+        out = self.tail(feat) + base
+        return (out, base) if return_base else out
 
 
 class STNBlock(nn.Module):
-    """Spatial transformer that predicts an affine warp for each frame."""
+    """Spatial transformer that predicts an affine warp for each frame.
 
-    def __init__(self, in_channels: int = 3) -> None:
+    The localization network deliberately keeps a spatial grid before the FC
+    head. Rotation and translation are *spatial* quantities: a globally averaged
+    descriptor has no way to express "the plate leans 5 degrees and sits left of
+    centre", so pooling all the way down to 1x1 leaves the head able to fit
+    little beyond zoom. `pool_size` therefore defaults to the 4x8 grid, and the
+    convolutions use stride 1 + max-pool so a 4x8 map still carries real layout
+    instead of being an upsample of a 1x4 map.
+    """
+
+    def __init__(self, in_channels: int = 3, pool_size: tuple[int, int] = (4, 8)) -> None:
         super().__init__()
-        self.localization = nn.Sequential(
-            nn.Conv2d(in_channels, 16, kernel_size=7, stride=2, padding=3),
+        self.pool_size = tuple(pool_size)
+        # `(1, 1)` selects the legacy topology so checkpoints trained before this
+        # fix still evaluate exactly as they did. Its stride-2 convolutions leave
+        # only a 1x4 map, which the global pool then flattens to a single vector.
+        self.legacy = self.pool_size == (1, 1)
+        stride = 2 if self.legacy else 1
+        layers = [
+            nn.Conv2d(in_channels, 16, kernel_size=7, stride=stride, padding=3),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(16, 32, kernel_size=5, stride=stride, padding=2),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(2, 2),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=stride, padding=1),
             nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
+        ]
+        if not self.legacy:
+            layers.append(nn.MaxPool2d(2, 2))
+        layers.append(nn.AdaptiveAvgPool2d(self.pool_size))
+        self.localization = nn.Sequential(*layers)
+
+        hidden = 32 if self.legacy else 64
         self.fc = nn.Sequential(
-            nn.Linear(64, 32),
+            nn.Linear(64 * self.pool_size[0] * self.pool_size[1], hidden),
             nn.ReLU(inplace=True),
-            nn.Linear(32, 6),
+            nn.Linear(hidden, 6),
         )
         self._init_identity()
 

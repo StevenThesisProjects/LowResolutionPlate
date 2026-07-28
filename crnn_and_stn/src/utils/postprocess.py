@@ -8,13 +8,24 @@ metrics consistently.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Sequence
 
+import numpy as np
 import torch
 
 DEFAULT_CHARSET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+DIGITS = "0123456789"
+
+# Every one of the 20,000 training labels is exactly 7 characters and matches one
+# of these two Brazilian layouts (Mercosur `LLLNLNN` and the older `LLLNNNN`).
+# `L` = letter, `N` = digit. Six of the seven positions are therefore locked to a
+# character class, which is what makes constrained decoding worth doing here.
+DEFAULT_PLATE_LAYOUTS = ("LLLNLNN", "LLLNNNN")
 
 
 def normalize_text(text: str) -> str:
@@ -202,3 +213,210 @@ def decode_with_confidence(
         results.append((pred_str, confidence))
 
     return results
+
+
+@dataclass(frozen=True)
+class PlateLayout:
+    """Per-position character classes shared by every plate layout in the data.
+
+    Multiple layouts are merged into one position-wise union, so a single decode
+    pass covers them all: `LLLNLNN` and `LLLNNNN` differ only at position 5, so
+    the union is `[A-Z]{3}[0-9][A-Z0-9][0-9]{2}`. Decoding once against the union
+    is equivalent to decoding once per layout and keeping the better score, but
+    costs a single pass.
+    """
+
+    patterns: tuple[str, ...] = DEFAULT_PLATE_LAYOUTS
+
+    def __post_init__(self) -> None:
+        if not self.patterns:
+            raise ValueError("PlateLayout needs at least one pattern.")
+        lengths = {len(p) for p in self.patterns}
+        if len(lengths) != 1:
+            raise ValueError(f"All layouts must have the same length, got {sorted(lengths)}.")
+        for pattern in self.patterns:
+            unknown = set(pattern) - {"L", "N"}
+            if unknown:
+                raise ValueError(f"Layout {pattern!r} has unknown class symbols {sorted(unknown)}.")
+
+    @property
+    def length(self) -> int:
+        return len(self.patterns[0])
+
+    def allowed_chars(self, position: int) -> str:
+        """Characters permitted at `position`, unioned across every layout."""
+        classes = {pattern[position] for pattern in self.patterns}
+        chars = ""
+        if "L" in classes:
+            chars += LETTERS
+        if "N" in classes:
+            chars += DIGITS
+        return chars
+
+    def allowed_indices(self, char2idx: dict[str, int]) -> list[np.ndarray]:
+        """Vocabulary indices permitted at each position, for fast lookup."""
+        return [
+            np.array(
+                sorted(char2idx[c] for c in self.allowed_chars(pos) if c in char2idx),
+                dtype=np.int64,
+            )
+            for pos in range(self.length)
+        ]
+
+    @classmethod
+    def from_spec(cls, spec: str) -> "PlateLayout":
+        """Build from a comma-separated spec such as ``"LLLNLNN,LLLNNNN"``."""
+        patterns = tuple(p.strip().upper() for p in spec.split(",") if p.strip())
+        return cls(patterns=patterns)
+
+
+def _logaddexp(a: float, b: float) -> float:
+    if a == -math.inf:
+        return b
+    if b == -math.inf:
+        return a
+    if a < b:
+        a, b = b, a
+    return a + math.log1p(math.exp(b - a))
+
+
+def constrained_beam_decode(
+    log_probs: torch.Tensor,
+    idx2char: dict[int, str],
+    layout: PlateLayout | None = None,
+    beam_width: int = 16,
+    char_topk: int = 8,
+) -> list[tuple[str, float]]:
+    """CTC prefix beam search restricted to the dataset's plate layouts.
+
+    Greedy decoding is free to emit the wrong length or a digit where the layout
+    guarantees a letter, and at ~6.6 pixels per character almost every confusion
+    (0/O, 1/I, 8/B, 5/S, 2/Z) crosses exactly that letter/digit boundary. Fixing
+    the length to 7 and locking six of the seven positions to a character class
+    removes that entire error family without touching the model.
+
+    Args:
+        log_probs: `[B, T, C]` log-softmax output (the model's native format).
+        idx2char: CTC index -> character, blank at index 0.
+        layout: position constraints; defaults to the two Brazilian layouts.
+        beam_width: prefixes kept per timestep.
+        char_topk: candidate characters considered per timestep and position.
+            Pruning to the top-k allowed characters keeps the search near-exact
+            while bounding the cost, since the tail of the distribution never
+            wins a 7-way product.
+
+    Returns:
+        `(text, confidence)` per sample. Confidence is the per-character
+        geometric mean probability of the winning sequence, which keeps it on
+        the same 0-1 scale as `decode_with_confidence`.
+    """
+
+    layout = layout or PlateLayout()
+    char2idx = {char: idx for idx, char in idx2char.items()}
+    allowed = layout.allowed_indices(char2idx)
+    target_len = layout.length
+    blank = 0
+
+    lp_all = log_probs.detach().float().cpu().numpy()
+    greedy_fallback = decode_with_confidence(log_probs, idx2char)
+    results: list[tuple[str, float]] = []
+
+    for sample_idx in range(lp_all.shape[0]):
+        lp = lp_all[sample_idx]  # [T, C]
+        num_steps = lp.shape[0]
+
+        # Candidate characters per (timestep, position): the top-k highest-scoring
+        # entries among the ones the layout permits at that position.
+        candidates: list[list[np.ndarray]] = []
+        for t in range(num_steps):
+            row = lp[t]
+            per_position = []
+            for pos in range(target_len):
+                pool = allowed[pos]
+                if 0 < char_topk < pool.size:
+                    order = np.argpartition(-row[pool], char_topk - 1)[:char_topk]
+                    per_position.append(pool[order])
+                else:
+                    per_position.append(pool)
+            candidates.append(per_position)
+
+        # prefix -> [log P(prefix, ends in blank), log P(prefix, ends in a char)]
+        beams: dict[tuple[int, ...], list[float]] = {(): [0.0, -math.inf]}
+
+        for t in range(num_steps):
+            row = lp[t]
+            steps_left = num_steps - t
+            nxt: dict[tuple[int, ...], list[float]] = {}
+
+            for prefix, (p_blank, p_nonblank) in beams.items():
+                p_total = _logaddexp(p_blank, p_nonblank)
+                missing = target_len - len(prefix)
+                # A prefix that can no longer reach the required length is dead;
+                # dropping it early keeps the beam full of viable candidates.
+                if missing > steps_left:
+                    continue
+
+                entry = nxt.setdefault(prefix, [-math.inf, -math.inf])
+                entry[0] = _logaddexp(entry[0], p_total + row[blank])
+                if prefix:
+                    # Repeating the last character collapses back onto the same
+                    # prefix under CTC, so it extends the non-blank mass only.
+                    entry[1] = _logaddexp(entry[1], p_nonblank + row[prefix[-1]])
+
+                if missing <= 0:
+                    continue
+                last = prefix[-1] if prefix else -1
+                for char_idx in candidates[t][len(prefix)]:
+                    char_idx = int(char_idx)
+                    extended = prefix + (char_idx,)
+                    ext_entry = nxt.setdefault(extended, [-math.inf, -math.inf])
+                    # A repeat needs an intervening blank, so it may only grow
+                    # from the blank-terminated mass.
+                    source = p_blank if char_idx == last else p_total
+                    ext_entry[1] = _logaddexp(ext_entry[1], source + row[char_idx])
+
+            if not nxt:
+                break
+            beams = dict(
+                sorted(
+                    nxt.items(),
+                    key=lambda kv: _logaddexp(kv[1][0], kv[1][1]),
+                    reverse=True,
+                )[:beam_width]
+            )
+
+        complete = [
+            (prefix, _logaddexp(scores[0], scores[1]))
+            for prefix, scores in beams.items()
+            if len(prefix) == target_len
+        ]
+        if not complete:
+            # Nothing reachable under the constraint (e.g. T too short); the
+            # unconstrained prediction is still better than an empty string.
+            results.append(greedy_fallback[sample_idx])
+            continue
+
+        best_prefix, best_score = max(complete, key=lambda item: item[1])
+        text = "".join(idx2char.get(idx, "") for idx in best_prefix)
+        confidence = float(math.exp(best_score / target_len))
+        results.append((text, min(confidence, 1.0)))
+
+    return results
+
+
+def decode_batch(
+    log_probs: torch.Tensor,
+    idx2char: dict[int, str],
+    mode: str = "greedy",
+    layout: PlateLayout | None = None,
+    beam_width: int = 16,
+) -> list[tuple[str, float]]:
+    """Dispatch to greedy or layout-constrained decoding."""
+
+    if mode == "greedy":
+        return decode_with_confidence(log_probs, idx2char)
+    if mode == "constrained":
+        return constrained_beam_decode(
+            log_probs, idx2char, layout=layout, beam_width=beam_width
+        )
+    raise ValueError(f"Unknown decode mode: {mode!r} (expected 'greedy' or 'constrained')")
