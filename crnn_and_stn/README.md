@@ -1,117 +1,70 @@
-# Baseline 1: Multi-Frame CRNN + STN
+# GroupNorm + SR Per-Frame — Ablation J1 & J2 (Root Cause #1, #2, #3 — issue #9)
 
-Trích xuất từ [MultiFrame-LPR-main](../MultiFrame-LPR-main/) — chỉ giữ phần **Baseline 1** (CRNN + STN), bỏ ResTran (Baseline 2).
+> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 
-Chạy trên dataset ICPR 2026 LRLPR trong thư mục `dataset/`.
+**Baseline chuẩn theo report ICPR của tác giả gốc là CRNN + STN (77.00%)** — không phải ResBlock backbone (76.68%, cải tiến làm sau ở PR #8). Mọi so sánh dưới đây tách rõ 2 mốc để không nhầm "vượt ResBlock" thành "vượt baseline gốc".
 
-## Cấu trúc project
+## 1. Vì sao tách J1 khỏi J2
 
-```
-crnn_and_stn/
-├── train.py                    # Entry point — chạy train/inference
-├── configs/config.py           # Hyperparameters (report Trang 48)
-├── src/
-│   ├── models/
-│   │   ├── crnn.py             # MultiFrameCRNN — pipeline chính
-│   │   └── components.py       # STNBlock, CNNBackbone, AttentionFusion
-│   ├── data/
-│   │   ├── dataset.py          # Load 5 frame/track, synthetic LR
-│   │   └── transforms.py       # Augmentation + degradation
-│   ├── training/
-│   │   └── trainer.py          # CTC loss, train/val loop
-│   └── utils/
-│       ├── postprocess.py      # CTC decode + confidence
-│       └── common.py           # seed_everything
-├── dataset/                    # Dữ liệu ICPR LRLPR
-├── results/                    # Checkpoint + submission (tự tạo khi train)
-└── summary/                    # Tài liệu phân tích
-```
+Chẩn đoán NaN trước đó xác nhận: bật SR trên backbone `norm=none` gây NaN toàn epoch; thêm GroupNorm (`--backbone-norm group`) sửa được. Nhưng GroupNorm **tự nó** có thể đã cải thiện accuracy, không liên quan gì tới SR. Nếu không đo riêng, khi cấu hình SR+GroupNorm vượt baseline sẽ không biết công lao thuộc về SR hay GroupNorm.
 
-## Pipeline model
+- **J1** — chỉ GroupNorm, không SR → đo riêng lợi ích của GroupNorm (sửa Root Cause #3).
+- **J2** — GroupNorm + SR per-frame + `L_CTC + λ·L_SR` (sửa Root Cause #1 & #2) → đo thêm lợi ích của SR trên nền đã có J1.
 
-```
-5 LR frames [B, 5, 3, 32, 128]
-    → STN Block          (căn chỉnh affine từng frame)
-    → CNN Backbone       (weight sharing — cùng CNN cho 5 frame)
-    → Attention Fusion   (gộp 5 feature map → 1)
-    → BiLSTM (2 layer)   (mô hình chuỗi)
-    → FC + CTC           (decode → "BAI8068")
-```
-
-## Cài đặt
-
-### Cách A — EZYCLOUDX template PyTorch (khuyến nghị, dễ nhất)
-
-Xem hướng dẫn đầy đủ: **[`summary/pytorch_template_run.md`](summary/pytorch_template_run.md)**
+## 2. Cấu hình
 
 ```bash
-# Trên container (torch CUDA có sẵn):
-pip install albumentations opencv-python tqdm numpy
-python train.py --experiment-name crnn_stn_pytorch --num-workers 8
+# J1 — GroupNorm, không SR (preset stable: batch 64, 80 epoch, lr 8e-4)
+python train.py --preset stable --experiment-name crnn_resblock_groupnorm_nosr \
+ --backbone-norm group --num-workers 8 --aug-level full
+
+# J2 — + SR per-frame + giám sát (batch 32 + accum 2 = effective batch 64, bắt buộc
+# trên GPU 24GB vì SR phóng ảnh 32x128 -> 64x256, gấp 4 lần pixel, gây OOM ở batch 64)
+python train.py --preset stable --experiment-name crnn_resblock_sr_supervised \
+ --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+ --use-sr --sr-scale 2 --lambda-sr 0.1 --backbone-norm group \
+ --num-workers 8 --aug-level full
 ```
 
-### Cách B — nvidia/cuda + uv (reproduce chuẩn hơn)
+Cùng seed 42; J2 chỉ khác J1 ở 3 flag `--use-sr --sr-scale 2 --lambda-sr 0.1`.
 
-Xem: [`summary/uv_setup.md`](summary/uv_setup.md)
+## 3. Kết quả
 
-```bash
-uv python pin 3.11 && uv sync && uv run python train.py
-```
+| Cấu hình                                                         | Val Exact Match | vs ResBlock | vs baseline chuẩn (77.00%) |
+| ---------------------------------------------------------------- | --------------: | ----------: | -------------------------: |
+| **CRNN + STN (baseline chuẩn, report ICPR)**                     |      **77.00%** |           — |                          — |
+| CRNN + STN (đo thực tế trên dataset project)                     |          75.78% |           — |                      −1.22 |
+| ResNet + Transformer + STN (report, tốt nhất trong report gốc)\* |          78.70% |           — |                      +1.70 |
+| ResBlock backbone (PR #8, `norm=none`, **không phải baseline**)  |          76.68% |           — |                      −0.32 |
+| J1 — ResBlock + GroupNorm                                        |          76.88% |       +0.20 |                      −0.12 |
+| **J2 — + SR per-frame + giám sát**                               |      **77.18%** |   **+0.50** |                  **+0.18** |
 
-## Chạy training
+\* Kiến trúc khác hẳn (ResNet+Transformer), không so trực tiếp được với nhánh CRNN đang làm.
 
-```bash
-# CRNN + STN (mặc định — Baseline 1)
-uv run python train.py
+J2 > J1 (+0.30) và > ResBlock (+0.50), nhưng so với **baseline chuẩn chỉ nhỉnh hơn +0.18** — và **J1 vẫn chưa vượt được baseline chuẩn**. So với mốc mạnh nhất trong report gốc (ResNet+Transformer+STN, 78.70%) J2 còn cách **1.52 điểm** — dù kiến trúc khác hẳn nên không so trực tiếp được, con số này cho thấy trần hiện tại của nhánh CRNN vẫn còn xa mốc cao nhất report từng đạt. Xem caveat ở mục 4 trước khi kết luận bất cứ điều gì từ các con số này.
 
-# Ablation tự động: CRNN vs CRNN+STN
-python run_ablation.py
+## 4. Caveat thống kê — quan trọng hơn mọi con số ở trên
 
-# Hoặc chạy thủ công
-python train.py --no-stn
+Trước khi chạy được J2 hoàn chỉnh, cùng một cấu hình (cùng seed) đã chạy 2 lần — lệch nhau **6.5 điểm** ở epoch 3 (42.64% vs 49.15%), do `cudnn.benchmark=True` khiến thuật toán convolution không xác định. Cộng thêm validation chỉ 999 sample → CI 95% ≈ ±2.7 điểm.
 
-# Tùy chỉnh
-python train.py \
-    --experiment-name my_run \
-    --epochs 30 \
-    --batch-size 64 \
-    --lr 0.0005 \
-    --aug-level full
+**Kết luận: chênh lệch +0.18–0.50 nêu ở mục 3 nằm gọn trong biên độ nhiễu đã đo được bằng thực nghiệm — chưa đủ bằng chứng để khẳng định GroupNorm hay SR thực sự cải thiện accuracy.** Cần chạy **O1 (3 seed: 42/100/2026)** cho cả J1 và J2 trước khi kết luận chắc chắn.
 
-# Train toàn bộ data + tạo submission test public
-python train.py --submission-mode
-```
+## 5. Overfit — cùng pattern ở cả 2 run
 
-## Kết quả mong đợi (report Trang 50)
+| Run | Val loss chạm đáy |      Best Val Acc | Train loss cuối |
+| --- | ----------------- | ----------------: | --------------: |
+| J1  | epoch 19 (0.2591) | 76.88% @ epoch 60 |          0.0074 |
+| J2  | epoch 15 (0.2773) | 77.18% @ epoch 57 |          0.0748 |
 
-| Model          | Accuracy   |
-| -------------- | ---------- |
-| CRNN           | 74.45%     |
-| **CRNN + STN** | **77.00%** |
+Cả 2 run: val loss chạm đáy sớm rồi tăng dần trong khi train loss gần 0 (model thuộc lòng tập train), val acc vẫn nhích lên dù val loss tăng. **60-80 epoch là dư cho dataset ~19,000 track** — dư địa cải thiện nên nhắm vào chống overfit (augmentation mạnh hơn, dropout, weight decay) hơn là train lâu hơn hoặc thêm tham số/module mới.
 
-## Output
+## 6. SR loss của J2 — giảm thật, chỉ bị che bởi nhiễu batch-cuối
 
-Sau khi train, trong `results/`:
+Trung bình `sr_loss` 10 epoch đầu: 0.804 → 10 epoch cuối: 0.674 (giảm ~16%). Module SR học đúng hướng tái tạo ảnh HR; xu hướng giảm chỉ bị che nếu nhìn giá trị batch-cuối từng epoch (dao động 0.61–0.90) thay vì trung bình cả epoch.
 
-| File                               | Mô tả                                          |
-| ---------------------------------- | ---------------------------------------------- |
-| `crnn_stn_baseline_best.pth`       | Checkpoint tốt nhất (theo val acc)             |
-| `submission_crnn_stn_baseline.txt` | Dự đoán validation: `track_id,text;confidence` |
+## 7. Kết luận & bước tiếp theo
 
-## Mapping từ MultiFrame-LPR-main
-
-| File gốc                   | File trích xuất            | Ghi chú                                          |
-| -------------------------- | -------------------------- | ------------------------------------------------ |
-| `src/models/crnn.py`       | `src/models/crnn.py`       | Giữ nguyên, thêm comment                         |
-| `src/models/components.py` | `src/models/components.py` | Chỉ STN, CNN, Attention (bỏ ResNet, Transformer) |
-| `src/data/dataset.py`      | `src/data/dataset.py`      | + strip label, comment tiếng Việt                |
-| `src/data/transforms.py`   | `src/data/transforms.py`   | Giữ nguyên                                       |
-| `src/training/trainer.py`  | `src/training/trainer.py`  | Giữ nguyên                                       |
-| `src/utils/postprocess.py` | `src/utils/postprocess.py` | Giữ nguyên                                       |
-| `src/utils/common.py`      | `src/utils/common.py`      | Giữ nguyên                                       |
-| `configs/config.py`        | `configs/config.py`        | Chỉ CRNN, path → `dataset/`                      |
-| `train.py`                 | `train.py`                 | Bỏ ResTran, đơn giản hóa                         |
-| `src/models/restran.py`    | ❌ Không trích             | Baseline 2                                       |
-| `run_ablation.py`          | `run_ablation.py`          | Chỉ 2 exp CRNN (bỏ ResTran)                      |
-
-Chi tiết: xem `summary/extraction_guide.md`
+- GroupNorm sửa đúng Root Cause #3 (hết NaN), gần như miễn phí compute (+15K params, FLOPs không đổi).
+- SR per-frame + giám sát cho tín hiệu tích cực (+0.30 so với J1) nhưng tốn **3.66x FLOPs / latency** — xem bảng chi phí trong `run_gpu.md`.
+- **Chưa cấu hình nào (J1 lẫn J2) vượt rõ ràng baseline chuẩn của tác giả (77.00%)** khi tính đến biên độ nhiễu — đây là điều quan trọng nhất cần nêu khi báo cáo, không nên nói "đã vượt baseline". Càng chưa gần mốc mạnh nhất report gốc (78.70%, ResNet+Transformer+STN — còn cách 1.52 điểm).
+- Bước tiếp theo: chạy **O1 (multi-seed)** trước khi đầu tư thêm vào J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện `J2 ≥ J1` để chạy J3, nhưng xây tiếp trên một kết quả 1-seed chưa xác nhận là rủi ro không đáng.

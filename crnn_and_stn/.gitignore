@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment & secrets
+.env
+.env.*
+
+# ── Dataset (nặng ~1.2GB — tải riêng, không push) ──
+dataset/data/
+dataset/Pa7a3Hin-test-public/
+dataset/TKzFBtn7-test-blind/
+dataset/val_tracks.json
+# Ảnh & archive dataset (phòng trường hợp đặt ngoài thư mục trên)
+dataset/**/*.jpg
+dataset/**/*.jpeg
+dataset/**/*.png
+dataset/**/*.bmp
+dataset/**/*.zip
+dataset/**/*.tar
+dataset/**/*.tar.gz
+dataset/**/*.7z
+dataset/
+
+summary/
+
+# ── Model weights & checkpoints ──
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.safetensors
+*.bin
+*.h5
+*.pkl
+*.pickle
+
+# ── Training outputs ──
+results/
+experiments/
+outputs/
+logs/
+runs/
+lightning_logs/
+wandb/
+submission_*.txt
+*.log
+
+# ── Báo cáo / tài liệu nặng ──
+report/
+*.pdf
+
+# ── Build & cache ──
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.ipynb_checkpoints/
+.cache/
+
+# ── IDE & OS ──
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~

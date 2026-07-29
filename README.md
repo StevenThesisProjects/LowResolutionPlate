@@ -1,4 +1,5 @@
 ## Phân loại PR:
+
 - [x] Feature
 - [ ] Bugs
 - [ ] Hotfix
@@ -18,7 +19,6 @@
 - **#1**: Tạo `MultiFrameCRNN` (crnn.py) kết hợp `STNBlock`, `CNNBackbone`, `AttentionFusion` (components.py)
 - **#2**: Thêm flag `--no-stn` vào `train.py`; `run_ablation.py` tự chạy 2 experiments tuần tự
 - **#4**: Class `Trainer` (trainer.py) với CTC decode + confidence score (postprocess.py)
-
 
 ---
 
