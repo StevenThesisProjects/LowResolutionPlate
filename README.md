@@ -4,33 +4,22 @@
 - [ ] Bugs
 - [ ] Hotfix
 
----
-
 # Đối chiếu tính năng đã làm theo yêu cầu:
 
-- [x] **#1**: Implement pipeline Multi-Frame CRNN + STN (Baseline 1)
-- [x] **#2**: Hỗ trợ ablation study CRNN vs CRNN+STN
-- [x] **#4**: Training loop: CTC Loss + AdamW + OneCycleLR + AMP
-
----
+- [x] #1: Áp dụng kiến thức mới về Super Resolution vào pipeline train
+- [x] #2: Tích hợp/chuẩn bị các hướng SR đề xuất như ResBlock, Channel Attention, PixelShuffle, Stacked Inputs
 
 # Cách thực hiện để xử lý mỗi yêu cầu:
 
-- **#1**: Tạo `MultiFrameCRNN` (crnn.py) kết hợp `STNBlock`, `CNNBackbone`, `AttentionFusion` (components.py)
-- **#2**: Thêm flag `--no-stn` vào `train.py`; `run_ablation.py` tự chạy 2 experiments tuần tự
-- **#4**: Class `Trainer` (trainer.py) với CTC decode + confidence score (postprocess.py)
-
----
+- #1: cập nhật thiết kế model/pipeline để có thể thử nghiệm SR như một thành phần hỗ trợ OCR
+- #2: chuẩn bị cấu trúc kiến trúc và tham số để dễ ablation các biến thể SR khác nhau
 
 # Phạm vi ảnh hưởng:
 
-- Toàn bộ code nằm trong module mới `crnn_and_stn/`, **không ảnh hưởng** các module khác trong repo
-- Thay đổi hyperparameter trong `configs/config.py` sẽ ảnh hưởng tất cả experiments
+- Ảnh hưởng đến hướng thử nghiệm model `CRNN + STN + SR`
+- Ảnh hưởng đến chiến lược train và so sánh baseline
+- Ảnh hưởng đến các module liên quan đến SR trong model pipeline
 
----
+<img width="714" height="740" alt="image" src="https://github.com/user-attachments/assets/c44cf3b5-a7a5-44b4-a436-d98c94ab390b" />
 
-# Liên kết đến các issues liên quan:
-
-- Trích xuất từ: `MultiFrame-LPR-main/` (cùng repo), chỉ giữ Baseline 1, bỏ ResTran
-- Branch: `dev/nhutminh` → merge target: `develop`
-- Commit: `76c5dff` — `featfeat: baseline crnn combine stn`
+<img width="1171" height="784" alt="image" src="https://github.com/user-attachments/assets/de97c15f-a2c0-46f7-9ce8-a719da2c3f78" />
