@@ -1,60 +1,203 @@
-"""Multi-frame CRNN with optional STN and stacked-input SR."""
+"""Multi-frame CRNN with STN and a residual backbone.
+
+This module keeps the original OCR flow intact:
+5 frames -> STN -> shared CNN backbone -> attention fusion -> BiLSTM -> CTC.
+The main change is that the backbone is now a deeper ResBlock-style encoder
+that is more stable for low-resolution plates and longer training schedules.
+"""
+
 from __future__ import annotations
+
+from typing import Optional, Sequence
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-from src.models.components import AttentionFusion, CNNBackbone, STNBlock, StackedSRNet
+from src.models.components import AttentionFusion, CNNBackbone, DCNAlignment, FrameSR, STNBlock
+
+
+def _normalize_stage_channels(
+    backbone_channels: int,
+    stage_channels: Optional[Sequence[int]],
+) -> tuple[int, ...]:
+    """Normalize channel presets so the model can accept CLI overrides cleanly."""
+
+    if stage_channels is None:
+        return (64, 128, 256, 256, backbone_channels)
+    channels = tuple(int(v) for v in stage_channels)
+    if len(channels) == 0:
+        raise ValueError("stage_channels must not be empty")
+    return channels
+
+
+def _normalize_stage_blocks(stage_blocks: Optional[Sequence[int]]) -> tuple[int, ...]:
+    """Normalize block presets; a tuple is easier to serialize and reuse."""
+
+    if stage_blocks is None:
+        return (2, 2, 2, 2, 2)
+    blocks = tuple(int(v) for v in stage_blocks)
+    if len(blocks) == 0:
+        raise ValueError("stage_blocks must not be empty")
+    return blocks
 
 
 class MultiFrameCRNN(nn.Module):
+    """Multi-frame CRNN with optional STN alignment."""
+
     def __init__(
         self,
         num_classes: int,
         hidden_size: int = 256,
         rnn_dropout: float = 0.25,
         use_stn: bool = True,
+        backbone_channels: int = 512,
+        backbone_base_channels: int = 64,
+        backbone_blocks: Optional[Sequence[int]] = None,
+        backbone_stage_channels: Optional[Sequence[int]] = None,
+        use_se: bool = False,
+        residual_scale: float = 0.1,
+        frame_dropout: float = 0.05,
+        fusion_dropout: float = 0.05,
         use_sr: bool = False,
         sr_scale: int = 2,
-        num_frames: int = 5,
+        sr_hidden_channels: int = 32,
+        sr_num_blocks: int = 4,
+        sr_res_scale: float = 0.1,
+        backbone_norm: str = "none",
+        use_dcn: bool = False,
+        dcn_hidden_channels: int = 32,
+        fusion_mode: str = "attention",
+        sr_multi_frame: bool = True,
+        stn_pool: Sequence[int] = (4, 8),
+        width_downsample: int = 8,
     ) -> None:
         super().__init__()
         self.use_stn = use_stn
+        self.frame_dropout = frame_dropout
         self.use_sr = use_sr
-        self.num_frames = num_frames
+        self.use_dcn = use_dcn
 
-        self.sr = StackedSRNet(num_frames=num_frames, target_size=(32, 128)) if use_sr else None
-        self.stn = STNBlock(in_channels=3) if use_stn else nn.Identity()
-        self.backbone = CNNBackbone(in_channels=3, out_channels=128)
-        self.fusion = AttentionFusion(channels=128)
+        stage_blocks = _normalize_stage_blocks(backbone_blocks)
+        stage_channels = _normalize_stage_channels(backbone_channels, backbone_stage_channels)
+        self.cnn_channels = stage_channels[-1]
 
+        if self.use_stn:
+            # STN performs a light geometric normalization per frame before the
+            # shared backbone extracts OCR features.
+            self.stn = STNBlock(in_channels=3, pool_size=tuple(stn_pool))
+
+        if self.use_dcn:
+            # Step 2 of the proposed pipeline: local (per-pixel) alignment across
+            # frames, catching the residual motion that STN's single affine warp
+            # per frame cannot express.
+            self.dcn = DCNAlignment(channels=3, hidden_channels=dcn_hidden_channels)
+
+        if self.use_sr:
+            # SR runs after STN (aligned frames are easier to upscale cleanly)
+            # and per-frame on the flattened B*F batch, so it never collapses
+            # the 5 frames into one image the way the old stacked-input SR did.
+            self.sr = FrameSR(
+                in_channels=3,
+                hidden_channels=sr_hidden_channels,
+                num_blocks=sr_num_blocks,
+                scale=sr_scale,
+                res_scale=sr_res_scale,
+                norm=backbone_norm,
+                multi_frame=sr_multi_frame,
+            )
+
+        self.backbone = CNNBackbone(
+            in_channels=3,
+            base_channels=backbone_base_channels,
+            stage_blocks=stage_blocks,
+            stage_channels=stage_channels,
+            res_scale=residual_scale,
+            use_se=use_se,
+            norm=backbone_norm,
+            width_downsample=width_downsample,
+        )
+
+        self.fusion = AttentionFusion(
+            channels=self.cnn_channels, dropout=fusion_dropout, mode=fusion_mode
+        )
         self.rnn = nn.LSTM(
-            input_size=128 * 8,
+            input_size=self.cnn_channels,
             hidden_size=hidden_size,
             num_layers=2,
-            batch_first=True,
             bidirectional=True,
+            batch_first=True,
             dropout=rnn_dropout,
         )
-        self.classifier = nn.Linear(hidden_size * 2, num_classes)
+        self.head = nn.Sequential(
+            nn.LayerNorm(hidden_size * 2),
+            nn.Dropout(rnn_dropout),
+            nn.Linear(hidden_size * 2, num_classes),
+        )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: [B, F, C, H, W]
-        if self.sr is not None:
-            x = self.sr(x)
-            x = x.unsqueeze(1).repeat(1, self.num_frames, 1, 1, 1)
+    def _apply_stn(self, frames: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        theta = self.stn(frames)
+        grid = F.affine_grid(theta, frames.size(), align_corners=False)
+        warped = F.grid_sample(frames, grid, align_corners=False, padding_mode="border")
+        return warped, theta
 
-        feats = []
-        for i in range(x.size(1)):
-            frame = x[:, i]
-            frame = self.stn(frame)
-            feats.append(self.backbone(frame))
+    def forward(self, x: torch.Tensor, return_sr: bool = False):
+        """Return log-probabilities for CTC loss.
 
-        feats = torch.stack(feats, dim=1)
-        fused = self.fusion(feats)
-        b, c, h, w = fused.shape
-        seq = fused.permute(0, 3, 1, 2).contiguous().view(b, w, c * h)
-        seq, _ = self.rnn(seq)
-        logits = self.classifier(seq)
-        # CTC expects log-probabilities over classes at each time step.
-        return torch.log_softmax(logits, dim=2)
+        Args:
+            x: Tensor with shape [B, Frames, C, H, W]
+            return_sr: also return the per-frame SR output (flattened
+                [B*F, C, H*scale, W*scale]) **and the STN transform** so the
+                trainer can compute an auxiliary pixel-level loss against HR
+                ground truth. The transform matters: SR runs after STN, so the
+                SR output lives in the rectified frame while the HR target does
+                not. Without warping the target by the same theta the loss
+                compares two different geometries and the SR head can only
+                learn to blur.
+        """
+
+        if x.dim() != 5:
+            raise ValueError(f"Expected 5D input [B, F, C, H, W], got shape {tuple(x.shape)}")
+
+        batch_size, num_frames, channels, height, width = x.size()
+        x_flat = x.view(batch_size * num_frames, channels, height, width)
+
+        # Step 1: global affine rectification, independently per frame.
+        theta = None
+        if self.use_stn:
+            x_flat, theta = self._apply_stn(x_flat)
+
+        # Step 2: local cross-frame alignment on the already-rectified frames.
+        if self.use_dcn:
+            x_flat = self.dcn(
+                x_flat.view(batch_size, num_frames, channels, height, width)
+            ).reshape(batch_size * num_frames, channels, height, width)
+
+        # Step 3: multi-frame super-resolution over the aligned frames.
+        sr_output = None
+        sr_base = None
+        if self.use_sr:
+            if return_sr:
+                x_flat, sr_base = self.sr(x_flat, num_frames=num_frames, return_base=True)
+                sr_output = x_flat
+            else:
+                x_flat = self.sr(x_flat, num_frames=num_frames)
+
+        features = self.backbone(x_flat)
+        features = features.view(batch_size, num_frames, self.cnn_channels, features.size(2), features.size(3))
+        if self.frame_dropout > 0 and self.training:
+            # Drop entire frame features with a small probability so the model
+            # does not over-rely on a single clear frame in the 5-frame stack.
+            frame_mask = torch.rand(batch_size, num_frames, 1, 1, 1, device=x.device)
+            keep_mask = (frame_mask > self.frame_dropout).float()
+            features = features * keep_mask + features.mean(dim=1, keepdim=True) * (1.0 - keep_mask)
+
+        fused = self.fusion(features)
+        # The fused feature map has height 1, so width becomes the sequence axis.
+        seq_input = fused.squeeze(2).permute(0, 2, 1)
+        rnn_out, _ = self.rnn(seq_input)
+        logits = self.head(rnn_out)
+        log_probs = logits.log_softmax(2)
+        if return_sr:
+            return log_probs, sr_output, sr_base, theta
+        return log_probs
