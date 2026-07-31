@@ -3,6 +3,9 @@
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `report/csv-report-process/history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`.
+> Ablation trọng số `λ_SR` (S2, λ=0.5) đã chạy — xem
+> [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md): kém S1 3 track, trong biên nhiễu,
+> không cải thiện. `λ_SR = 0.1` (cấu hình S1) vẫn là lựa chọn tốt nhất đã đo.
 
 ## 1. Cấu hình đã chạy
 
@@ -170,6 +173,14 @@ baseline gốc 77.00%), và phần lớn cải thiện đến từ kiến trúc/
 cũng cho bằng chứng học được thật (vượt bilinear, khoảng cách nới rộng theo
 thời gian) — khác hẳn kết luận "chưa chứng minh được giá trị" đã đặt ra cho J2.
 
-Bước tiếp theo theo đúng thứ tự trong `run_gpu.md`: S2 (λ_SR=0.5), S3
-(+Perceptual), S4 (sr-scale 1, kiểm tra giới hạn 55% nội suy) để biết S1 đã là
-điểm tối ưu hay còn cải thiện được, sau đó Chart + Submission.
+**Cập nhật — S2 (λ_SR=0.5) đã chạy** (xem [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md)):
+794/999 (79.48%), kém S1 đúng 3 track — nằm sâu trong biên nhiễu ±13, tức tăng
+`λ_SR` từ 0.1 lên 0.5 **không cải thiện**. Trả lời được câu hỏi để ngỏ ở trên:
+trong 2 điểm đã đo của khoảng đề xuất `λ_SR ∈ [0.1, 0.5]`, đầu thấp (0.1, cấu hình
+S1) vẫn tốt hơn hoặc bằng đầu cao — không có lý do đổi sang 0.5. Phát hiện phụ:
+196/999 track đổi dự đoán giữa S1/S2 dù điểm tổng gần hoà, gợi ý hướng ensemble
+thay vì chỉ chọn 1 cấu hình theo điểm tổng.
+
+Bước tiếp theo theo đúng thứ tự trong `run_gpu.md`: S3 (+Perceptual), S4
+(sr-scale 1, kiểm tra giới hạn 55% nội suy) để biết S1 đã là điểm tối ưu hay còn
+cải thiện được, sau đó multi-seed (O1) trên λ=0.1, rồi Chart + Submission.

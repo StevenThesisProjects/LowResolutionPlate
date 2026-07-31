@@ -184,6 +184,8 @@ Không cần: `pandas`, `matplotlib`, `seaborn` (chỉ dùng cho analysis trong 
 
 ## 3. Các bước cải tiến sau Baseline 1
 
+> **Xem [model_comparison_summary.md](model_comparison_summary.md) để có bảng so sánh TẤT CẢ cấu hình đã chạy (10 dòng, từ baseline gốc tới S2) trong 1 file duy nhất**, thay vì đọc rải rác qua từng tài liệu bên dưới.
+
 Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thực tế của project — xem [training_runs/run_gpu.md](../training_runs/run_gpu.md)) là điểm khởi đầu cho 2 hướng nâng cấp đã/đang thử:
 
 1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
