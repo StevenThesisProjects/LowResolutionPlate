@@ -260,5 +260,5 @@ crnn_and_stn/wandb/
 submission_*.txt
 
 # ── Báo cáo / tài liệu nặng ──
-crnn_and_stn/report/
+# crnn_and_stn/report/
 *.pdf

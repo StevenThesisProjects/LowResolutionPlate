@@ -57,7 +57,7 @@ submission_*.txt
 *.log
 
 # ── Báo cáo / tài liệu nặng ──
-report/
+# report/
 *.pdf
 
 # ── Build & cache ──
@@ -78,3 +78,5 @@ dist/
 Thumbs.db
 *.swp
 *~
+
+LowResolutionPlate_Aug2026

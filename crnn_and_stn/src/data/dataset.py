@@ -24,9 +24,16 @@ from tqdm import tqdm
 from src.data.transforms import (
     get_degradation_transforms,
     get_light_transforms,
+    get_normalize_transforms,
+    get_sr_geometric_transforms,
+    get_sr_photometric_transforms,
     get_train_transforms,
     get_val_transforms,
 )
+
+# Kích thước ảnh LR gốc trong dataset (đo trên 300 track: ~46x19).
+NATIVE_LR_HEIGHT = 19
+NATIVE_LR_WIDTH = 46
 
 
 class MultiFrameDataset(Dataset):
@@ -45,6 +52,10 @@ class MultiFrameDataset(Dataset):
         augmentation_level: str = "full",
         is_test: bool = False,
         full_train: bool = False,
+        provide_sr_target: bool = False,
+        sr_scale: int = 2,
+        lr_domain_match: bool = False,
+        num_frames: int = 5,
     ):
         """
         Args:
@@ -58,6 +69,13 @@ class MultiFrameDataset(Dataset):
             augmentation_level : 'full' hoặc 'light'
             is_test            : True khi load test set (không có label)
             full_train         : True khi train toàn bộ data (submission mode)
+            provide_sr_target  : True để trả thêm ảnh HR sạch làm target giám sát SR
+                                  (chỉ dùng khi train với --use-sr; val/test giữ nguyên
+                                  5-tuple cũ, không đổi hành vi)
+            sr_scale            : Hệ số upscale của SR target (phải khớp model.sr_scale)
+            lr_domain_match     : True để degrade HR ở đúng cỡ LR gốc trước khi resize
+                                  (sửa Nguyên nhân #4 — domain gap synthetic/real LR)
+            num_frames          : Số frame dùng mỗi track (Ablation 3, mặc định 5 = toàn bộ)
         """
         self.mode = mode
         self.samples: List[Dict[str, Any]] = []
@@ -69,6 +87,10 @@ class MultiFrameDataset(Dataset):
         self.augmentation_level = augmentation_level
         self.is_test = is_test
         self.full_train = full_train
+        self.provide_sr_target = provide_sr_target
+        self.sr_scale = sr_scale
+        self.lr_domain_match = lr_domain_match
+        self.num_frames = num_frames
 
         # Chọn pipeline transform theo mode
         if mode == "train":
@@ -76,10 +98,30 @@ class MultiFrameDataset(Dataset):
                 self.transform = get_light_transforms(img_height, img_width)
             else:
                 self.transform = get_train_transforms(img_height, img_width)
-            self.degrade = get_degradation_transforms()
+            self.degrade = get_degradation_transforms(domain_match=lr_domain_match)
         else:
             self.transform = get_val_transforms(img_height, img_width)
             self.degrade = None
+
+        # Nhánh SR có giám sát dùng pipeline riêng để cặp (input, target) khớp
+        # pixel: hình học chạy một lần ở cỡ target, input suy ra bằng downscale;
+        # quang học chạy đồng thời trên cả hai. Xem chú thích trong transforms.py.
+        self.sr_target_height = img_height * sr_scale
+        self.sr_target_width = img_width * sr_scale
+        if self.provide_sr_target:
+            self.sr_geometric = get_sr_geometric_transforms(
+                self.sr_target_height, self.sr_target_width
+            )
+            self.sr_photometric = get_sr_photometric_transforms()
+            self.sr_input_norm = get_normalize_transforms(img_height, img_width)
+            self.sr_target_norm = get_normalize_transforms(
+                self.sr_target_height, self.sr_target_width
+            )
+        else:
+            self.sr_geometric = None
+            self.sr_photometric = None
+            self.sr_input_norm = None
+            self.sr_target_norm = None
 
         print(f"[{mode.upper()}] Quét dữ liệu: {root_dir}")
         abs_root = os.path.abspath(root_dir)
@@ -218,39 +260,81 @@ class MultiFrameDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, int, str, str]:
+    def _select_frames(self, paths: List[str]) -> List[str]:
+        """Chọn `num_frames` frame trải đều trong track (Ablation 3).
+
+        Trải đều thay vì lấy N frame đầu: với N=2 ta muốn frame đầu và cuối
+        (đa dạng nhất về góc/blur) chứ không phải 2 frame liên tiếp gần giống nhau.
+        """
+        if self.num_frames >= len(paths) or len(paths) == 0:
+            return paths
+        if self.num_frames == 1:
+            return [paths[len(paths) // 2]]  # frame giữa thường ổn định nhất
+        step = (len(paths) - 1) / (self.num_frames - 1)
+        return [paths[round(i * step)] for i in range(self.num_frames)]
+
+    def __getitem__(self, idx: int):
         """
         Load 5 frame → tensor [5, 3, H, W].
 
-        Returns:
+        Returns (5-tuple mặc định, không đổi hành vi cũ):
             images_tensor : [5, 3, 32, 128]
             target        : indices CTC của plate_text
             target_len    : độ dài chuỗi nhãn
             label         : plate_text gốc (string)
             track_id      : tên folder track
+
+        Nếu `provide_sr_target=True` (chỉ bật khi train với --use-sr), trả thêm:
+            hr_target     : [5, 3, H*scale, W*scale] khi sample là synthetic —
+                             khớp pixel với input vì cùng một ảnh đã augment;
+                             `None` với sample LR thật (không có HR tương ứng).
         """
         item = self.samples[idx]
         images_list = []
+        hr_list = []
+        has_hr_target = bool(self.provide_sr_target and item["is_synthetic"])
+        paths = self._select_frames(item["paths"])
 
-        for path in item["paths"]:
-            image = cv2.imread(path, cv2.IMREAD_COLOR)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        for path in paths:
+            raw = cv2.imread(path, cv2.IMREAD_COLOR)
+            raw = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+
+            if has_hr_target:
+                image, hr_image = self._build_sr_pair(raw)
+                images_list.append(image)
+                hr_list.append(hr_image)
+                continue
 
             # Synthetic LR: degrade HR trước, rồi mới augment
             if item["is_synthetic"] and self.degrade:
-                image = self.degrade(image=image)["image"]
-
-            image = self.transform(image=image)["image"]
-            images_list.append(image)
+                image = self.degrade(image=raw)["image"]
+            else:
+                image = raw
+            images_list.append(self.transform(image=image)["image"])
 
         images_tensor = torch.stack(images_list, dim=0)
+        # Sample LR thật không có ảnh HR khớp pixel nên không đóng góp SR loss.
+        # Trả None thay vì một tensor zeros [5,3,64,256] (~3.9 MB/sample) chỉ để
+        # bị mask đi ngay sau đó ở phía trainer.
+        hr_target = torch.stack(hr_list, dim=0) if has_hr_target else None
 
         if self.is_test:
+            if self.provide_sr_target:
+                return images_tensor, torch.tensor([0]), 1, "", item["track_id"], hr_target
             return images_tensor, torch.tensor([0]), 1, "", item["track_id"]
 
         target = [self.char2idx[c] for c in item["label"] if c in self.char2idx]
         if not target:
             target = [0]
+        if self.provide_sr_target:
+            return (
+                images_tensor,
+                torch.tensor(target, dtype=torch.long),
+                len(target),
+                item["label"],
+                item["track_id"],
+                hr_target,
+            )
         return (
             images_tensor,
             torch.tensor(target, dtype=torch.long),
@@ -259,14 +343,59 @@ class MultiFrameDataset(Dataset):
             item["track_id"],
         )
 
+    def _build_sr_pair(self, raw) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Sinh cặp (input LR, target HR) khớp pixel từ một ảnh HR gốc.
+
+        Thứ tự quan trọng: augment hình học MỘT lần ở cỡ target, rồi mới hạ ảnh
+        đã augment xuống đúng cỡ LR gốc (~46x19) để degrade. Nhờ vậy input là
+        một phép downscale thuần tuý của target — hai ảnh khớp pixel tuyệt đối —
+        đồng thời blur/noise/JPEG sinh ra ở cùng thang không gian với ảnh LR
+        thật, thu hẹp luôn domain gap của Nguyên nhân #4.
+        """
+        hr_aug = self.sr_geometric(image=raw)["image"]
+
+        if self.lr_domain_match:
+            lr_source = cv2.resize(
+                hr_aug, (NATIVE_LR_WIDTH, NATIVE_LR_HEIGHT), interpolation=cv2.INTER_AREA
+            )
+        else:
+            lr_source = cv2.resize(
+                hr_aug, (self.img_width, self.img_height), interpolation=cv2.INTER_AREA
+            )
+        if self.degrade:
+            lr_source = self.degrade(image=lr_source)["image"]
+
+        # Cùng một phép jitter màu cho cả hai ảnh, nếu không SR phải học cách
+        # hoàn tác phép chỉnh sáng — việc không liên quan gì tới khôi phục nét.
+        jittered = self.sr_photometric(image=lr_source, hr=hr_aug)
+        return (
+            self.sr_input_norm(image=jittered["image"])["image"],
+            self.sr_target_norm(image=jittered["hr"])["image"],
+        )
+
     @staticmethod
     def collate_fn(batch):
-        """Gom batch cho DataLoader — CTC cần targets nối liền."""
-        images, targets, target_lengths, labels_text, track_ids = zip(*batch)
-        return (
-            torch.stack(images, 0),
-            torch.cat(targets),
-            torch.tensor(target_lengths, dtype=torch.long),
-            labels_text,
-            track_ids,
-        )
+        """Gom batch cho DataLoader — CTC cần targets nối liền.
+
+        Tự nhận diện 5-tuple (mặc định) hay 6-tuple (kèm SR target) qua
+        zip(*batch), không cần biết trước dataset có bật provide_sr_target hay không.
+
+        Với nhánh SR, chỉ những sample thật sự có ảnh HR mới được stack lại, kèm
+        `hr_index` chỉ ra vị trí của chúng trong batch. Cách này thay cho việc
+        nhồi tensor zeros cho mọi sample LR thật rồi mask đi — batch 64 từng phải
+        chuyển thừa ~126 MB zeros mỗi vòng qua DataLoader.
+        """
+        elements = list(zip(*batch))
+        images = torch.stack(elements[0], 0)
+        targets = torch.cat(elements[1])
+        target_lengths = torch.tensor(elements[2], dtype=torch.long)
+        labels_text = elements[3]
+        track_ids = elements[4]
+
+        if len(elements) == 5:
+            return images, targets, target_lengths, labels_text, track_ids
+
+        positions = [i for i, hr in enumerate(elements[5]) if hr is not None]
+        hr_targets = torch.stack([elements[5][i] for i in positions], 0) if positions else None
+        hr_index = torch.tensor(positions, dtype=torch.long)
+        return images, targets, target_lengths, labels_text, track_ids, hr_targets, hr_index
