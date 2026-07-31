@@ -1,0 +1,29 @@
+# MultiFrame-LPR dependencies
+# Python 3.11+ recommended
+#
+# GPU (CUDA 12.8) - install PyTorch first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#
+# CPU only:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#
+# Then install the rest:
+#   pip install -r requirements.txt
+
+# Core ML
+torch>=2.9.1
+torchvision>=0.24.1
+
+# Data & augmentation
+albumentations>=2.0.8
+opencv-python>=4.10.0
+numpy>=2.3.5
+pillow>=12.0.0
+
+# Utilities
+tqdm>=4.66.5
+pandas>=2.3.3
+
+# Visualization (optional for training plots)
+matplotlib>=3.10.8
+seaborn>=0.13.2
