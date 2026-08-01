@@ -3,9 +3,13 @@
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `report/csv-report-process/history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`.
-> Ablation trọng số `λ_SR` (S2, λ=0.5) đã chạy — xem
-> [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md): kém S1 3 track, trong biên nhiễu,
-> không cải thiện. `λ_SR = 0.1` (cấu hình S1) vẫn là lựa chọn tốt nhất đã đo.
+> 2 ablation tách từ S1 đã chạy — xem
+> [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
+> biên nhiễu, không cải thiện) và
+> [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) (+L_Perceptual: **hơn
+> S1 8 track, điểm cao nhất đã đo**, nhưng vẫn trong biên nhiễu nên chưa kết luận
+> chắc chắn tốt hơn S1). Bảng so sánh đầy đủ:
+> [model_comparison_summary.md](model_comparison_summary.md).
 
 ## 1. Cấu hình đã chạy
 
@@ -181,6 +185,13 @@ S1) vẫn tốt hơn hoặc bằng đầu cao — không có lý do đổi sang 
 196/999 track đổi dự đoán giữa S1/S2 dù điểm tổng gần hoà, gợi ý hướng ensemble
 thay vì chỉ chọn 1 cấu hình theo điểm tổng.
 
-Bước tiếp theo theo đúng thứ tự trong `run_gpu.md`: S3 (+Perceptual), S4
-(sr-scale 1, kiểm tra giới hạn 55% nội suy) để biết S1 đã là điểm tối ưu hay còn
-cải thiện được, sau đó multi-seed (O1) trên λ=0.1, rồi Chart + Submission.
+**Cập nhật — S3 (+L_Perceptual α=0.1) đã chạy** (xem
+[s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md)): 805/999 (80.58%),
+**hơn S1 8 track** — điểm cao nhất trong toàn bộ lịch sử thử nghiệm, nhưng 8 track
+vẫn nằm trong biên nhiễu ±13 nên chưa đủ để khẳng định chắc chắn tốt hơn S1 (khác
+S2, vốn cho kết quả âm tính rõ ràng). Đây là tín hiệu tích cực đầu tiên kể từ S1
+đáng chạy multi-seed cùng S1 thay vì chỉ multi-seed riêng S1.
+
+Bước tiếp theo theo đúng thứ tự trong `run_gpu.md`: S4 (sr-scale 1, kiểm tra giới
+hạn 55% nội suy), sau đó multi-seed (O1) trên **cả λ=0.1 (S1) và +Perceptual
+(S3)** để biết cấu hình nào thật sự tốt hơn, rồi Chart + Submission.
