@@ -3,12 +3,15 @@
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `report/csv-report-process/history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`.
-> 2 ablation tách từ S1 đã chạy — xem
+> 3 ablation tách từ S1 đã chạy — xem
 > [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
-> biên nhiễu, không cải thiện) và
+> biên nhiễu, không cải thiện),
 > [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) (+L_Perceptual: **hơn
-> S1 8 track, điểm cao nhất đã đo**, nhưng vẫn trong biên nhiễu nên chưa kết luận
-> chắc chắn tốt hơn S1). Bảng so sánh đầy đủ:
+> S1 8 track, đồng hạng cao nhất đã đo**) và
+> [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) (SR scale=1, không phóng
+> to ảnh: **hoà tuyệt đối với S3**, bằng chứng nghiêng về `T=32` là yếu tố chính
+> chứ không phải bản thân việc phóng to ảnh). Cả S3 lẫn S4 vẫn trong biên nhiễu so
+> với S1 nên chưa kết luận chắc chắn tốt hơn. Bảng so sánh đầy đủ:
 > [model_comparison_summary.md](model_comparison_summary.md).
 
 ## 1. Cấu hình đã chạy
@@ -192,6 +195,16 @@ vẫn nằm trong biên nhiễu ±13 nên chưa đủ để khẳng định ch�
 S2, vốn cho kết quả âm tính rõ ràng). Đây là tín hiệu tích cực đầu tiên kể từ S1
 đáng chạy multi-seed cùng S1 thay vì chỉ multi-seed riêng S1.
 
-Bước tiếp theo theo đúng thứ tự trong `run_gpu.md`: S4 (sr-scale 1, kiểm tra giới
-hạn 55% nội suy), sau đó multi-seed (O1) trên **cả λ=0.1 (S1) và +Perceptual
-(S3)** để biết cấu hình nào thật sự tốt hơn, rồi Chart + Submission.
+**Cập nhật — S4 (sr-scale 1 + width_downsample 4) đã chạy** (xem
+[s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md)): 805/999 (80.58%) —
+**hoà tuyệt đối với S3**, đạt bằng một cơ chế hoàn toàn khác (không phóng to ảnh,
+giữ `T=32` qua thay đổi backbone thay vì qua SR). Đây là bằng chứng gián tiếp
+quan trọng: `T=32` (nhiều bước CTC hơn), không phải bản thân việc SR phóng to
+ảnh, mới có thể là yếu tố chính đứng sau lợi ích đo được của S1 so với J2/J3
+(vốn chạy ở `T=16`). Cần thêm 1 ablation "`width_downsample=4` không SR" để tách
+dứt điểm — chưa nằm trong phạm vi S1-S4 đã hoàn thành.
+
+Cả 4 cấu hình S1-S4 theo kế hoạch trong `run_gpu.md` đã chạy xong. Bước tiếp
+theo: multi-seed (O1) trên **S1, S3, S4** (3 ứng viên tốt nhất hiện tại, không
+chỉ S1) để biết cấu hình nào thật sự tốt hơn một cách đáng tin cậy, rồi Chart +
+Submission. Bảng so sánh đầy đủ cả 4: [model_comparison_summary.md](model_comparison_summary.md).

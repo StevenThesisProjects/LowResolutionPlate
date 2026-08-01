@@ -1,10 +1,8 @@
 # Lệnh chạy GPU
 
-Chỉ lệnh + kết quả. Phân tích tại [../baseline1_crnn_stn/](../baseline1_crnn_stn/) —
-bảng so sánh tổng hợp tất cả cấu hình:
-[model_comparison_summary.md](../baseline1_crnn_stn/model_comparison_summary.md).
-Phạm vi hiện tại: **J1/J2/J3 (đã có) + S1-S4**. Ablation/multi-seed/benchmark
-không thuộc phạm vi này.
+Chỉ lệnh + kết quả. Phân tích tại [../baseline1_crnn_stn/](../baseline1_crnn_stn/).
+Phạm vi hiện tại: **J1/J2/J3 (đã có) + S1-S4 (đã xong)**. Ablation/multi-seed/
+benchmark không thuộc phạm vi này.
 
 **S1 đã chạy — 79.78% (797/999 track), vượt J2 26 track.** Phân tích đầy đủ:
 [s1_proposed_mf_sr_ocr.md](../baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md).
@@ -14,6 +12,15 @@ không cải thiện).** [s2_lam05_mf_sr_ocr.md](../baseline1_crnn_stn/s2_lam05_
 
 **S3 đã chạy — 80.58% (805/999 track), điểm cao nhất đã đo, +8 track so với S1
 (vẫn trong biên nhiễu, chưa kết luận chắc).** [s3_perceptual_mf_sr_ocr.md](../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md).
+
+**S4 đã chạy — 80.58% (805/999 track), hoà tuyệt đối với S3 (mô hình khác nhau,
+185/999 dự đoán khác nhau).** SR scale=1 (không phóng to ảnh) + `T=32` qua
+`width_downsample=4` vẫn đạt bằng S1 → nghiêng về giả thuyết `T=32` là yếu tố
+chính, không phải bản thân việc SR phóng to ảnh.
+[s4_sr_scale1_mf_sr_ocr.md](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
+
+**Cả 4 cấu hình S1-S4 đã chạy xong.** Bảng so sánh đầy đủ + đánh giá:
+[model_comparison_summary.md](../baseline1_crnn_stn/model_comparison_summary.md).
 
 > Val 999 track → biên nhiễu **±1.3 điểm (±13 track)**. Chênh lệch nhỏ hơn = nhiễu.
 
@@ -57,15 +64,22 @@ Val = 999 track Scenario-B. ±13 track = ±1.3 điểm là biên nhiễu.
 | **S1** | **Joint MF-SR-OCR (đề xuất, mục 5), λ_SR=0.1** |    **797** | **79.78%** |
 | S2     | Joint MF-SR-OCR, λ_SR=0.5 (mục 5)         |        794 |     79.48% |
 | **S3** | **Joint MF-SR-OCR, + L_Perceptual α=0.1 (mục 5)** | **805** | **80.58%** |
+| **S4** | **Joint MF-SR-OCR, SR scale=1 + width_downsample=4 (mục 5)** | **805** | **80.58%** |
 
 J2 hơn J1 3 track, J3 kém J2 9 track — cả hai trong biên nhiễu ±13. **S1 hơn J2
 tới 26 track — gấp đôi biên nhiễu**, lần đầu tiên một cấu hình vượt qua ngưỡng đó
 kể từ baseline gốc 77.00%. S2 (tăng `λ_SR` lên 0.5) kém S1 3 track — trong biên
-nhiễu, không cải thiện. **S3 (+L_Perceptual) hơn S1 8 track — điểm cao nhất đã
-đo, nhưng vẫn trong biên nhiễu so với S1** nên chưa kết luận chắc chắn tốt hơn.
+nhiễu, không cải thiện. **S3 (+L_Perceptual) và S4 (SR scale=1, không phóng to
+ảnh) đều hơn S1 8 track và hoà tuyệt đối với nhau (805/999)** — từng cặp vẫn
+trong biên nhiễu ±13 nên chưa "chắc chắn" theo tiêu chuẩn thống kê, nhưng 2 hướng
+độc lập cùng hội tụ về 1 điểm là tín hiệu đồng thuận đáng chú ý. S4 còn cho bằng
+chứng gián tiếp rằng `T=32` (không phải bản thân việc SR phóng to ảnh) mới là yếu
+tố chính đứng sau lợi ích đo được ở S1 — xem mục 5 và
+[s4_sr_scale1_mf_sr_ocr.md §3](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md#3-trả-lời-câu-hỏi-t-confound--kết-quả-chính-của-s4).
 Chi tiết + giới hạn cần nêu: [s1_proposed_mf_sr_ocr.md](../baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md),
 [s2_lam05_mf_sr_ocr.md](../baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md),
-[s3_perceptual_mf_sr_ocr.md](../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md).
+[s3_perceptual_mf_sr_ocr.md](../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md),
+[s4_sr_scale1_mf_sr_ocr.md](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
 
 **Chi phí compute** (`tools/benchmark.py --all`, CPU). Hai bảng khác nhau vì
 kiến trúc mặc định đã đổi (STN pool `(1,1)` → `(4,8)`) giữa lúc J1/J2/J3 và lúc
@@ -171,10 +185,13 @@ python train.py \
   --decode constrained --use-ema \
   --num-workers 8 --aug-level full
 
-## S4 — chưa chạy. SR ×1: HR gốc ~115x42px, target ×2 (256px) có 55% là nội suy
-##      bicubic thuần. ×1 giữ output 32x128 ≈ đúng độ phân giải HR thật. Dù S1
-##      đã cho bằng chứng SR học vượt bilinear (mục 4 của báo cáo S1), S4 vẫn
-##      cần chạy để biết SR có thể tốt hơn nữa ở đúng thang thông tin thật không.
+## S4 — SR ×1: HR gốc ~115x42px, target ×2 (256px) có 55% là nội suy bicubic
+##      thuần. ×1 giữ output 32x128 ≈ đúng độ phân giải HR thật — ĐÃ CHẠY: 80.58%
+##      (805/999), hoà tuyệt đối với S3, +8 track so với S1, early-stopped epoch
+##      58, đỉnh epoch 40. Vì T=32 vẫn giữ được (qua width_downsample=4) mà điểm
+##      không giảm dù SR không phóng to ảnh, bằng chứng nghiêng về T=32 là yếu tố
+##      chính, không phải SR có phóng to ảnh hay không.
+##      Chi tiết: ../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md
 python train.py \
   --preset stable --experiment-name s4_sr_scale1 \
   --epochs 60 --batch-size 32 --grad-accum-steps 2 \
