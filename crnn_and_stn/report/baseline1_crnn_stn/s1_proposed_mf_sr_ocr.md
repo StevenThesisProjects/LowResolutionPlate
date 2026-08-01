@@ -1,8 +1,8 @@
 # S1 — Joint End-to-End MF-SR-OCR (Proposed Method)
 
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `report/csv-report-process/history_s1_proposed.csv`,
-> `log_s1.txt`, `submission_s1_proposed.txt`.
+> Dữ liệu nguồn: `results/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
+> `log_s1.txt`, `submission_s1_proposed.txt`, `sr_quality_s1.csv`, `mf_sr_ocr.pth`.
 > 3 ablation tách từ S1 đã chạy — xem
 > [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
 > biên nhiễu, không cải thiện),
@@ -145,6 +145,26 @@ nhất (37), dùng constrained decode.
   nào trong khung `T=32`, nên `constrained_beam_decode` rơi vào nhánh fallback về
   greedy (xem docstring hàm trong `postprocess.py`). Ràng buộc layout **không
   tuyệt đối 100%** trong thực tế — cần biết để không báo cáo "100% đúng độ dài".
+
+---
+
+## 5b. Metrics bổ sung theo review Bước 2
+
+| Chỉ số | S1 | Ghi chú |
+|---|---:|---|
+| Exact Match | 79.78% (797/999) | |
+| CER ↓ | 0.0562 | mức corpus |
+| NED ↓ / 1−NED ↑ | 0.0562 / 0.9438 | |
+| PSNR: SR vs base | 16.6827 vs 15.6110 | **+1.0717 dB** |
+| SSIM: SR vs base | 0.4179 vs 0.3481 | **+0.0698** |
+| r(PSNR, đọc đúng) | **−0.362** | tương quan **âm** |
+
+Tương quan âm nghĩa là track model **đọc sai** lại có PSNR **cao hơn** (18.24 so với
+16.29 ở track đọc đúng) — nhất quán với 3 cấu hình còn lại. Chi tiết + giải thích:
+[../buoc2_metrics.md](../buoc2_metrics.md).
+
+Dữ liệu: `results/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv` (999 dòng).
+Hình định tính (5 đúng + 5 sai): `results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures/`.
 
 ---
 

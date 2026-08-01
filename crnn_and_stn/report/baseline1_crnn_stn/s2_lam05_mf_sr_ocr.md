@@ -1,7 +1,7 @@
 # S2 — MF-SR-OCR với λ_SR = 0.5 (ablation trọng số SR loss)
 
 > Kết quả của cấu hình S2 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `report/csv-report-process/mf_sr_ocr/s2_mf_sr_ocr_lam05/history_s2_lam05.csv`,
+> Dữ liệu nguồn: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/history_s2_lam05.csv`,
 > `submission_s2_lam05.txt`. Không có `log_s2.txt` (không chạy `tee` khi train run này).
 > So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) — S2 chỉ khác S1
 > đúng 1 tham số.
@@ -89,6 +89,28 @@ nhánh SR (nay có trọng số gấp 5 lần) ảnh hưởng ngược lên STN 
 được STN chọn để align dần trở nên "khó" hơn cho phép nội suy bilinear thuần. Đây
 là suy luận từ tương quan trong CSV, chưa verify trực tiếp bằng cách so `theta`
 qua các epoch — cần xem lại nếu muốn khẳng định chắc.
+
+## 3b. Metrics bổ sung theo review Bước 2 — **cấu hình đáng chú ý nhất**
+
+| Chỉ số | S2 | So với S1 |
+|---|---:|---|
+| Exact Match | 79.48% (794/999) | **−3 track (kém hơn)** |
+| CER ↓ | 0.0549 | −0.0013 (tốt hơn) |
+| NED ↓ / 1−NED ↑ | 0.0549 / 0.9451 | |
+| PSNR: SR vs base | 18.5228 vs 16.2349 | **+2.2879 dB** — gấp hơn 2 lần S1 (+1.07) |
+| SSIM: SR vs base | 0.5461 vs 0.3780 | **+0.1681** — gấp 2.4 lần S1 (+0.070) |
+| r(PSNR, đọc đúng) | −0.346 | tương quan âm |
+
+**S2 là bằng chứng trực tiếp nhất cho kết luận chính của Bước 2**: tăng `λ_SR` lên 0.5
+làm chất lượng tái tạo ảnh **tốt vượt trội** — PSNR gấp hơn 2 lần, SSIM gấp 2.5 lần mọi
+cấu hình khác — nhưng OCR lại **kém nhất nhóm S**.
+
+Tức là tối ưu theo PSNR **không** đồng nghĩa với dễ đọc hơn. Khi reviewer hỏi "sao
+không tối ưu theo PSNR", S2 chính là thí nghiệm đã trả lời: đã thử, và OCR tệ đi.
+
+Chi tiết + tương quan mức track: [../buoc2_metrics.md](../buoc2_metrics.md).
+Dữ liệu: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/sr_quality_s2.csv`.
+Hình định tính: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures/`.
 
 ## 4. Giới hạn cần nêu khi báo cáo
 

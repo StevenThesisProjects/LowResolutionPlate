@@ -44,7 +44,8 @@ COL_LR = 210
 COL_SR = 210
 COL_ATTN = 170
 COL_PRED = 300
-HEADER_H = 26
+# 2 dòng: track_id ở trên, nhãn cột ở dưới — 1 dòng thì track_id đè lên nhãn "I_LR".
+HEADER_H = 44
 PAD = 8
 BG = 250
 
@@ -112,15 +113,17 @@ def prediction_column(width: int, height: int, truth: str, pred: str, conf: floa
     colour = (0, 130, 0) if ok else (0, 0, 200)
     put_text(column, f"GT   : {truth}", (8, 26), scale=0.52)
     put_text(column, f"Pred : {pred}", (8, 52), scale=0.52, color=colour)
-    put_text(column, f"conf = {conf:.3f}", (8, 78), scale=0.44)
-    put_text(column, "ĐÚNG" if ok else "SAI", (8, 104), scale=0.56, color=colour, thickness=2)
 
-    # Đánh dấu ký tự sai — thứ người đọc paper muốn thấy ngay.
+    # Đánh dấu ký tự sai — thứ người đọc paper muốn thấy ngay. Đặt ngay dưới dòng
+    # Pred, và đẩy conf/verdict xuống để không chèn lên nhau.
     if not ok and len(pred) == len(truth):
         diff = "".join("^" if a != b else " " for a, b in zip(truth, pred))
-        put_text(column, f"       {diff}", (8, 66), scale=0.52, color=colour)
-    elif not ok:
-        put_text(column, f"(dai {len(pred)} vs {len(truth)})", (8, 126), scale=0.42, color=colour)
+        put_text(column, f"       {diff}", (8, 70), scale=0.52, color=colour)
+
+    put_text(column, f"conf = {conf:.3f}", (8, 100), scale=0.44)
+    put_text(column, "ĐÚNG" if ok else "SAI", (8, 126), scale=0.56, color=colour, thickness=2)
+    if not ok and len(pred) != len(truth):
+        put_text(column, f"(dai {len(pred)} vs {len(truth)})", (8, 150), scale=0.42, color=colour)
     return column
 
 
@@ -133,11 +136,12 @@ def build_row(frames, sr_frames, weights, truth, pred, conf, track_id, num_frame
 
     body = np.hstack([lr_col, sr_col, attn_col, pred_col])
     header = blank(HEADER_H, body.shape[1])
-    put_text(header, f"{track_id}", (6, 18), scale=0.46, color=(90, 90, 90))
-    for label, offset in [("I_LR", 0), ("I_SR", COL_LR),
-                          ("Attention", COL_LR + COL_SR),
-                          ("Prediction", COL_LR + COL_SR + COL_ATTN)]:
-        put_text(header, label, (offset + 78, 18), scale=0.46, color=(90, 90, 90))
+    put_text(header, f"{track_id}", (8, 17), scale=0.46, color=(90, 90, 90))
+    for label, offset, span in [("I_LR", 0, COL_LR), ("I_SR", COL_LR, COL_SR),
+                                ("Attention", COL_LR + COL_SR, COL_ATTN),
+                                ("Prediction", COL_LR + COL_SR + COL_ATTN, COL_PRED)]:
+        (text_w, _), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.46, 1)
+        put_text(header, label, (offset + (span - text_w) // 2, 37), scale=0.46, color=(90, 90, 90))
     row = np.vstack([header, body])
     return cv2.copyMakeBorder(row, PAD, PAD, PAD, PAD, cv2.BORDER_CONSTANT, value=(210, 210, 210))
 

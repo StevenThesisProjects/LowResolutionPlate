@@ -70,6 +70,91 @@ S4: bỏ upsampling của SR, đổi cách lấy T=32) — 2 điểm hội tụ 
   lý nếu ưu tiên 0/999 track lỗi độ dài. Đây là lựa chọn "tốt nhất trong điều kiện
   chưa multi-seed", không phải kết luận thống kê chắc chắn — xem mục 6.
 
+## 2b. Metrics mức ký tự — CER / NED (review Bước 2)
+
+Tính lại từ `submission_*.txt` + nhãn gốc, **không cần train lại**. CER là mức corpus
+(tổng edit distance / tổng ký tự nhãn), NED là trung bình mỗi track
+(`ED / max(len_ref, len_hyp)`). Cả hai **thấp = tốt**; paper hay ghi `1−NED`.
+
+| Cấu hình | Exact Match | CER ↓ | NED ↓ | 1−NED ↑ |
+|---|---:|---:|---:|---:|
+| S1 (λ=0.1) | 79.78% | 0.0562 | 0.0562 | 0.9438 |
+| S2 (λ=0.5) | 79.48% | 0.0549 | 0.0549 | 0.9451 |
+| **S3 (+perceptual)** | **80.58%** | **0.0522** | **0.0522** | **0.9478** |
+| S4 (SR ×1) | 80.58% | 0.0532 | 0.0532 | 0.9468 |
+
+Hai điều exact-match không cho thấy được:
+
+1. **S2 kém S1 về exact match nhưng TỐT hơn về CER** (0.0549 vs 0.0562) — khi S2 sai,
+   nó sai "gần đúng" hơn. Exact match phạt sai 1 ký tự như sai cả biển nên giấu mất
+   điều này.
+2. **CER phá được thế hoà S3 ↔ S4.** Hai cấu hình bằng nhau tuyệt đối ở exact match
+   (805/999) nhưng S3 có CER tốt hơn (0.0522 vs 0.0532) — tiêu chí đầu tiên tách được
+   hai ứng viên tốt nhất. Chênh lệch nhỏ, vẫn cần multi-seed xác nhận.
+
+CER và NED trùng nhau vì gần như mọi dự đoán đều đúng 7 ký tự, nên
+`max(len_ref, len_hyp)` luôn bằng `len_ref`.
+
+### PSNR / SSIM — chất lượng tái tạo ảnh của nhánh SR
+
+Đo bằng `tools/eval_sr_quality.py` trên 999 track val (4.995 ảnh). `base` = ảnh chưa
+qua SR. **Con số đáng đọc là cột "Chênh"**, không phải giá trị tuyệt đối.
+
+| Cấu hình | PSNR (SR) | PSNR (base) | Chênh | SSIM (SR) | SSIM (base) | Chênh |
+|---|---:|---:|---:|---:|---:|---:|
+| S1 (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
+| **S2** (×2, λ=0.5) | 18.5228 | 16.2349 | **+2.2879 dB** | 0.5461 | 0.3780 | **+0.1681** |
+| S3 (×2, perceptual) | 16.9582 | 15.8727 | +1.0855 dB | 0.4234 | 0.3569 | +0.0664 |
+| S4 (×1) | 17.5249 | 16.5011 | +1.0238 dB | 0.5027 | 0.4408 | +0.0618 |
+
+⚠️ **Không so PSNR tuyệt đối giữa S4 và S1/S2/S3** — S1–S3 xuất ảnh 64×256, S4 xuất
+32×128, hai thang khác nhau. Chỉ cột "Chênh" so được, vì mỗi cấu hình so với base của
+chính nó.
+
+**Phát hiện quan trọng — PSNR/SSIM NGHỊCH với khả năng đọc biển số:**
+
+Ở mức từng track (n=999, ghép PSNR với đúng/sai từng track):
+
+| Cấu hình | PSNR track **đọc đúng** | PSNR track **đọc sai** | r(PSNR, đúng) |
+|---|---:|---:|---:|
+| S1 | 16.288 | 18.240 | **−0.362** |
+| S2 | 18.102 | 20.154 | **−0.346** |
+| S3 | 16.492 | 18.894 | **−0.412** |
+| S4 | 17.080 | 19.371 | **−0.400** |
+
+**Track đọc SAI lại có PSNR CAO hơn ~2 dB**, tương quan âm nhất quán ở cả 4 cấu hình.
+Ở mức cấu hình cũng cùng chiều: S2 có PSNR tốt nhất (+2.29 dB, hơn gấp đôi mọi cấu
+hình khác) nhưng OCR **kém nhất** (794/999).
+
+Giả thuyết: PSNR bị chi phối bởi *nội dung ảnh* — ảnh mờ/tương phản thấp có sai khác
+pixel nhỏ nên PSNR cao, nhưng đúng là loại khó đọc nhất. Tức PSNR đo "ảnh này dễ tái
+tạo tới đâu", còn OCR cần "ảnh này chứa bao nhiêu chi tiết đọc được".
+
+→ Tối ưu theo PSNR **đẩy model đi sai hướng**, không chỉ là vô ích. Đây là câu trả lời
+cho câu hỏi "sao không tối ưu theo PSNR", và là bằng chứng số cho nguyên tắc đặt ra từ
+đầu project: đánh giá SR bằng OCR exact-match, không phải PSNR/SSIM.
+
+Chi tiết + 3 chỗ lệch so với review: [../buoc2_metrics.md](../buoc2_metrics.md).
+
+### Hình định tính (Figure 4) — đã sinh cho cả 4 cấu hình
+
+`results/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
+`figure4_qualitative_grid.png` (grid 4 cột `I_LR → I_SR → Attention → Prediction`,
+5 case đúng + 5 case sai) và 10 ảnh từng track riêng.
+
+**Track xuất hiện ở nhiều cấu hình** — tiện để so trực tiếp khi chọn hình:
+
+| Track | Xuất hiện ở | Dùng để minh hoạ |
+|---|---|---|
+| `track_22161`, `track_19095` | **sai ở cả 4** | giới hạn thật của dữ liệu, không phải điểm yếu của một model |
+| `track_21455` | đúng ở S1/S2/S3 | case dễ, đọc chắc chắn |
+| `track_12478`, `track_17959` | sai ở S2 và S3 | |
+| `track_14442` | chỉ sai ở S4 | |
+
+⚠️ Danh sách "10 track tiêu biểu" **không tái lập chính xác khi đổi phần cứng** — thứ
+tự xếp theo confidence lệch nhau ở các track có confidence gần bằng nhau (khác biệt số
+thực GPU vs CPU). Nên chốt một bộ hình và giữ nguyên, đừng chạy lại rồi lấy bộ khác.
+
 ## 3. Nhánh phụ — AdamW tuning trên backbone cũ (lịch sử, không so trực tiếp được)
 
 Chạy trên backbone CNN+BatchNorm gốc, nay không còn tồn tại trong code (đã bị

@@ -1,8 +1,13 @@
 # Lệnh chạy GPU
 
 Chỉ lệnh + kết quả. Phân tích tại [../baseline1_crnn_stn/](../baseline1_crnn_stn/).
-Phạm vi hiện tại: **J1/J2/J3 (đã có) + S1-S4 (đã xong)**. Ablation/multi-seed/
-benchmark không thuộc phạm vi này.
+
+**Phạm vi**: J1/J2/J3 + S1–S4 (đã xong) **+ đợt revision theo review** (multi-seed,
+metrics, hình) — checklist ở [mục 0](#0-chạy-theo-thứ-tự-này-checklist-cho-đợt-revision),
+theo dõi tiến độ ở [../checklist_review.md](../checklist_review.md).
+
+> **Dữ liệu S1–S4 nằm ở `results/mf_sr_ocr/<cấu hình>/`** (đã chuyển khỏi
+> `report/csv-report-process/`). Thư mục `results/` bị **gitignore** → nhớ backup riêng.
 
 **S1 đã chạy — 79.78% (797/999 track), vượt J2 26 track.** Phân tích đầy đủ:
 [s1_proposed_mf_sr_ocr.md](../baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md).
@@ -30,31 +35,83 @@ chính, không phải bản thân việc SR phóng to ảnh.
 
 Kế hoạch đầy đủ + lý do: [../paper/paper_revision_plan.md](../paper/paper_revision_plan.md).
 
-### ⬜ B0 — Cài thêm 1 gói (30 giây)
+**Tiến độ**: B0 ✅ · B1a ✅ · B1b ✅ · B2 ✅ · **B3 🔄 đang chạy** · B4–B6 chưa.
+
+### ✅ B0 — Chuẩn bị (30 giây)
 
 ```bash
+mkdir -p results                # BẮT BUỘC: `results/` bị gitignore nên server
+                                # clone về KHÔNG có thư mục này -> `tee` fail và
+                                # MẤT LOG (python tự tạo sau, nhưng tee chạy trước)
 pip install scikit-image        # cho PSNR/SSIM; thiếu thì chỉ có PSNR
 ```
 
-### ⬜ B1 — Lấy PSNR/SSIM + hình cho paper (vài phút, KHÔNG train)
+### B1 — PSNR/SSIM + hình cho paper (KHÔNG train)
 
-Chạy trên checkpoint S1–S4 **đã có sẵn**. Làm trước vì rẻ và có kết quả ngay.
-Lệnh đầy đủ cả 4 cấu hình: [mục 6b](#6b-psnrssim--figure-định-tính-review-bước-2b--3).
+> **Chạy ở đâu cũng được — miễn là máy đó có file `.pth`.** Đây là inference thuần:
+> GPU thì nhanh, CPU cũng chạy được (~20 phút/cấu hình).
+>
+> ⚠️ Lưu ý `*.pth` bị **gitignore** (113 MB/file) → `git pull` trên server **không**
+> kéo checkpoint về. Nếu gặp "❌ Không tìm thấy checkpoint" thì phải upload/copy
+> checkpoint sang máy đó trước, không phải lỗi lệnh.
+
+#### ✅ B1a — PSNR/SSIM: ĐÃ CHẠY XONG CẢ 4 CẤU HÌNH
+
+Kết quả ở `results/mf_sr_ocr/<cấu hình>/sr_quality_*.csv` (999 dòng mỗi file).
+Số liệu + phân tích: [../buoc2_metrics.md](../buoc2_metrics.md).
+
+Chỉ chạy lại nếu cần (lưu ý **chỉ S4 mới có `--width-downsample 4`**):
 
 ```bash
-python tools/eval_sr_quality.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --width-downsample 4 --lr-domain-match --output-csv results/sr_quality_s4.csv
+python tools/eval_sr_quality.py --lr-domain-match \
+  --checkpoint results/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-csv results/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv
 
-python tools/visualize_paper_figures.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --width-downsample 4 --output-dir results/paper_figures/s4
+python tools/eval_sr_quality.py --lr-domain-match \
+  --checkpoint results/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --output-csv results/mf_sr_ocr/s2_mf_sr_ocr_lam05/sr_quality_s2.csv
+
+python tools/eval_sr_quality.py --lr-domain-match \
+  --checkpoint results/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
+  --output-csv results/mf_sr_ocr/s3_l_perceptual/sr_quality_s3.csv
+
+python tools/eval_sr_quality.py --lr-domain-match --width-downsample 4 \
+  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --output-csv results/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv
 ```
 
-### ⬜ B2 — Smoke test 1 epoch (~4 phút) — ĐỪNG BỎ QUA
+#### ✅ B1b — Hình định tính (Bước 3 của review): ĐÃ CHẠY XONG CẢ 4
 
-Code trainer vừa sửa (thêm CER/NED + thời gian vào CSV) **chưa chạy thật lần nào**.
-Tốn 4 phút để chắc, thay vì phát hiện sai cột sau 16 giờ.
+Kết quả ở `results/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
+`figure4_qualitative_grid.png` + 10 ảnh từng track (5 đúng `NN_ok_*`, 5 sai `NN_err_*`).
+
+Lệnh để chạy lại (inference thuần, không train — GPU nhanh, CPU ~20 phút/cấu hình):
+
+```bash
+python tools/visualize_paper_figures.py \
+  --checkpoint results/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-dir results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures
+
+python tools/visualize_paper_figures.py \
+  --checkpoint results/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --output-dir results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures
+
+python tools/visualize_paper_figures.py \
+  --checkpoint results/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
+  --output-dir results/mf_sr_ocr/s3_l_perceptual/paper_figures
+
+python tools/visualize_paper_figures.py --width-downsample 4 \
+  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --output-dir results/mf_sr_ocr/s4_sr_scale1/paper_figures
+```
+
+Mỗi lệnh xuất `figure4_qualitative_grid.png` (5 case đúng + 5 case sai) + ảnh từng
+track riêng. Chi tiết cách chọn track: [mục 6b](#6b-psnrssim--figure-định-tính-review-bước-2b--3).
+
+### ✅ B2 — Smoke test 1 epoch — ĐÃ ĐẠT
+
+CSV ra đủ 14 cột, `val_cer`/`val_ned`/`*_time_s` đều có giá trị; banner in đúng
+`deterministic: True`. Chạy lại nếu sửa thêm code trainer:
 
 ```bash
 python train.py --preset stable --experiment-name smoke --epochs 1 \
@@ -70,7 +127,7 @@ head -2 results/history_smoke.csv
 **Điều kiện đạt** — dòng header phải có đủ 14 cột, kết thúc bằng:
 `...,nan_batches,val_cer,val_ned,train_time_s,val_time_s,epoch_time_s`
 
-### ⬜ B3 — Multi-seed S4 (~16 h) — chạy cấu hình rẻ nhất trước
+### 🔄 B3 — Multi-seed S4 (~16 h) — ĐANG CHẠY trên GPU thuê
 
 ```bash
 for SEED in 42 100 2026; do
@@ -86,14 +143,45 @@ done
 
 ### ⬜ B4 — Multi-seed S1 (~33 h) và S3 (~36–45 h)
 
-Lệnh đầy đủ: [mục 5](#5-s--proposed-method-joint-end-to-end-mf-sr-ocr). Nếu ngân sách
-GPU eo hẹp thì bỏ S3, giữ S1 + S4.
+**Phạm vi đã chốt: S1 + S3 + S4. Bỏ S2** (kết quả âm tính, giữ 1 seed là đủ) — lý do
+đầy đủ ở [../checklist_review.md](../checklist_review.md).
+
+Đổi cờ theo từng cấu hình, lệnh gốc ở
+[mục 5](#5-s--proposed-method-joint-end-to-end-mf-sr-ocr):
+
+| Cấu hình | Cờ khác so với S4 |
+|---|---|
+| **S1** | `--sr-scale 2` · **bỏ** `--width-downsample 4` |
+| **S3** | `--sr-scale 2 --sr-perceptual-weight 0.1` · **bỏ** `--width-downsample 4` |
+
+Ví dụ cho S1 (S3 chỉ thêm `--sr-perceptual-weight 0.1`):
+
+```bash
+for SEED in 42 100 2026; do
+  python train.py --preset stable --experiment-name s1_seed${SEED} --seed ${SEED} \
+    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+    --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
+    --backbone-norm group --lr-domain-match \
+    --decode constrained --use-ema \
+    --no-cudnn-benchmark --num-workers 8 --aug-level full \
+    2>&1 | tee results/log_s1_seed${SEED}.txt
+done
+```
 
 ### ⬜ B5 — Tổng hợp Mean ± Std
 
 ```bash
-python tools/aggregate_seeds.py --from-logs results/log_s4_seed*.txt --label "S4"
-python tools/aggregate_seeds.py --from-logs results/log_s1_seed*.txt --label "S1"
+for C in s1 s3 s4; do
+  python tools/aggregate_seeds.py --from-logs results/log_${C}_seed*.txt --label "${C:u}"
+done
+```
+
+So sánh trực tiếp 2 cấu hình (kèm kiểm định chênh lệch có ý nghĩa không):
+
+```bash
+python tools/aggregate_seeds.py \
+  --acc <3 số S4> --label "S4 (SR ×1)" \
+  --baseline-acc <3 số S1> --baseline-label "S1 (SR ×2)"
 ```
 
 ### ⬜ B6 — Chốt cấu hình → chạy test
@@ -207,13 +295,21 @@ Mốc J2: ep1 `0.00%` · ep2 `31.83%` · ep3 `49.15%`. Đạt nếu ep2 > 25% v�
 
 ---
 
-## 4. P0 — Chấm lại checkpoint cũ (không tốn GPU, chạy trước tiên)
+## 4. P0 — Chấm lại checkpoint bằng constrained decode ✅ ĐÃ XONG
 
 20.000 nhãn dài 7 ký tự, chỉ 2 layout (`LLLNLNN` 13k, `LLLNNNN` 7k) → 6/7 vị trí
-khoá cứng lớp chữ/số. Greedy hiện tại không dùng ràng buộc này.
+khoá cứng lớp chữ/số.
+
+**Không cần chạy lại**: `--decode constrained` đã là cấu hình mặc định của S1–S4, và
+mỗi run đã log sẵn cả 2 cột `val_acc` (constrained) lẫn `val_acc_greedy`. Chênh lệch đo
+được chỉ ~+2 track ở epoch tốt nhất.
+
+Nếu vẫn muốn chấm lại một checkpoint bất kỳ (kiến trúc suy ngược từ `state_dict`):
 
 ```bash
-python tools/eval_decode.py --checkpoint results/crnn_resblock_sr_supervised_best.pth
+python tools/eval_decode.py \
+  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4
 ```
 
 ---
@@ -305,18 +401,21 @@ Có sẵn 3 chart (`tools/plot_results.py`) + ảnh định tính (`tools/visual
 Chưa có heatmap. Cần `pip install matplotlib`.
 
 ```bash
-## Val Exact Match + Loss theo epoch, so J1 vs S1
+D=results/mf_sr_ocr
+
+## Val Exact Match + Loss theo epoch — so S1 vs S3 vs S4
 python tools/plot_results.py curves \
-  --history results/history_crnn_resblock_groupnorm_nosr.csv \
-            results/history_s1_proposed.csv \
-  --labels "J1 GroupNorm (không SR)" "S1 Proposed MF-SR-OCR" \
+  --history $D/s1_mf_sr_ocr/history_s1_proposed.csv \
+            $D/s3_l_perceptual/history_s3_perceptual.csv \
+            $D/s4_sr_scale1/history_s4_sr_scale1.csv \
+  --labels "S1 (λ=0.1)" "S3 (+perceptual)" "S4 (SR ×1)" \
   --baseline 77.00 --output-dir results/charts
 # -> results/charts/training_curves.png
 
-## So sánh J1/J2/J3/S1 (dot plot)
+## So sánh toàn bộ (dot plot)
 python tools/plot_results.py ablation \
-  --names "ResBlock" "+GroupNorm (J1)" "+SR (J2)" "+SR+DCN (J3)" "S1 Proposed" \
-  --acc 76.68 76.88 77.18 76.28 79.78 \
+  --names "ResBlock" "+GroupNorm (J1)" "+SR (J2)" "+SR+DCN (J3)" "S1" "S2" "S3" "S4" \
+  --acc 76.68 76.88 77.18 76.28 79.78 79.48 80.58 80.58 \
   --baseline 77.00 --output-dir results/charts
 # -> results/charts/ablation_comparison.png
 
@@ -331,18 +430,23 @@ python tools/plot_results.py cost \
   --baseline 77.00 --output-dir results/charts
 # -> results/charts/accuracy_vs_cost.png
 
-## Ảnh định tính: LR frames -> SR output -> prediction.
-## Attention = độ dày viền khung (dày hơn = frame được tin cậy hơn).
-python tools/visualize.py --checkpoint results/s1_proposed_best.pth \
+## Ảnh định tính kiểu cũ (2 hàng LR/SR, dùng để soi lỗi lúc debug).
+## Cho figure của paper thì dùng tools/visualize_paper_figures.py ở mục 6b.
+python tools/visualize.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
   --use-sr --use-dcn --backbone-norm group --decode constrained \
   --num-samples 12 --output-dir results/viz
 
-python tools/visualize.py --checkpoint results/s1_proposed_best.pth \
+python tools/visualize.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
   --use-sr --use-dcn --backbone-norm group --decode constrained \
   --only-errors --num-samples 20 --output-dir results/viz_errors
 ```
 
-`curves` cũng đọc log stdout qua `--from-log results/log_s1.txt` khi chưa có CSV.
+`curves` cũng đọc log stdout qua `--from-log $D/s1_mf_sr_ocr/log_s1.txt` khi chưa có CSV.
+
+> ⚠️ Chart `cost` cần số latency/params từ bảng compute ở [mục 2](#2-kết-quả-đã-có-mốc-tham-chiếu).
+> **S4 chưa được benchmark** (`tools/benchmark.py` chưa chạy cho `sr_scale=1`) — đừng
+> đưa S4 vào chart cost cho tới khi có số thật. Đã biết S4 nhanh hơn S1 **2.34×/epoch**
+> lúc train (3.94 vs 9.21 phút), nhưng đó là thời gian train, không phải latency inference.
 
 ---
 
@@ -355,27 +459,41 @@ python tools/visualize.py --checkpoint results/s1_proposed_best.pth \
 
 ### PSNR/SSIM của nhánh SR
 
+> Kết quả S1–S4 nằm ở `results/mf_sr_ocr/<cấu hình>/`. Ghi `--output-csv` vào **đúng
+> folder của cấu hình đó** để mọi thứ của một run nằm cùng chỗ.
+>
+> ⚠️ `results/` bị **gitignore** → toàn bộ dữ liệu này không được git theo dõi. Nhớ
+> backup riêng, và copy số liệu tổng hợp vào các file `.md` trong `report/` (những file
+> đó mới được commit).
+
 ```bash
+D=results/mf_sr_ocr
+
 # S1 (sr_scale=2, width/8)
 python tools/eval_sr_quality.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
-  --lr-domain-match --output-csv results/sr_quality_s1.csv
+  --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --lr-domain-match --output-csv $D/s1_mf_sr_ocr/sr_quality_s1.csv
 
 # S2 (sr_scale=2, width/8)
 python tools/eval_sr_quality.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
-  --lr-domain-match --output-csv results/sr_quality_s2.csv
+  --checkpoint $D/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --lr-domain-match --output-csv $D/s2_mf_sr_ocr_lam05/sr_quality_s2.csv
 
 # S3 (sr_scale=2, width/8, có perceptual)
 python tools/eval_sr_quality.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
-  --lr-domain-match --output-csv results/sr_quality_s3.csv
+  --checkpoint $D/s3_l_perceptual/s3_perceptual_best.pth \
+  --lr-domain-match --output-csv $D/s3_l_perceptual/sr_quality_s3.csv
 
 # S4 (sr_scale=1 => BẮT BUỘC --width-downsample 4)
 python tools/eval_sr_quality.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --width-downsample 4 --lr-domain-match --output-csv results/sr_quality_s4.csv
+  --checkpoint $D/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --lr-domain-match \
+  --output-csv $D/s4_sr_scale1/sr_quality_s4.csv
 ```
+
+> ⚠️ **zsh không tách từ khi expand biến** (khác bash). Đừng gom cờ vào biến kiểu
+> `$extra` rồi truyền vào — `--width-downsample 4` sẽ thành **một** tham số và
+> argparse báo `unrecognized arguments`. Viết thẳng cờ như trên.
 
 Xuất ra: PSNR/SSIM của SR **và** của mốc `base` (không học), kèm chênh lệch — con số
 đáng báo cáo là **chênh lệch**, không phải PSNR tuyệt đối.
@@ -392,14 +510,16 @@ Xuất ra: PSNR/SSIM của SR **và** của mốc `base` (không học), kèm ch
 ### Figure định tính 4 cột (I_LR → I_SR → Attention → Prediction)
 
 ```bash
+D=results/mf_sr_ocr
+
 python tools/visualize_paper_figures.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --width-downsample 4 --output-dir results/paper_figures/s4
+  --checkpoint $D/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --output-dir $D/s4_sr_scale1/paper_figures
 
 # Đổi checkpoint để so cùng một track qua các cấu hình:
 python tools/visualize_paper_figures.py \
-  --checkpoint report/csv-report-process/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
-  --output-dir results/paper_figures/s1
+  --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-dir $D/s1_mf_sr_ocr/paper_figures
 ```
 
 Xuất ra `figure4_qualitative_grid.png` (5 case đúng + 5 case sai) và ảnh từng track
@@ -415,16 +535,36 @@ muốn tuần tự.
 
 ## 7. Submission
 
-Chỉ chạy sau khi đã chốt cấu hình ở mục 5.
+**Chưa từng chạy test lần nào** — mọi số S1–S4 đều là validation. Chỉ chạy sau khi
+multi-seed xong và đã chốt cấu hình (mục 0, B6).
+
+> 🚨 **`--submission-mode` KHÔNG phải chỉ là inference — nó train lại từ đầu** trên
+> toàn bộ 20.000 track (`full_train=True`), **bỏ validation** → `Trainer.fit()` **tắt
+> early stopping** và lưu checkpoint theo *train loss* (thứ gần như luôn giảm).
+> Chạy đủ 60 epoch ở chế độ này sẽ **lưu ra model của epoch cuối, đã overfit nặng**
+> (S1 đỉnh val ở epoch 37 rồi tụt; S3 ở 25; S4 ở 40).
+>
+> → Nếu dùng, **bắt buộc đặt `--epochs` bằng epoch tốt nhất học được từ validation**,
+> đừng để 60.
+
+**Phương án an toàn hơn (khuyến nghị)**: dùng lại checkpoint đã được validate, chỉ chạy
+inference trên test — số val và số test đến từ **cùng một model**. Hiện chưa có tool
+cho việc này (`tools/eval_decode.py` chỉ chạy `mode="val"`), cần viết thêm ~1 giờ.
+Phân tích đánh đổi đầy đủ: [../paper/paper_revision_plan.md §2b](../paper/paper_revision_plan.md).
 
 ```bash
+## Phương án B — train lại toàn bộ data rồi predict test.
+## Đổi --epochs theo epoch tốt nhất của cấu hình đã chốt, KHÔNG để 60.
 python train.py \
   --preset stable --experiment-name submission_final \
-  --epochs 60 --batch-size 32 --grad-accum-steps 2 \
-  --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
-  --backbone-norm group --lr-domain-match \
+  --epochs <epoch_tốt_nhất> --batch-size 32 --grad-accum-steps 2 \
+  --use-sr --sr-scale 1 --use-dcn --lambda-sr 0.1 \
+  --backbone-norm group --lr-domain-match --width-downsample 4 \
   --decode constrained --use-ema \
-  --submission-mode --num-workers 8 --aug-level full
+  --submission-mode --num-workers 8 --aug-level full \
+  2>&1 | tee results/log_submission.txt
 ```
 
-`--submission-mode` bỏ validation split → không còn accuracy trong lúc train.
+Cờ trên đang là cấu hình **S4**; đổi theo cấu hình thắng sau multi-seed.
+Test public 1.000 track, test blind 3.000 track — file ra là
+`submission_<tên>_final.txt`, khác với `submission_<tên>.txt` (dự đoán validation).

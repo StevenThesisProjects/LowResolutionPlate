@@ -1,7 +1,7 @@
 # S4 — MF-SR-OCR với SR scale=1 (tách "T confound" khỏi upsampling)
 
 > Kết quả của cấu hình S4 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `report/csv-report-process/mf_sr_ocr/s4_sr_scale1/history_s4_sr_scale1.csv`,
+> Dữ liệu nguồn: `results/mf_sr_ocr/s4_sr_scale1/history_s4_sr_scale1.csv`,
 > `log_s4.txt`, `submission_s4_sr_scale1.txt`.
 > So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) và
 > [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md).
@@ -140,6 +140,43 @@ thiện này là bằng chứng mạnh tương đương S1.
 Kết hợp với mục 2 (decode constrained = greedy tuyệt đối tại epoch tốt nhất),
 S4 là cấu hình có hành vi "ổn định/dễ đoán" nhất trong 4 cấu hình đã chạy, dù
 điểm accuracy chỉ ngang S3.
+
+## 5b. Metrics bổ sung theo review Bước 2
+
+| Chỉ số | S4 | Ghi chú |
+|---|---:|---|
+| Exact Match | 80.58% (805/999) | đồng hạng nhất với S3 |
+| CER ↓ | 0.0532 | kém S3 (0.0522), hơn S1 (0.0562) |
+| NED ↓ / 1−NED ↑ | 0.0532 / 0.9468 | |
+| PSNR: SR vs base | 17.5249 vs 16.5011 | +1.0238 dB |
+| SSIM: SR vs base | 0.5027 vs 0.4408 | +0.0618 |
+| r(PSNR, đọc đúng) | −0.400 | tương quan âm |
+
+⚠️ **PSNR tuyệt đối của S4 (17.52) không so được với S1/S2/S3** — S4 xuất ảnh 32×128,
+ba cấu hình kia xuất 64×256, hai thang khác nhau. Chỉ cột chênh lệch so được. Ngoài ra
+với `sr_scale=1` thì mốc `base` là ảnh **giữ nguyên** (không nội suy), nên +1.02 dB đọc
+là "SR hơn việc không làm gì".
+
+Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
+Dữ liệu: `results/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv`.
+Hình định tính: `results/mf_sr_ocr/s4_sr_scale1/paper_figures/`.
+
+## 5c. Thời gian train — xác nhận S4 rẻ hơn thật
+
+Đo từ tqdm trong log (1188 step/epoch):
+
+| | Phút/epoch | Tổng train |
+|---|---:|---:|
+| S1 (sr_scale=2) | 9.21 | 8.45 h / 55 epoch |
+| **S4 (sr_scale=1)** | **3.94** | **3.81 h / 58 epoch** |
+
+**S4 nhanh hơn 2.34× mỗi epoch mà độ chính xác bằng nhau** (805/999 cả hai). Giả thuyết
+"S4 rẻ hơn" ở mục 3 nay có số đo xác nhận, không còn là suy luận định tính.
+
+⚠️ Đây là thời gian **train**, chưa phải latency **inference** — `tools/benchmark.py`
+chưa chạy cho `sr_scale=1` nên chưa có số cho bảng compute chính thức.
+
+Dữ liệu: `results/mf_sr_ocr/s4_sr_scale1/log_s4.txt`.
 
 ## 6. Giới hạn cần nêu khi báo cáo
 
