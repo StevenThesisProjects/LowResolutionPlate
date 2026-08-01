@@ -61,6 +61,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--frame-dropout", type=float, default=None)
     parser.add_argument("--fusion-dropout", type=float, default=None)
+    parser.add_argument("--weight-decay", type=float, default=None)
+    parser.add_argument("--wd-skip-bias-norm", action="store_true",
+                        help="Tách bias/GroupNorm khỏi weight decay — bật khi tăng --weight-decay")
     parser.add_argument("--grad-clip", type=float, default=None)
     parser.add_argument("--grad-accum-steps", type=int, default=None)
     parser.add_argument("--warmup-ratio", type=float, default=None)
@@ -199,6 +202,7 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         "num_frames": "NUM_FRAMES",
         "img_height": "IMG_HEIGHT",
         "img_width": "IMG_WIDTH",
+        "weight_decay": "WEIGHT_DECAY",
         "grad_clip": "GRAD_CLIP",
         "grad_accum_steps": "GRAD_ACCUM_STEPS",
         "decode": "DECODE_MODE",
@@ -238,6 +242,8 @@ def _apply_overrides(config: Config, args: argparse.Namespace) -> None:
         config.USE_DCN = True
     if args.lr_domain_match:
         config.LR_DOMAIN_MATCH = True
+    if args.wd_skip_bias_norm:
+        config.WEIGHT_DECAY_SKIP_BIAS_NORM = True
     if args.no_stn:
         config.USE_STN = False
         if args.experiment_name is None and args.preset is None:
@@ -283,6 +289,9 @@ def main() -> None:
     print(f"Data       : {config.DATA_ROOT}")
     print(f"Epochs     : {config.EPOCHS} | Batch: {config.BATCH_SIZE} | LR: {config.LEARNING_RATE}")
     print(f"AMP        : {config.USE_AMP} | Grad Accum: {config.GRAD_ACCUM_STEPS}")
+    print(f"WeightDecay: {config.WEIGHT_DECAY} (skip bias/norm: {config.WEIGHT_DECAY_SKIP_BIAS_NORM})")
+    print(f"Seed       : {config.SEED} | cudnn.benchmark: {config.USE_CUDNN_BENCHMARK} "
+          f"(deterministic: {not config.USE_CUDNN_BENCHMARK})")
     print(f"Device     : {config.DEVICE}")
     print(f"Submission : {args.submission_mode}")
     print(f"Backbone   : base={config.BACKBONE_BASE_CHANNELS}, blocks={config.BACKBONE_STAGE_BLOCKS}, channels={config.BACKBONE_STAGE_CHANNELS}, res_scale={config.BACKBONE_RES_SCALE}, norm={config.BACKBONE_NORM}")

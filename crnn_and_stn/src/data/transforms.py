@@ -176,3 +176,23 @@ def get_sr_photometric_transforms() -> A.Compose:
 def get_normalize_transforms(img_height: int, img_width: int) -> A.Compose:
     """Resize + normalize + to-tensor, không augmentation."""
     return get_val_transforms(img_height, img_width)
+
+
+# ---------------------------------------------------------------------------
+# Biến thể TẤT ĐỊNH của 2 hàm trên, dùng khi ĐÁNH GIÁ chất lượng SR (PSNR/SSIM)
+# ---------------------------------------------------------------------------
+#
+# Lúc train, augment ngẫu nhiên là cần thiết. Lúc đo PSNR/SSIM thì ngược lại:
+# mỗi lần chạy phải ra đúng một con số, nếu không thì không biết chênh lệch giữa
+# 2 checkpoint là do model hay do lần bốc augment khác nhau. Hai hàm dưới bỏ toàn
+# bộ phép ngẫu nhiên, chỉ giữ resize — phần degradation vẫn giữ (xem
+# `sr_eval_mode` trong dataset.py) vì đó là thứ mô phỏng ảnh LR thật.
+
+
+def get_sr_eval_geometric_transforms(img_height: int, img_width: int) -> A.Compose:
+    """Chỉ resize về cỡ target — bản tất định của `get_sr_geometric_transforms`.
+
+    Phần quang học không cần hàm tương ứng: ở chế độ đánh giá, `_build_sr_pair`
+    bỏ qua thẳng bước jitter thay vì gọi một Compose rỗng.
+    """
+    return A.Compose([A.Resize(height=img_height, width=img_width)])

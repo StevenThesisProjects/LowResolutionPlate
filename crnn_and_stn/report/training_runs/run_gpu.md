@@ -26,13 +26,94 @@ chính, không phải bản thân việc SR phóng to ảnh.
 
 ---
 
+## 0. CHẠY THEO THỨ TỰ NÀY (checklist cho đợt revision)
+
+Kế hoạch đầy đủ + lý do: [../paper/paper_revision_plan.md](../paper/paper_revision_plan.md).
+
+### ⬜ B0 — Cài thêm 1 gói (30 giây)
+
+```bash
+pip install scikit-image        # cho PSNR/SSIM; thiếu thì chỉ có PSNR
+```
+
+### ⬜ B1 — Lấy PSNR/SSIM + hình cho paper (vài phút, KHÔNG train)
+
+Chạy trên checkpoint S1–S4 **đã có sẵn**. Làm trước vì rẻ và có kết quả ngay.
+Lệnh đầy đủ cả 4 cấu hình: [mục 6b](#6b-psnrssim--figure-định-tính-review-bước-2b--3).
+
+```bash
+python tools/eval_sr_quality.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --lr-domain-match --output-csv results/sr_quality_s4.csv
+
+python tools/visualize_paper_figures.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --output-dir results/paper_figures/s4
+```
+
+### ⬜ B2 — Smoke test 1 epoch (~4 phút) — ĐỪNG BỎ QUA
+
+Code trainer vừa sửa (thêm CER/NED + thời gian vào CSV) **chưa chạy thật lần nào**.
+Tốn 4 phút để chắc, thay vì phát hiện sai cột sau 16 giờ.
+
+```bash
+python train.py --preset stable --experiment-name smoke --epochs 1 \
+  --batch-size 32 --grad-accum-steps 2 \
+  --use-sr --sr-scale 1 --use-dcn --lambda-sr 0.1 \
+  --backbone-norm group --lr-domain-match --width-downsample 4 \
+  --decode constrained --use-ema --no-cudnn-benchmark \
+  --num-workers 8 --aug-level full 2>&1 | tee results/log_smoke.txt
+
+head -2 results/history_smoke.csv
+```
+
+**Điều kiện đạt** — dòng header phải có đủ 14 cột, kết thúc bằng:
+`...,nan_batches,val_cer,val_ned,train_time_s,val_time_s,epoch_time_s`
+
+### ⬜ B3 — Multi-seed S4 (~16 h) — chạy cấu hình rẻ nhất trước
+
+```bash
+for SEED in 42 100 2026; do
+  python train.py --preset stable --experiment-name s4_seed${SEED} --seed ${SEED} \
+    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+    --use-sr --sr-scale 1 --use-dcn --lambda-sr 0.1 \
+    --backbone-norm group --lr-domain-match --width-downsample 4 \
+    --decode constrained --use-ema \
+    --no-cudnn-benchmark --num-workers 8 --aug-level full \
+    2>&1 | tee results/log_s4_seed${SEED}.txt
+done
+```
+
+### ⬜ B4 — Multi-seed S1 (~33 h) và S3 (~36–45 h)
+
+Lệnh đầy đủ: [mục 5](#5-s--proposed-method-joint-end-to-end-mf-sr-ocr). Nếu ngân sách
+GPU eo hẹp thì bỏ S3, giữ S1 + S4.
+
+### ⬜ B5 — Tổng hợp Mean ± Std
+
+```bash
+python tools/aggregate_seeds.py --from-logs results/log_s4_seed*.txt --label "S4"
+python tools/aggregate_seeds.py --from-logs results/log_s1_seed*.txt --label "S1"
+```
+
+### ⬜ B6 — Chốt cấu hình → chạy test
+
+**Chỉ sau khi B5 xong.** Chưa từng chạy test lần nào — xem
+[paper_revision_plan.md §2b](../paper/paper_revision_plan.md) trước khi chạy, vì
+`--submission-mode` **train lại từ đầu và tắt early stopping**, không phải chỉ inference.
+
+> ⚠️ Mọi lệnh train đều phải có `2>&1 | tee results/log_*.txt`. S2/S3 mất vĩnh viễn
+> số liệu thời gian chỉ vì quên `tee`.
+
+---
+
 ## 1. Setup
 
 ```bash
 unzip crnn_and_stn.zip -d crnn_and_stn && cd crnn_and_stn
 nvidia-smi                                    # xem CUDA Version trước khi chọn index
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install albumentations opencv-python tqdm numpy matplotlib
+pip install albumentations opencv-python tqdm numpy matplotlib scikit-image
 apt update && apt install -y libgl1
 ```
 
@@ -50,21 +131,21 @@ python -c "import torch,torchvision; from torchvision.ops import DeformConv2d; p
 
 Val = 999 track Scenario-B. ±13 track = ±1.3 điểm là biên nhiễu.
 
-| Run    | Cấu hình                                  | Track đúng |    Val Acc |
-| ------ | ----------------------------------------- | ---------: | ---------: |
-| —      | CRNN + STN (report ICPR gốc)              |          — |     77.00% |
-| —      | CRNN + STN (đo lại)                       |        757 |     75.78% |
-| —      | aug light                                 |        739 |     73.97% |
-| SR-v1  | stacked-input SR (bản lỗi)                |        492 |     49.25% |
-| SR-v2  | stacked-input SR, lr thấp + aug light     |        550 |     55.06% |
-| —      | ResBlock backbone `norm=none`             |        766 |     76.68% |
-| J1     | + GroupNorm, không SR                     |    **768** |     76.88% |
-| **J2** | **+ SR per-frame ×2 có giám sát**         |    **771** | **77.18%** |
-| J3     | + DCNv2 (kernel init ngẫu nhiên — đã sửa) |        762 |     76.28% |
-| **S1** | **Joint MF-SR-OCR (đề xuất, mục 5), λ_SR=0.1** |    **797** | **79.78%** |
-| S2     | Joint MF-SR-OCR, λ_SR=0.5 (mục 5)         |        794 |     79.48% |
-| **S3** | **Joint MF-SR-OCR, + L_Perceptual α=0.1 (mục 5)** | **805** | **80.58%** |
-| **S4** | **Joint MF-SR-OCR, SR scale=1 + width_downsample=4 (mục 5)** | **805** | **80.58%** |
+| Run    | Cấu hình                                                     | Track đúng |    Val Acc |
+| ------ | ------------------------------------------------------------ | ---------: | ---------: |
+| —      | CRNN + STN (report ICPR gốc)                                 |          — |     77.00% |
+| —      | CRNN + STN (đo lại)                                          |        757 |     75.78% |
+| —      | aug light                                                    |        739 |     73.97% |
+| SR-v1  | stacked-input SR (bản lỗi)                                   |        492 |     49.25% |
+| SR-v2  | stacked-input SR, lr thấp + aug light                        |        550 |     55.06% |
+| —      | ResBlock backbone `norm=none`                                |        766 |     76.68% |
+| J1     | + GroupNorm, không SR                                        |    **768** |     76.88% |
+| **J2** | **+ SR per-frame ×2 có giám sát**                            |    **771** | **77.18%** |
+| J3     | + DCNv2 (kernel init ngẫu nhiên — đã sửa)                    |        762 |     76.28% |
+| **S1** | **Joint MF-SR-OCR (đề xuất, mục 5), λ_SR=0.1**               |    **797** | **79.78%** |
+| S2     | Joint MF-SR-OCR, λ_SR=0.5 (mục 5)                            |        794 |     79.48% |
+| **S3** | **Joint MF-SR-OCR, + L_Perceptual α=0.1 (mục 5)**            |    **805** | **80.58%** |
+| **S4** | **Joint MF-SR-OCR, SR scale=1 + width_downsample=4 (mục 5)** |    **805** | **80.58%** |
 
 J2 hơn J1 3 track, J3 kém J2 9 track — cả hai trong biên nhiễu ±13. **S1 hơn J2
 tới 26 track — gấp đôi biên nhiễu**, lần đầu tiên một cấu hình vượt qua ngưỡng đó
@@ -96,11 +177,11 @@ Lúc J1/J2/J3 (STN pool `(1,1)` cũ):
 
 Đo lại với kiến trúc hiện tại (STN pool `(4,8)` mặc định — khớp `--all` mới):
 
-| Cấu hình            |     Params | GFLOPs/track | Latency (ms) | vs base |
-| ------------------- | ---------: | -----------: | -----------: | ------: |
-| ResBlock (không SR) | 29,427,468 |        26.14 |        50.03 |   1.00x |
-| + GroupNorm         | 29,442,700 |        26.14 |        51.30 |   1.03x |
-| + SR per-frame      | 29,558,255 |       108.31 |       184.43 |   3.69x |
+| Cấu hình              |         Params | GFLOPs/track | Latency (ms) |   vs base |
+| --------------------- | -------------: | -----------: | -----------: | --------: |
+| ResBlock (không SR)   |     29,427,468 |        26.14 |        50.03 |     1.00x |
+| + GroupNorm           |     29,442,700 |        26.14 |        51.30 |     1.03x |
+| + SR per-frame        |     29,558,255 |       108.31 |       184.43 |     3.69x |
 | **+ SR + DCNv2 = S1** | **29,577,214** |   **109.08** |   **192.75** | **3.85x** |
 
 Dòng cuối khớp chính xác `Model params: 29,577,214` trong `log_s1.txt` — xác
@@ -203,11 +284,18 @@ python train.py \
 
 **Đọc `results/history_*.csv` khi đang chạy:**
 
-| Cột                             | Ý nghĩa                                                                            |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| `val_acc` vs `val_acc_greedy`   | Khoảng cách = giá trị thật của constrained decode                                  |
-| `sr_loss` vs `sr_loss_bilinear` | `sr_loss ≥ sr_loss_bilinear` kéo dài = SR học không hơn nội suy, tốn 3.66x compute |
-| `nan_batches`                   | Phải luôn = 0                                                                      |
+| Cột                                            | Ý nghĩa                                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `val_acc` vs `val_acc_greedy`                  | Khoảng cách = giá trị thật của constrained decode                                  |
+| `sr_loss` vs `sr_loss_bilinear`                | `sr_loss ≥ sr_loss_bilinear` kéo dài = SR học không hơn nội suy, tốn 3.66x compute |
+| `nan_batches`                                  | Phải luôn = 0                                                                      |
+| `val_cer`                                      | Character Error Rate mức corpus (tổng edit distance / tổng ký tự nhãn). Thấp = tốt |
+| `val_ned`                                      | Normalized Edit Distance trung bình mỗi track. Thấp = tốt (paper hay ghi `1−NED`)  |
+| `train_time_s` / `val_time_s` / `epoch_time_s` | Thời gian thực mỗi epoch (giây)                                                    |
+
+> 5 cột cuối được **thêm từ 2026-08-01** (phục vụ Bước 2 của review + đo thời gian).
+> CSV của S1–S4 chạy trước đó không có các cột này — `csv.DictReader` trả `None`,
+> không crash, nhưng đừng vẽ chart CER cho S1–S4 cũ vì không có dữ liệu.
 
 ---
 
@@ -255,6 +343,73 @@ python tools/visualize.py --checkpoint results/s1_proposed_best.pth \
 ```
 
 `curves` cũng đọc log stdout qua `--from-log results/log_s1.txt` khi chưa có CSV.
+
+---
+
+## 6b. PSNR/SSIM + figure định tính (review Bước 2b & 3)
+
+> **Chạy được NGAY trên checkpoint S1–S4 đã có — không cần chờ multi-seed, không tốn
+> giờ train.** Cả hai tool đều chạy hậu kỳ trên `.pth`, chỉ forward validation.
+> Kiến trúc được suy ngược từ `state_dict` nên không phải nhớ lại flag lúc train —
+> trừ `--width-downsample` và `--lr-domain-match` (không nằm trong state_dict).
+
+### PSNR/SSIM của nhánh SR
+
+```bash
+# S1 (sr_scale=2, width/8)
+python tools/eval_sr_quality.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --lr-domain-match --output-csv results/sr_quality_s1.csv
+
+# S2 (sr_scale=2, width/8)
+python tools/eval_sr_quality.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --lr-domain-match --output-csv results/sr_quality_s2.csv
+
+# S3 (sr_scale=2, width/8, có perceptual)
+python tools/eval_sr_quality.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
+  --lr-domain-match --output-csv results/sr_quality_s3.csv
+
+# S4 (sr_scale=1 => BẮT BUỘC --width-downsample 4)
+python tools/eval_sr_quality.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --lr-domain-match --output-csv results/sr_quality_s4.csv
+```
+
+Xuất ra: PSNR/SSIM của SR **và** của mốc `base` (không học), kèm chênh lệch — con số
+đáng báo cáo là **chênh lệch**, không phải PSNR tuyệt đối.
+
+> ⚠️ **Không đặt PSNR của S4 chung cột với S1/S2/S3.** S1–S3 xuất ảnh 64×256, S4 xuất
+> 32×128 — hai thang khác nhau, so trực tiếp là sai. Với S4, mốc `base` là ảnh giữ
+> nguyên (không nội suy) nên đọc là "SR có hơn việc không làm gì".
+>
+> Val vốn không có cặp (ảnh vào, HR) — tool bật `sr_eval_mode` để sinh cặp synthetic
+> khớp pixel, tắt augment ngẫu nhiên (tái lập được), giữ degradation (giống phân phối
+> lúc train), và warp HR theo `theta` đúng như `Trainer._sr_loss`. Số đo là trên
+> **cặp synthetic**, cần ghi rõ trong paper.
+
+### Figure định tính 4 cột (I_LR → I_SR → Attention → Prediction)
+
+```bash
+python tools/visualize_paper_figures.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --width-downsample 4 --output-dir results/paper_figures/s4
+
+# Đổi checkpoint để so cùng một track qua các cấu hình:
+python tools/visualize_paper_figures.py \
+  --checkpoint report/csv-report-process/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-dir results/paper_figures/s1
+```
+
+Xuất ra `figure4_qualitative_grid.png` (5 case đúng + 5 case sai) và ảnh từng track
+riêng. Mặc định `--pick extreme`: lấy case đúng **tự tin nhất** và case sai **mơ hồ
+nhất** — hai đầu phân phối, thay vì mấy track đầu danh sách. Dùng `--pick first` nếu
+muốn tuần tự.
+
+> Với S4 lưu ý: cấu hình này có **0/999 track confidence < 0.55**, nên "case sai mơ hồ
+> nhất" của S4 vẫn có confidence khá cao — không giống S1/S3. Đây là đặc điểm của model,
+> không phải lỗi tool.
 
 ---
 

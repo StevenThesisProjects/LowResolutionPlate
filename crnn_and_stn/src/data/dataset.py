@@ -25,6 +25,7 @@ from src.data.transforms import (
     get_degradation_transforms,
     get_light_transforms,
     get_normalize_transforms,
+    get_sr_eval_geometric_transforms,
     get_sr_geometric_transforms,
     get_sr_photometric_transforms,
     get_train_transforms,
@@ -56,6 +57,7 @@ class MultiFrameDataset(Dataset):
         sr_scale: int = 2,
         lr_domain_match: bool = False,
         num_frames: int = 5,
+        sr_eval_mode: bool = False,
     ):
         """
         Args:
@@ -76,12 +78,23 @@ class MultiFrameDataset(Dataset):
             lr_domain_match     : True để degrade HR ở đúng cỡ LR gốc trước khi resize
                                   (sửa Nguyên nhân #4 — domain gap synthetic/real LR)
             num_frames          : Số frame dùng mỗi track (Ablation 3, mặc định 5 = toàn bộ)
+            sr_eval_mode        : CHỈ dùng để đo PSNR/SSIM trên val, không dùng khi train.
+                                  Bật lên thì val cũng sinh cặp (input, HR target) khớp
+                                  pixel — mặc định val không có cặp nào vì sample synthetic
+                                  chỉ được tạo ở mode train. Augment hình học/quang học bị
+                                  tắt để số đo tái lập được; degradation vẫn giữ vì đó là
+                                  thứ mô phỏng ảnh LR thật. Mặc định False => đường train
+                                  và val hiện tại không đổi chút nào.
         """
         self.mode = mode
         self.samples: List[Dict[str, Any]] = []
         self.img_height = img_height
         self.img_width = img_width
         self.char2idx = char2idx or {}
+        # Đo SR mà quên bật provide_sr_target thì `has_hr_target` luôn False và
+        # tool sẽ báo "không có cặp nào" một cách khó hiểu — bật luôn cho chắc.
+        if sr_eval_mode:
+            provide_sr_target = True
         self.val_split_file = val_split_file
         self.seed = seed
         self.augmentation_level = augmentation_level
@@ -91,6 +104,7 @@ class MultiFrameDataset(Dataset):
         self.sr_scale = sr_scale
         self.lr_domain_match = lr_domain_match
         self.num_frames = num_frames
+        self.sr_eval_mode = sr_eval_mode
 
         # Chọn pipeline transform theo mode
         if mode == "train":
@@ -101,7 +115,13 @@ class MultiFrameDataset(Dataset):
             self.degrade = get_degradation_transforms(domain_match=lr_domain_match)
         else:
             self.transform = get_val_transforms(img_height, img_width)
-            self.degrade = None
+            # Đo SR cần degradation để ảnh vào giống phân phối lúc train; val
+            # thường thì không degrade gì cả.
+            self.degrade = (
+                get_degradation_transforms(domain_match=lr_domain_match)
+                if sr_eval_mode
+                else None
+            )
 
         # Nhánh SR có giám sát dùng pipeline riêng để cặp (input, target) khớp
         # pixel: hình học chạy một lần ở cỡ target, input suy ra bằng downscale;
@@ -109,10 +129,18 @@ class MultiFrameDataset(Dataset):
         self.sr_target_height = img_height * sr_scale
         self.sr_target_width = img_width * sr_scale
         if self.provide_sr_target:
-            self.sr_geometric = get_sr_geometric_transforms(
-                self.sr_target_height, self.sr_target_width
-            )
-            self.sr_photometric = get_sr_photometric_transforms()
+            if sr_eval_mode:
+                # Tất định — xem chú thích ở transforms.py. Nhánh quang học không
+                # được dùng ở chế độ này (xem `_build_sr_pair`).
+                self.sr_geometric = get_sr_eval_geometric_transforms(
+                    self.sr_target_height, self.sr_target_width
+                )
+                self.sr_photometric = None
+            else:
+                self.sr_geometric = get_sr_geometric_transforms(
+                    self.sr_target_height, self.sr_target_width
+                )
+                self.sr_photometric = get_sr_photometric_transforms()
             self.sr_input_norm = get_normalize_transforms(img_height, img_width)
             self.sr_target_norm = get_normalize_transforms(
                 self.sr_target_height, self.sr_target_width
@@ -222,16 +250,19 @@ class MultiFrameDataset(Dataset):
                     + glob.glob(os.path.join(track_path, "hr-*.jpg"))
                 )
 
-                # Sample 1: ảnh LR thật từ camera
-                self.samples.append({
-                    "paths": lr_files,
-                    "label": label,
-                    "is_synthetic": False,
-                    "track_id": track_id,
-                })
+                # Sample 1: ảnh LR thật từ camera.
+                # Bỏ ở chế độ đo SR: ảnh LR thật KHÔNG phải bản downscale chính xác
+                # của HR thật nên không có cặp khớp pixel để tính PSNR/SSIM.
+                if not self.sr_eval_mode:
+                    self.samples.append({
+                        "paths": lr_files,
+                        "label": label,
+                        "is_synthetic": False,
+                        "track_id": track_id,
+                    })
 
-                # Sample 2: synthetic LR (degrade từ HR) — chỉ khi training
-                if self.mode == "train" and hr_files:
+                # Sample 2: synthetic LR (degrade từ HR) — khi training, hoặc khi đo SR
+                if (self.mode == "train" or self.sr_eval_mode) and hr_files:
                     self.samples.append({
                         "paths": hr_files,
                         "label": label,
@@ -367,7 +398,12 @@ class MultiFrameDataset(Dataset):
 
         # Cùng một phép jitter màu cho cả hai ảnh, nếu không SR phải học cách
         # hoàn tác phép chỉnh sáng — việc không liên quan gì tới khôi phục nét.
-        jittered = self.sr_photometric(image=lr_source, hr=hr_aug)
+        # Ở chế độ đánh giá thì bỏ hẳn jitter (phải tất định), bỏ qua thẳng thay vì
+        # gọi một Compose rỗng — không phụ thuộc vào hành vi của albumentations.
+        if self.sr_eval_mode:
+            jittered = {"image": lr_source, "hr": hr_aug}
+        else:
+            jittered = self.sr_photometric(image=lr_source, hr=hr_aug)
         return (
             self.sr_input_norm(image=jittered["image"])["image"],
             self.sr_target_norm(image=jittered["hr"])["image"],

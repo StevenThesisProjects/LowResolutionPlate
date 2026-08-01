@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import math
 import os
+import time
 from typing import Dict, List, Optional, Tuple
 
 import torch
@@ -27,7 +28,35 @@ from tqdm import tqdm
 
 from src.training.losses import SRPixelLoss
 from src.utils.common import seed_everything
-from src.utils.postprocess import PlateLayout, decode_batch, decode_with_confidence
+from src.utils.postprocess import (
+    PlateLayout,
+    decode_batch,
+    decode_with_confidence,
+    edit_distance,
+    normalize_text,
+)
+
+
+def build_optimizer_param_groups(model: nn.Module, weight_decay: float) -> List[Dict]:
+    """Tách bias/norm ra khỏi weight decay.
+
+    `AdamW(model.parameters(), weight_decay=...)` áp weight decay lên **mọi** tham số,
+    kể cả bias và scale/shift của GroupNorm — anti-pattern đã biết: hai đại lượng đó
+    cần được học tự do, phạt chúng làm méo chuẩn hoá. Tách theo `ndim <= 1` bắt đúng
+    mọi tham số 1-D (bias, GroupNorm weight/bias, PReLU slope).
+
+    Việc này càng quan trọng khi tăng `weight_decay` (review đề xuất 1e-4 -> 1e-3):
+    không tách thì mức phạt sai chỗ cũng bị nhân lên 10 lần.
+    """
+    decay, no_decay = [], []
+    for param in model.parameters():
+        if not param.requires_grad:
+            continue
+        (no_decay if param.ndim <= 1 else decay).append(param)
+    return [
+        {"params": decay, "weight_decay": weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
 
 
 class ModelEMA:
@@ -147,8 +176,15 @@ class Trainer:
         self.ema = ModelEMA(model, decay=float(getattr(config, "EMA_DECAY", 0.999))) if bool(
             getattr(config, "USE_EMA", False)
         ) else None
+        # Mặc định TẮT param-grouping để tái lập chính xác S1-S4. Bật lên khi tăng
+        # weight_decay (review đề xuất 1e-3) — lúc đó bắt buộc phải tách, xem
+        # docstring của `build_optimizer_param_groups`.
+        if bool(getattr(config, "WEIGHT_DECAY_SKIP_BIAS_NORM", False)):
+            optimizer_params = build_optimizer_param_groups(model, config.WEIGHT_DECAY)
+        else:
+            optimizer_params = model.parameters()
         self.optimizer = optim.AdamW(
-            model.parameters(),
+            optimizer_params,
             lr=config.LEARNING_RATE,
             weight_decay=config.WEIGHT_DECAY,
         )
@@ -172,6 +208,10 @@ class Trainer:
         self.epoch_sr_base_loss = 0.0
         self._sr_base_loss = 0.0
         self.last_greedy_acc = 0.0
+        # Thời gian mỗi epoch — ghi thẳng vào CSV. S2/S3 mất số liệu này vĩnh viễn
+        # chỉ vì chạy thiếu `tee`; có trong CSV thì không phụ thuộc log stdout nữa.
+        self.epoch_train_time = 0.0
+        self.epoch_val_time = 0.0
 
     def _output_path(self, filename: str) -> str:
         os.makedirs(self.config.OUTPUT_DIR, exist_ok=True)
@@ -342,9 +382,16 @@ class Trainer:
         Metric: Exact Match — chuỗi dự đoán phải khớp hoàn toàn ground truth.
         Luôn chấm cả greedy lẫn decode chính (`DECODE_MODE`) để bảng so sánh
         trong báo cáo có sẵn cả hai cột mà không tốn thêm một lần train.
+
+        Kèm 2 metric mức ký tự (review Bước 2), tính trên decode chính:
+          - CER  = tổng edit distance / tổng độ dài nhãn (corpus-level, thấp = tốt)
+          - NED  = trung bình edit_distance / max(len(ref), len(hyp)) (thấp = tốt;
+                   một số paper báo cáo `1 - NED`, nhớ đổi dấu khi trích dẫn)
+        Exact match phạt sai 1 ký tự như sai cả biển; CER/NED cho thấy model sai
+        "gần đúng" hay "sai hẳn" — thông tin exact match không thể hiện được.
         """
         if self.val_loader is None:
-            return {"loss": 0.0, "acc": 0.0, "acc_greedy": 0.0}, []
+            return {"loss": 0.0, "acc": 0.0, "acc_greedy": 0.0, "cer": 0.0, "ned": 0.0}, []
 
         model = self._eval_model()
         model.eval()
@@ -352,6 +399,9 @@ class Trainer:
         total_correct = 0
         greedy_correct = 0
         total_samples = 0
+        total_edit_distance = 0
+        total_ref_chars = 0
+        total_ned = 0.0
         submission_data: List[str] = []
 
         with torch.no_grad():
@@ -384,13 +434,31 @@ class Trainer:
                         total_correct += 1
                     if greedy_list[i][0] == labels_text[i]:
                         greedy_correct += 1
+
+                    # Chuẩn hoá trước khi so để CER/NED nhất quán với exact match.
+                    reference = normalize_text(labels_text[i])
+                    hypothesis = normalize_text(pred_text)
+                    distance = edit_distance(reference, hypothesis)
+                    total_edit_distance += distance
+                    total_ref_chars += len(reference)
+                    longest = max(len(reference), len(hypothesis))
+                    total_ned += (distance / longest) if longest > 0 else 0.0
+
                     submission_data.append(f"{track_ids[i]},{pred_text};{conf:.4f}")
                 total_samples += len(labels_text)
 
         val_acc = (total_correct / total_samples * 100) if total_samples > 0 else 0.0
         self.last_greedy_acc = (greedy_correct / total_samples * 100) if total_samples > 0 else 0.0
+        val_cer = (total_edit_distance / total_ref_chars) if total_ref_chars > 0 else 0.0
+        val_ned = (total_ned / total_samples) if total_samples > 0 else 0.0
         return (
-            {"loss": val_loss / len(self.val_loader), "acc": val_acc, "acc_greedy": self.last_greedy_acc},
+            {
+                "loss": val_loss / len(self.val_loader),
+                "acc": val_acc,
+                "acc_greedy": self.last_greedy_acc,
+                "cer": val_cer,
+                "ned": val_ned,
+            },
             submission_data,
         )
 
@@ -403,18 +471,26 @@ class Trainer:
         path = self._output_path(f"history_{self._exp_name()}.csv")
         # Truncate on the first epoch instead of appending: a re-run used to
         # leave the previous run's rows and a second header inside the same file.
+        #
+        # Các cột mới (CER/NED + thời gian) được THÊM VÀO CUỐI, không chèn giữa:
+        # `plot_results.py` đọc bằng `csv.DictReader` nên thêm cột cuối là an toàn,
+        # còn CSV cũ (S1-S4) vẫn đọc được vì thứ tự cột cũ giữ nguyên.
         mode = "w" if epoch == 0 else "a"
         with open(path, mode) as handle:
             if mode == "w":
                 handle.write(
                     "epoch,train_loss,val_loss,val_acc,val_acc_greedy,lr,"
-                    "sr_loss,sr_loss_bilinear,nan_batches\n"
+                    "sr_loss,sr_loss_bilinear,nan_batches,"
+                    "val_cer,val_ned,train_time_s,val_time_s,epoch_time_s\n"
                 )
             handle.write(
                 f"{epoch + 1},{train_loss:.6f},{val_metrics['loss']:.6f},"
                 f"{val_metrics['acc']:.4f},{val_metrics.get('acc_greedy', 0.0):.4f},"
                 f"{lr:.8f},{self.epoch_sr_loss:.6f},{self.epoch_sr_base_loss:.6f},"
-                f"{self.nan_batches}\n"
+                f"{self.nan_batches},"
+                f"{val_metrics.get('cer', 0.0):.6f},{val_metrics.get('ned', 0.0):.6f},"
+                f"{self.epoch_train_time:.2f},{self.epoch_val_time:.2f},"
+                f"{self.epoch_train_time + self.epoch_val_time:.2f}\n"
             )
 
     def save_model(self, path: str = None) -> None:
@@ -437,8 +513,13 @@ class Trainer:
 
         for epoch in range(self.config.EPOCHS):
             self.current_epoch = epoch
+            train_start = time.perf_counter()
             train_loss = self.train_one_epoch()
+            self.epoch_train_time = time.perf_counter() - train_start
+
+            val_start = time.perf_counter()
             val_metrics, submission_data = self.validate()
+            self.epoch_val_time = time.perf_counter() - val_start
 
             current_lr = self.scheduler.get_last_lr()[0]
             decode_note = (
@@ -450,7 +531,10 @@ class Trainer:
                 f"Train Loss: {train_loss:.4f} | "
                 f"Val Loss: {val_metrics['loss']:.4f} | "
                 f"Val Acc: {val_metrics['acc']:.2f}%{decode_note} | "
-                f"LR: {current_lr:.2e}"
+                f"CER: {val_metrics.get('cer', 0.0):.4f} | "
+                f"NED: {val_metrics.get('ned', 0.0):.4f} | "
+                f"LR: {current_lr:.2e} | "
+                f"Time: {self.epoch_train_time / 60:.2f}m+{self.epoch_val_time:.0f}s"
             )
             self._log_epoch(epoch, train_loss, val_metrics, current_lr)
 

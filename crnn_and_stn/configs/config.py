@@ -37,6 +37,10 @@ class Config:
     SEED: int = 42
     NUM_WORKERS: int = 4
     WEIGHT_DECAY: float = 1e-4
+    # Tách bias/GroupNorm khỏi weight decay. Mặc định False để tái lập đúng S1-S4;
+    # BẮT BUỘC bật khi tăng WEIGHT_DECAY (nếu không, mức phạt sai chỗ cũng bị
+    # nhân lên theo). Xem `build_optimizer_param_groups` trong trainer.py.
+    WEIGHT_DECAY_SKIP_BIAS_NORM: bool = False
     GRAD_CLIP: float = 2.0
     SPLIT_RATIO: float = 0.9
     USE_CUDNN_BENCHMARK: bool = True
