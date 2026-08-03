@@ -156,7 +156,7 @@ không vào bảng chính.
 
 ### Thứ tự chạy
 
-**S1 ✅ → S4 ✅ → J1 🔴 (~10h)** — chỉ còn 1 run. Lệnh đầy đủ:
+**S1 ✅ → S4 ✅ → J1 ✅** — đã chạy xong cả 3. Lệnh đã dùng:
 [training_runs/run_gpu.md §0 B4](training_runs/run_gpu.md).
 
 ---
@@ -327,7 +327,7 @@ Chi tiết: [s4_sr_scale1_mf_sr_ocr.md §5d](baseline1_crnn_stn/s4_sr_scale1_mf_
    vi multi-seed, việc này sẽ **không** được xác nhận trực tiếp; ghi rõ trong paper
    là giới hạn đã biết, không phải việc bỏ sót
 3. ~~Chưa so được S4 với S1~~ → ✅ **ĐÃ SO ĐƯỢC**: S1 = 79.95% ± 0.15 vs
-   S4 = 79.48% ± 0.44 → không khác biệt có ý nghĩa. Còn J1 chưa chạy
+   S4 = 79.48% ± 0.44 → không khác biệt có ý nghĩa. J1 = 80.45% ± 0.45 (cao nhất)
 4. Paper phải chuyển hẳn sang báo cáo **Mean ± Std**, bỏ lối best-of-run
 
 ### 📋 "Xác minh: ghi nhận bảng kết quả 3 seeds vào CSV log" — trạng thái

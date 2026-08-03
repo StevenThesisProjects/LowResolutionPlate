@@ -6,7 +6,7 @@
 > Toàn bộ Val Acc đo trên cùng 1 tập **999 track Scenario-B** (`dataset/val_tracks.json`),
 > trừ 2 dòng "report gốc" (đo trên tập của tác giả report, không phải tập này).
 > Cập nhật: 2026-08-03 — **phạm vi multi-seed chốt cuối: J1 + S1 + S4**
-> (S1 và S4 đã xong; chỉ còn J1 ~10h).
+> ✅ **đã xong cả 3** — J1 đạt điểm cao nhất (80.45% ± 0.45).
 
 ## 0. 🚨 Đọc trước: có 2 loại số trong file này, đừng trộn
 

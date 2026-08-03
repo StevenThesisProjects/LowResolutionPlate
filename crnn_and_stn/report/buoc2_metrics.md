@@ -9,15 +9,18 @@
 > cuối cùng (2026-08-03) là **3 model J1 + S1 + S4**
 > ([../checklist_review.md](checklist_review.md)) — S2 và S3 sẽ **không** có
 > CER/NED/PSNR multi-seed; đọc số của 2 cấu hình đó như tham khảo, không phải kết
-> luận cuối. J1 sẽ tự động có `val_cer`/`val_ned` trong `history_*.csv` khi
-> chạy xong.
+> luận cuối.
 >
 > ✅ **CER multi-seed đã có cho S1 và S4** — thay thế 2 dòng tương ứng ở mục 1:
 >
 > | Cấu hình | Exact Match | CER ↓ |
 > |---|---:|---:|
+> | **J1 — 3 seed** 🥇 | **80.45% ± 0.45** | **0.0525 ± 0.0007** |
 > | S1 — 3 seed | **79.95% ± 0.15** | **0.0541 ± 0.0016** |
 > | S4 — 3 seed | **79.48% ± 0.44** | **0.0543 ± 0.0001** |
+>
+> 🚨 **J1 (không SR) tốt nhất cả exact match lẫn CER** — và là cấu hình duy nhất
+> đạt **0/999 track sai độ dài ở cả 3 seed**.
 >
 > Phát hiện chỉ multi-seed mới thấy: **S4 ổn định hơn 16× về CER** (std 0.0001 vs
 > 0.0016) nhưng **kém ổn định hơn 3× về exact match** (std 0.44 vs 0.15) — hai đại

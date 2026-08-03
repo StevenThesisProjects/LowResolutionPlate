@@ -80,10 +80,10 @@ Chế độ deterministic (`cudnn.deterministic=True, benchmark=False`) thườn
 |---|---:|---|
 | S4 | ~12 h thật | ✅ xong — **79.48% ± 0.44** |
 | S1 | ~22 h thật | ✅ xong — **79.95% ± 0.15** |
-| J1 | ~10 h | 🔴 **run cuối cùng** (cờ lịch sử `--stn-pool 1,1`) |
+| J1 | ~10 h | ✅ xong — **80.45% ± 0.45** 🥇 (chạy cờ nền S1/S4, không phải `1,1`) |
 | ~~J2~~ | ~27 h | ⏭️ **đã bỏ** — giữ 1 seed 77.18% cho phụ lục |
 
-**Tổng còn lại: ~10 h GPU — đúng 1 run (J1).** Đã trừ S1 + S4 xong.
+**✅ Tổng còn lại: 0 h GPU — cả 3 model đã xong.**
 
 > ✅ Ước lượng "+25% cho deterministic" là **quá thận trọng** — số thật chỉ chậm
 > hơn **2–4%** (S1: 9.39 vs 9.21 phút/epoch; S4: 4.09 vs 3.94). Dùng con số này
@@ -128,7 +128,7 @@ Chế độ deterministic (`cudnn.deterministic=True, benchmark=False`) thườn
 | `results/submission_<exp>.txt` | cùng lúc với `.pth` | dự đoán trên **validation** (999 dòng), không phải bài nộp |
 | `results/log_<exp>.txt` | **chỉ khi có `2>&1 \| tee`** | ⚠️ khâu duy nhất còn phụ thuộc thao tác tay — S2/S3 mất log vì quên |
 
-### P1 — Multi-seed verification (nội dung chính của review) — 🟡 còn ~10 h GPU
+### P1 — Multi-seed verification (nội dung chính của review) — ✅ **HOÀN THÀNH**
 
 Đây là việc quan trọng nhất: nó xác nhận (hoặc bác bỏ) chính con số headline của paper.
 
@@ -164,7 +164,7 @@ sửa), nhưng số hạng `λ_Perceptual` phải ghi rõ là ablation 1-seed ch
 | **S1** (λ_SR=0.1) | ✅ bắt buộc | Phương pháp đề xuất hiện tại của paper, là con số headline |
 | **S3** (+perceptual) | ⏭️ **đã loại (2026-08-02)** | Chính là công thức review mô tả, nhưng đồng hạng 1-seed với S4 — giữ 1 seed, chuyển ngân sách sang J1 |
 | **S4** (SR ×1) | ✅ bắt buộc | Đồng hạng cao nhất + rẻ hơn 2.34× — đóng góp riêng về hiệu quả — **đã xong** |
-| **J1** (không SR) | ✅ **bổ sung** | Mốc nền T=16 của ladder — chạy **cờ lịch sử** (`--stn-pool 1,1`), tái lập được ~76.9% |
+| **J1** (không SR) | ✅ **XONG — 80.45% ± 0.45** 🥇 | 🚨 Đạt **điểm cao nhất**: hoà S1 (+0.50, trong nhiễu), **hơn S4 có ý nghĩa** (+0.97 > 2×0.36), rẻ hơn **3.76×** compute → **nhánh SR không chứng minh được đóng góp** |
 | ~~J2~~ (SR single-frame) | ⏭️ **đã loại (2026-08-03)** | Tốn ~27h. Ablation multi-frame vs single-frame giữ ở mức 1 seed (J2 77.18% vs S1 79.78%) + ghi Limitations |
 | S2 (λ_SR=0.5) | ❌ loại | Kết quả âm tính đã rõ ở 1 seed (794, thấp nhất nhóm S). Không ai sẽ dùng cấu hình này |
 
@@ -175,7 +175,7 @@ nhận" là đủ cho cả hai.
 
 **Lệnh** — lưu ý: `train.py` trơn **không** tái lập S1/S4/J1 (mặc định là
 nhánh ResBlock cũ), phải ghi đủ flag. Thêm `--no-cudnn-benchmark` để bật
-deterministic. S1 và S4 đã xong; chỉ còn J1 (~10h). Bản đầy đủ:
+deterministic. ✅ Cả 3 model đã xong. Bản đầy đủ:
 [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md#-b4--multi-seed-j1-8-h-s1-26-h-j2-26-h--ladder-sạch).
 
 ```bash
