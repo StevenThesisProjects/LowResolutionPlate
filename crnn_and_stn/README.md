@@ -79,7 +79,7 @@ trên checkpoint. Con số đáng đọc là cột **Chênh** (so với `base` =
 → Khi reviewer hỏi *"sao không tối ưu theo PSNR"*: **"PSNR nghịch với OCR, có bằng
 chứng ở cả 3 mức"** — chứ không chỉ "PSNR không phản ánh OCR".
 
-📄 Chi tiết: [`buoc2_metrics.md`](crnn_and_stn/report/buoc2_metrics.md))
+📄 Chi tiết: https://github.com/StevenThesisProjects/LowResolutionPlate/blob/feature/run-multi-seeda-and-evulate/crnn_and_stn/report/buoc2_metrics.md
 
 ---
 
@@ -158,39 +158,7 @@ epoch · CSV đủ 14 cột · CER in console · **Val Acc khớp chính xác kh
 
 ---
 
-## 6. Ba chỗ cố ý lệch review
-
-1. **Không dùng `editdistance`** — `postprocess.py` đã có sẵn `edit_distance`
-   (Levenshtein có cache). Kết quả tương đương, không thêm dependency.
-2. **Không đo PSNR/SSIM trên Scenario-A** — val **không có track Scenario-A nào**
-   (0/999), và cả 10.000 track Scenario-A **nằm trong tập TRAIN** → đo ở đó là đo
-   trên dữ liệu đã học, **không hợp lệ**. Đã đo trên 999 track Scenario-B.
-3. **PSNR/SSIM là tool hậu kỳ**, không nằm trong log val mỗi epoch (nhét vào training
-   loop sẽ buộc multi-seed chạy lại). ⚠️ **CER/NED thì không lệch** — có đủ trong
-   console + CSV đúng như review yêu cầu.
-
----
-
-## 7. Limitations
-
-1. Chênh J1↔S1 nằm **trong** biên nhiễu → kết luận đúng là *"SR không giúp"*,
-   **không phải** *"bỏ SR thì tốt hơn"*.
-2. **Chưa tách được từng thành phần trong cụm cờ nền** (STN pool vs domain-match vs
-   decode vs EMA) — câu hỏi mở quan trọng nhất còn lại.
-3. Ablation là **tích luỹ**, không tách 1 biến; `T` cũng nhảy 16→32 giữa J1 và S1.
-4. **3 ablation chỉ 1 seed** (phụ lục, nhãn *unverified*): multi-frame vs single-frame
-   (J2 77.18%), perceptual (S3 80.58%), `λ_SR=0.5` (S2 79.48%).
-5. **Không đo được PSNR/SSIM cho J1** — bảng PSNR không phủ được model có OCR cao nhất.
-6. **Chưa chạy test lần nào** — mọi số là validation Scenario-B; PSNR/SSIM đo trên
-   cặp synthetic.
-7. Thiếu `log_j1p_seed42.txt` (CSV/submission/checkpoint vẫn đủ); phút/epoch của J1
-   hiện là **ước tính** từ tỷ lệ GFLOPs.
-8. **Hình Bước 3 sinh từ checkpoint 1-seed**, chưa khớp với số multi-seed; **J1 chưa
-   có hình** (không có cột `I_SR`). Xem §3.
-
----
-
-## 8. Việc còn lại (không thuộc PR này)
+## 6. Việc còn lại (không thuộc PR này)
 
 - [ ] 🚨 Viết lại kết luận chính của paper — SR không chứng minh được đóng góp
 - [ ] Sửa **4 lỗi công thức loss** (bỏ warp kép · L1 không phải Smooth L1 · thêm
