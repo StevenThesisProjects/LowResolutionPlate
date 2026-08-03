@@ -6,6 +6,13 @@
 > là 1 seed, và **trùng khớp chính xác với seed 42 của multi-seed** — khác S4, số
 > 1-seed của S1 không hề bị thổi phồng.
 >
+> 🚨 **NHƯNG: nhánh SR KHÔNG chứng minh được đóng góp.** J1 — **cùng bộ cờ nền,
+> chỉ bỏ SR/DCN/MFSR** — đạt **80.45% ± 0.45**, tức **hoà S1** (+0.50, trong nhiễu)
+> trong khi rẻ hơn **3.76×** compute. Toàn bộ phần "S1 vượt J2 26 track" ở §2 dưới
+> đây so với **J2 lịch sử** (kiến trúc cũ), **không** phải với J1 cùng nền.
+> **Kết luận chính của tài liệu này cần đọc lại theo §8.**
+> Chi tiết: [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+>
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`, `sr_quality_s1.csv`, `mf_sr_ocr.pth`.
@@ -294,12 +301,29 @@ Nghịch lý đáng nêu: **S1 ổn định hơn S4 về exact match** (std 0.15
 Ổn định dự đoán: **778/999 track (77.9%) được cả 3 seed dự đoán giống hệt nhau** —
 tức 22.1% số track đổi kết quả tuỳ seed (S4: 23.1%).
 
-Phân tích đầy đủ 6 run + so sánh chi tiết S1↔S4: **[multi_seed_results.md](multi_seed_results.md)**.
+### 🚨 So với J1 (cùng nền, không SR) — SR không mang lại lợi ích
 
-Việc còn lại trong phạm vi multi-seed đã chốt (**J1 + S1 + S4**): chỉ còn **J1**
-(không SR, T=16, ~10h) — mốc nền cho claim **"S1 vượt cấu hình không SR"** có error
-bar. Chạy **đúng cờ lịch sử** (`--stn-pool 1,1`) → tái lập được ~76.88%.
-Phạm vi cuối cùng là **3 model: J1 + S1 + S4**.
-⏭️ J2 ra ngoài phạm vi: ablation multi-frame vs single-frame giữ 1 seed (J2 77.18%
-vs S1 79.78%, chênh 26 track = gấp đôi biên nhiễu) + ghi Limitations.
-Lệnh: [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md).
+| Model | SR/DCN/MFSR | `T` | GFLOPs | Mean ± Std |
+|---|:---:|---:|---:|---:|
+| **J1** | ❌ | 16 | **26.14** | **80.45% ± 0.45** 🥇 |
+| **S1** | ✅ | 32 | 109.08 (**3.76×**) | 79.95% ± 0.15 |
+
+```
+Chênh lệch   : +0.50 điểm (J1 so với S1)
+Sai số hiệu  : ±0.28
+⚠️ NẰM TRONG biên nhiễu → không phân biệt được.
+```
+
+J1 dùng **chung toàn bộ cụm cờ nền** với S1 (GroupNorm, STN pool `(4,8)`,
+`--lr-domain-match`, constrained decode, EMA) và chỉ **bỏ SR + DCN + MFSR**. Thêm
+cụm đó vào **không cải thiện** mà tốn 3.76× compute. Ở mức track, J1 hơn S1
+**+2 / +8 / +5** qua 3 seed — cùng chiều ở cả 3.
+
+→ Phần +26 track "S1 vượt J2" ở [§2](#2-kết-quả-chính) là so với **J2 lịch sử**
+(STN pool `(1,1)`, không domain-match/EMA/constrained). Khi so với cấu hình **cùng
+nền**, lợi thế đó **biến mất**. Cải thiện thật đến từ cụm cờ nền, không phải SR.
+
+Phân tích đầy đủ 9 run: **[multi_seed_results.md](multi_seed_results.md)**.
+
+✅ **Bước 1 của review đã hoàn thành** — đủ 3 model J1/S1/S4 có Mean ± Std.
+Không còn run GPU nào trong phạm vi đã chốt.

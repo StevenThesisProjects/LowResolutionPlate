@@ -4,39 +4,51 @@
 > Dữ liệu S1–S4: `results/mf_sr_ocr/<cấu hình>/` · Multi-seed:
 > `results/multi-seed/<cấu hình>/` · Lệnh chạy:
 > [training_runs/run_gpu.md §0](training_runs/run_gpu.md).
-> Cập nhật: 2026-08-03 — **phạm vi cuối cùng: 3 model J1 + S1 + S4** (bỏ J2, S2, S3).
-> S1 và S4 **đã có multi-seed**; chỉ còn **J1 (~10h)**. Toàn bộ trạng thái dưới đây
-> đã được đối chiếu với code thật (`grep`) và banner 6 log multi-seed.
+> Cập nhật: 2026-08-04 — ✅ **BƯỚC 1 HOÀN THÀNH**: đủ 3 model J1/S1/S4 có
+> Mean ± Std trên 3 seed deterministic. **Không còn run GPU nào** trong phạm vi.
 
-## 🎯 Ba model của paper
+## 🚨 Kết quả cuối — cấu hình KHÔNG SR đạt điểm cao nhất
 
-| Model | Vai trò | Multi-seed | Kết quả |
-|---|---|:---:|---|
-| **J1** | Mốc nền: GroupNorm, **không SR**, T=16 | 🔴 ~10h | *chưa chạy* (kỳ vọng ~76.9%) |
-| **S1** | **Phương pháp đề xuất** — Joint MF-SR-OCR ×2 | ✅ | **79.95% ± 0.15** |
-| **S4** | Biến thể rẻ: SR ×1, T=32 qua backbone | ✅ | **79.48% ± 0.44** |
+| Model | SR | `T` | GFLOPs | **Mean ± Std** | Hạng |
+|---|---|---:|---:|---:|:---:|
+| **J1** — GroupNorm, **không SR** | ❌ | 16 | **26.14** | **80.45% ± 0.45** | 🥇 |
+| **S1** — Joint MF-SR-OCR (đề xuất) | ×2 MFSR+DCN | 32 | 109.08 | **79.95% ± 0.15** | 🥈 |
+| **S4** — SR ×1 | ×1 MFSR+DCN | 32 | chưa đo | **79.48% ± 0.44** | 🥉 |
 
-Mọi cấu hình khác (J2, J3, S2, S3, nhánh AdamW, SR-v1/v2) là **exploratory** — giữ
-số 1-seed làm tham khảo/phụ lục, **không** đưa vào bảng chính có error bar.
+| Cặp | Chênh | Sai số hiệu | Kết luận |
+|---|---:|---:|---|
+| J1 vs S1 | +0.50 | ±0.28 | ⚠️ trong nhiễu → **hoà** |
+| **J1 vs S4** | **+0.97** | ±0.36 | ✅ **J1 tốt hơn thật** |
+| S1 vs S4 | +0.47 | ±0.27 | ⚠️ trong nhiễu → **hoà** |
+
+**→ Nhánh SR không mang lại lợi ích đo được, mà tốn 3.76× compute.** Phần cải thiện
+thật so với baseline đến từ **cụm cờ nền** (STN pool `(4,8)` + `--lr-domain-match` +
+constrained decode + EMA): J1-mới hơn J1-**lịch sử** **+3.57 điểm** (76.88% → 80.45%)
+với cùng kiến trúc không SR.
+
+**Giả thuyết `T=32` cũng bị bác bỏ** — J1 chạy `T=16` mà vẫn ngang/hơn S1 và S4.
+
+> ⚠️ **J1 multi-seed dùng cờ nền của S1/S4** (STN pool `(4,8)`, domain-match,
+> constrained, EMA — chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)`. Đây là
+> ablation 1-cụm-biến sạch so với S1 nên tốt hơn về khoa học, nhưng **không đặt
+> chung cột với 76.88%**. Chi tiết:
+> [baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md §3c](baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
+>
+> 📄 Phân tích đầy đủ 9 run: [baseline1_crnn_stn/multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
 
 ## Tình trạng nhanh
 
 | Mục review                       | Trạng thái                                                          |
 | -------------------------------- | ---------------------------------------------------------------------- |
-| Nhóm 1 — công thức loss          | ⚠️ đã tìm ra **4 lỗi**, **chưa sửa vào paper**                        |
-| Nhóm 2 — quy trình deterministic | ✅ **XONG, đã verify trên 6/6 log**                                   |
-| Nhóm 3 — chống overfitting       | 🟡 **1/4 đã có sẵn trong code**, 3 mục chưa (hoãn tới sau Bước 1)      |
-| **Bước 1** — multi-seed          | 🟡 **2/3 xong**: S1 ✅ · S4 ✅ · **J1 🔴 (~10h)**                       |
+| Nhóm 1 — công thức loss          | ⚠️ đã xác định **4 lỗi** (xem mục Nhóm 1), **chưa sửa vào paper**    |
+| Nhóm 2 — quy trình deterministic | ✅ **XONG, đã verify trên 9/9 log**                                   |
+| Nhóm 3 — chống overfitting       | 🟡 **1/4 đã có sẵn trong code**, 3 mục chưa                            |
+| **Bước 1** — multi-seed          | ✅ **XONG** — J1 ✅ · S1 ✅ · S4 ✅ (3 seed mỗi model)                  |
 | **Bước 2** — CER/NED/PSNR/SSIM   | ✅ **XONG** (2 chỗ cố ý lệch review, có lý do)                        |
 | **Bước 3** — hình định tính      | 🟡 script + 4 bộ hình xong, **còn chọn hình cuối cho Figure 4**       |
 | Bước 4 — PARSeq/SVTR             | ❌ chưa bắt đầu, để cuối cùng                                         |
 
-**Đường găng duy nhất**: **J1 (~10h)** — 1 run GPU cuối cùng.
-
-> ✅ **Số chính thức đã có**: S1 = **79.95% ± 0.15**, S4 = **79.48% ± 0.44** → chênh
-> +0.47 điểm, sai số hiệu ±0.27 → **không khác biệt có ý nghĩa thống kê**. S4 rẻ hơn
-> 2.30× khi train. Phân tích đầy đủ 6 run:
-> [baseline1_crnn_stn/multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
+**Không còn việc cần GPU** trong phạm vi đã chốt.
 
 ### ✅ Đã verify gì trong đợt review này (2026-08-03)
 
@@ -255,13 +267,15 @@ L_SR    = (1/N) Σ ‖I_SR − Warp_sg[θ](I_HR)‖₁   # chỉ warp HR; θ b�
 - [x] **S1 × 3 seed** ✅ **XONG** → `79.95% ± 0.15` (42: 79.78 · 100: 80.08 · 2026: 79.98)
 - [x] `aggregate_seeds.py` so S1 ↔ S4 → **không khác biệt có ý nghĩa** (+0.47 ± 0.27)
 - [x] Báo cáo multi-seed: [baseline1_crnn_stn/multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md)
-- [ ] **J1 × 3 seed** (~10h) — 🔴 **run GPU cuối cùng** (mốc nền, không SR,
-      cờ lịch sử `--stn-pool 1,1`, tái lập được ~76.88%)
+- [x] **J1 × 3 seed** ✅ **XONG** → `80.45% ± 0.45` (42: 79.98 · 100: 80.88 · 2026: 80.48)
+      ⚠️ Chạy bằng **cờ nền S1/S4** (STN pool `(4,8)` + domain-match + constrained +
+      EMA, chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)` — nên là ablation
+      1-cụm-biến sạch so với S1, và số **không** so được với 76.88% lịch sử
 - [ ] ~~J2 × 3 seed~~ — **đã bỏ**, tiết kiệm 27h; giữ số 1-seed 77.18% cho phụ lục
 - [ ] ~~S2 × 3 seed~~ — **đã quyết định bỏ**, giữ kết quả 1 seed kèm nhãn "chưa xác nhận"
 - [ ] ~~S3 × 3 seed~~ — **đã quyết định bỏ**, giữ kết quả 1 seed kèm nhãn "chưa xác nhận"
-- [ ] `aggregate_seeds.py` → bảng Mean ± Std đủ **3** model (thêm J1)
-- [ ] Cập nhật `model_comparison_summary.md` + kết luận paper (đã cập nhật phần S1/S4)
+- [x] `aggregate_seeds.py` → bảng Mean ± Std đủ **3** model ✅
+- [x] Cập nhật `model_comparison_summary.md` + `multi_seed_results.md` + `groupnorm_sr_ablation_j1_j2.md §3c` ✅
 
 ### ✅ Kết quả S1 multi-seed — con số headline TRỤ VỮNG
 
@@ -429,38 +443,30 @@ nhưng lại đọc sai.
 | Nhóm 1 — công thức      | 2/6         | 4 lỗi công thức, việc phía paper          |       0 |
 | Nhóm 2 — deterministic  | **4/4** ✅  | —                                         |       0 |
 | Nhóm 3 — chống overfit  | 2/7         | sau Bước 1 (Dropout, aug, wd, patience)   |   nhiều |
-| **Bước 1 — multi-seed** | 5/9         | **chỉ còn J1**                           | **~10h** |
+| **Bước 1 — multi-seed** | **9/9** ✅  | —                                         |       0 |
 | **Bước 2 — metrics**    | **8/8** ✅  | (tuỳ chọn: `--output-csv`)                |       0 |
 | Bước 3 — hình           | 3/4         | chọn hình cuối (+ cân nhắc sinh lại)      |       0 |
 | Bước 4 — SOTA           | 0/4         | cuối cùng, cắt được                       |   riêng |
 
-**Tổng kết**: 2/7 hạng mục xong hẳn (Nhóm 2, Bước 2). Đường găng còn lại chỉ là
-**~10h GPU cho J1** — 1 run duy nhất. Mọi việc khác đều **0 GPU**, làm song song được.
+**Tổng kết**: 3/7 hạng mục xong hẳn (Nhóm 2, **Bước 1**, Bước 2).
+**Không còn việc nào cần GPU** trong phạm vi đã chốt.
 
 ### Việc kế tiếp theo thứ tự
 
-**Cần GPU (1 việc, ~10h):**
+**Không còn việc cần GPU** trong phạm vi đã chốt. Các việc còn lại đều **0 GPU**:
 
-1. 🔴 **Chạy J1 × 3 seed** (~10h) — mốc nền (GroupNorm, không SR, T=16), cờ lịch sử
-   `--stn-pool 1,1`. Kỳ vọng ra lại ~76.88%. Sau run này bảng ablation của paper đủ
-   **3 dòng có error bar**. Lệnh: [training_runs/run_gpu.md §0 B4](training_runs/run_gpu.md).
-
-**Làm ngay được, không cần GPU (song song lúc chờ):**
-
-2. ✍️ **Sửa 4 lỗi công thức loss trong paper** (Nhóm 1) — đã xác định chính xác
-   chỗ sai, chỉ là việc viết lại. Đây là phần review nhấn mạnh nhất mà hiện **chưa
-   động vào chút nào**.
-3. ✍️ **Viết mục Limitations** — 3 điều phải ghi rõ:
-   (a) ablation **multi-frame vs single-frame chỉ có 1 seed** (J2 77.18% vs S1
-   79.78%, chênh 26 track) — không có error bar;
-   (b) chưa tách được `T=32` khỏi bản thân module SR (thiếu run `width-downsample 4`
-   không `use-sr`); ladder J1→S1 là ablation **tích luỹ**, không tách 1 biến;
-   (c) S2/S3 là 1 seed, chưa xác nhận.
+1. ✍️ **Sửa 4 lỗi công thức loss trong paper** (Nhóm 1) — chi tiết 4 lỗi + công
+   thức đúng nằm ở [mục Nhóm 1](#nhóm-1--hoàn-thiện-công-thức-loss-việc-phía-paper-0-gpu)
+   của chính file này.
+2. 🚨 **VIẾT LẠI KẾT LUẬN CHÍNH CỦA PAPER** — việc lớn nhất còn lại. Kết quả J1
+   **đảo chiều** câu chuyện: nhánh SR không chứng minh được đóng góp, phần cải
+   thiện thật đến từ cụm cờ nền. Bản thảo hiện coi S1 là phương pháp thắng.
+3. ✍️ **Cập nhật Limitations** — đã có nháp trong file trên (§3), nhưng **cần bổ
+   sung** 2 mục mới sau kết quả J1: (a) chưa tách được từng thành phần trong cụm cờ
+   nền; (b) J1 dùng cờ nền S1/S4 nên không so được với J1 lịch sử 76.88%.
 4. 🖼️ **Chọn hình cuối cho Figure 4** — cân nhắc sinh lại từ checkpoint
-   `results/multi-seed/*/[s1|s4]_seed42_best.pth` để hình khớp với số multi-seed.
-5. 📊 Sau khi có J1: `aggregate_seeds.py` → bảng Mean ± Std đủ 3 model,
-   cập nhật [model_comparison_summary.md §1c](baseline1_crnn_stn/model_comparison_summary.md#1c-kết-quả-multi-seed--số-chính-thức-cho-paper)
-   và [multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
-6. ✅ **Chốt cấu hình cuối** theo Mean ± Std → S1 và S4 hiện **ngang nhau về
-   accuracy** (chênh nằm trong nhiễu), nên quyết định dựa trên tiêu chí khác:
-   S4 rẻ hơn 2.30× khi train · S1 std nhỏ hơn 3× và không nhạy với chế độ cudnn.
+   `results/multi-seed/*/*_seed42_best.pth` để hình khớp số multi-seed.
+5. 📏 **Benchmark compute cho J1 và S4** — `tools/benchmark.py` chưa có dòng cho
+   `sr-scale=1`; phút/epoch của J1 mới là ước tính (thiếu `log_j1p_seed42.txt`).
+   Cần số thật vì claim **"S1 tốn 3.76× compute để đổi lấy −0.50 điểm"** là lập
+   luận mạnh nhất của bài.

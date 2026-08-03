@@ -130,57 +130,94 @@ Cả 4 khoảng cách đều **vượt xa biên nhiễu ±13** và **nhất quá
 có seed nào làm đảo chiều). Đây là bằng chứng mạnh nhất hiện có cho claim *"nhóm S
 vượt nhóm J"* — dù J1/J2 vẫn là 1 seed nên chưa phải kiểm định 2 phía đầy đủ.
 
-## 3c. 🔴 Multi-seed J1 — KHUNG CHỜ KẾT QUẢ (chưa chạy)
+## 3c. ✅ Multi-seed J1 — **80.45% ± 0.45**, cao nhất toàn project
 
-> Đây là **run GPU duy nhất còn lại** của cả đợt revision (~10 h). Điền bảng dưới
-> ngay sau khi chạy xong, rồi cập nhật
-> [model_comparison_summary.md §1c](model_comparison_summary.md) và
-> [multi_seed_results.md](multi_seed_results.md).
+> 🚨 **KẾT QUẢ NÀY ĐẢO NGƯỢC KẾT LUẬN CHÍNH CỦA PAPER.** Cấu hình **không có SR**
+> đạt điểm **cao hơn** cả S1 (đề xuất) lẫn S4. Đọc kỹ mục này trước khi viết bài.
+> Dữ liệu: `results/multi-seed/crnn_resblock_groupnorm_nosr_j1/`.
 
-**Lệnh** (cờ lịch sử — giữ đúng kiến trúc J1 ở [mục 2](#2-cấu-hình)):
+### ⚠️ Trước hết: run này KHÔNG dùng cờ lịch sử ở [mục 2](#2-cấu-hình)
 
-```bash
-for SEED in 42 100 2026; do
-  python train.py --preset stable --experiment-name j1_seed${SEED} --seed ${SEED} \
-    --backbone-norm group --stn-pool 1,1 \
-    --no-cudnn-benchmark --num-workers 8 --aug-level full \
-    2>&1 | tee results/log_j1_seed${SEED}.txt
-done
-```
+Banner `log_j1p_seed100.txt` cho thấy cấu hình thật đã chạy:
 
-🚨 `--stn-pool 1,1` **phải có dấu phẩy** (`1 1` → parse thành `(11,)` → crash).
+| Tham số | J1 lịch sử (mục 2, 76.88%) | **J1 multi-seed (đã chạy)** | Giống S1/S4? |
+|---|---|---|:---:|
+| STN pool | `(1,1)` | **`(4,8)`** | ✅ |
+| LR domain match | ❌ | **✅** | ✅ |
+| Decode | greedy | **constrained** | ✅ |
+| EMA | ❌ | **✅** (0.999) | ✅ |
+| Epochs / batch | 80 / 64 | **60 / 32 + accum 2** | ✅ |
+| SR · DCN | ❌ · ❌ | ❌ · ❌ | (khác S1) |
+| `T` | 16 | **16** | (S1/S4 dùng 32) |
+| Params | 29,313,452 | **29,442,700** | — |
+
+→ Đây là bản **"S1 trừ đi SR/DCN/MFSR"**, tức **ablation 1-cụm-biến sạch** so với
+S1 — chứ không phải tái lập J1 lịch sử. Tên experiment `j1p` phản ánh đúng điều đó.
+**Về mặt khoa học đây là cấu hình TỐT HƠN để so** với S1, nên giữ nguyên; chỉ cần
+gọi tên cho đúng và **không** đặt chung cột với 76.88%.
+
+### Kết quả
 
 | Seed | Track đúng | Val Acc | Best epoch | Số epoch | Val Loss | CER ↓ | Conf. TB | conf<0.55 | sai độ dài |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 42 | | | | | | | | | |
-| 100 | | | | | | | | | |
-| 2026 | | | | | | | | | |
-| **Mean ± Std** | | | | | | | | | |
+| 42 | 799/999 | 79.98% | 22 | 40 | 0.2030 | 0.0525 | 0.9642 | 6 | 0 |
+| 100 | **808/999** | **80.88%** | 17 | 35 | 0.1855 | 0.0532 | 0.9589 | 11 | 0 |
+| 2026 | 804/999 | 80.48% | 35 | 53 | 0.2571 | 0.0518 | 0.9765 | 2 | 0 |
+| **Mean ± Std** | | **80.45% ± 0.45** | | | | **0.0525 ± 0.0007** | 0.9665 ± 0.0089 | | **0/999** |
 
-**✅ Điều kiện đạt**: Mean rơi quanh **76.88% ± 1.3**. J1 **không dùng SR**, mà mọi
-thay đổi code từ 2026-07 tới nay đều nằm ở nhánh SR → phải tái lập được số cũ. Lệch
-nhiều hơn ⇒ kiểm tra lại cờ (đặc biệt `--stn-pool`) trước khi dùng số.
+Đã chấm lại trực tiếp `submission_*.txt` với `plate_text` gốc — khớp chính xác số
+trong log. `0/999 track sai độ dài` ở **cả 3 seed**.
 
-**Mốc để so sau khi có kết quả** (số chính thức, 3 seed deterministic):
+### 🚨 So với S1 và S4 — SR không mang lại lợi ích đo được
 
-| Model | Mean ± Std | Chênh so với J1 (kỳ vọng) |
-|---|---:|---|
-| J1 (sẽ có) | *…* | — |
-| **S1** (đề xuất) | **79.95% ± 0.15** | ~ +3.1 điểm → **claim headline** |
-| **S4** (rẻ hơn 2.3×) | **79.48% ± 0.44** | ~ +2.6 điểm |
+| So sánh | Chênh | Sai số hiệu | Kết luận |
+|---|---:|---:|---|
+| **J1 vs S1** (79.95% ± 0.15) | **+0.50** | ±0.28 | ⚠️ trong biên nhiễu → **hoà** |
+| **J1 vs S4** (79.48% ± 0.44) | **+0.97** | ±0.36 | ✅ **> 2× sai số → J1 TỐT HƠN THẬT** |
 
-Sau khi có J1, chạy kiểm định cho claim headline:
+Ở mức từng track (cùng seed, net gain của J1):
 
-```bash
-python tools/aggregate_seeds.py \
-  --acc 79.7798 80.0801 79.9800 --label "S1 (đề xuất)" \
-  --baseline-acc <3 số J1> --baseline-label "J1 (không SR)"
-```
+| So với | seed 42 | seed 100 | seed 2026 | TB |
+|---|---:|---:|---:|---:|
+| S1 | +2 | +8 | +5 | **+5.0 track** |
+| S4 | +10 | +11 | +8 | **+9.7 track** |
 
-⚠️ **Nhắc lại khi viết paper**: J1→S1 đổi **nhiều biến cùng lúc** (SR, DCN, MFSR,
-STN pool, domain-match, decode, EMA) và `T` cũng nhảy 16→32. Đây là **ablation tích
-luỹ**, không phải tách 1 biến — viết là *"gộp tất cả thay đổi được +X điểm"*, không
-phải *"SR đóng góp +X điểm"*.
+Cùng chiều ở **cả 3 seed**, không seed nào đảo ngược.
+
+### Hệ quả — hai giả thuyết trung tâm bị bác bỏ
+
+**1. "Nhánh SR đóng góp vào độ chính xác" — KHÔNG có bằng chứng.**
+J1 bỏ hẳn SR/DCN/MFSR mà vẫn **hoà S1** và **hơn S4 rõ rệt**. Vậy +3.57 điểm mà
+J1-mới hơn J1-lịch-sử (76.88% → 80.45%) đến từ **cụm cờ nền** — STN pool `(4,8)`,
+`--lr-domain-match`, constrained decode, EMA — chứ **không** phải từ SR.
+Kiểm chứng ở mức track: J1-mới hơn J1-lịch-sử **+31 / +40 / +36 track** qua 3 seed.
+
+**2. "`T=32` là yếu tố chính" — cũng KHÔNG đứng vững.**
+J1 chạy **`T=16`** mà vẫn ngang/hơn S1 và S4 (đều `T=32`). Giả thuyết nêu ở
+[s4_sr_scale1_mf_sr_ocr.md §3](s4_sr_scale1_mf_sr_ocr.md) — rằng lợi ích của "SR"
+thực ra đến từ việc `T` tăng gấp đôi — **không còn cơ sở**: khi cụm cờ nền đã bật,
+`T=16` không hề kém `T=32`.
+
+→ **Cách đọc trung thực nhất hiện nay**: phần cải thiện thật so với baseline gốc
+đến từ **cụm cờ nền (STN pool + domain-match + constrained decode + EMA)**, còn
+**module SR chưa chứng minh được đóng góp** — thậm chí biến thể SR ×1 (S4) còn
+**kém hơn** khi không có SR.
+
+### Chi phí — SR đắt mà không lợi
+
+| | GFLOPs/track | Latency (ms) | vs J1 | Val Acc (3 seed) |
+|---|---:|---:|---:|---:|
+| **J1** (không SR) | **26.14** | **51.30** | **1.00×** | **80.45% ± 0.45** |
+| S1 (MFSR+DCN) | 109.08 | 192.75 | **3.76×** | 79.95% ± 0.15 |
+| S4 (SR ×1) | chưa đo | chưa đo | — | 79.48% ± 0.44 |
+
+**S1 tốn 3.76× compute để đổi lấy −0.50 điểm.** Đây là con số nên đưa vào bài.
+
+### Ghi chú vận hành
+
+⚠️ **Thiếu `log_j1p_seed42.txt`** — chỉ có log của seed 100 và 2026. CSV +
+submission + checkpoint của seed 42 vẫn đủ nên không mất số liệu, nhưng không tra
+lại được banner cấu hình của riêng seed đó.
 
 ## 4. Caveat thống kê — quan trọng hơn mọi con số ở trên
 

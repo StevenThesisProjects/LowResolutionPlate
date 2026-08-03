@@ -45,8 +45,9 @@ Mọi cấu hình đã từng train trong project, không bỏ dòng nào. Cột
 | 2 | **S4 — SR scale=1, T=32 qua `width_downsample=4`** | Đề xuất (S) | **805** | **80.58%** | 1 ⚠️ | [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) |
 | 3 | **S1 — Joint MF-SR-OCR, λ_SR=0.1 (đề xuất chính)** | Đề xuất (S) | **797** | **79.78%** | 1 ⚠️ | [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) |
 | 4 | S2 — S1 + λ_SR=0.5 | Đề xuất (S) | 794 | 79.48% | 1 ⚠️ | [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) |
-| — | 🥇 **S1 — 3 seed deterministic** | **CHÍNH THỨC** | 797/800/799 | **79.95% ± 0.15** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
-| — | 🥈 **S4 — 3 seed deterministic** | **CHÍNH THỨC** | 789/797/796 | **79.48% ± 0.44** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
+| — | 🥇 **J1 — 3 seed deterministic (KHÔNG SR)** | **CHÍNH THỨC** | 799/808/804 | **80.45% ± 0.45** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
+| — | 🥈 **S1 — 3 seed deterministic** | **CHÍNH THỨC** | 797/800/799 | **79.95% ± 0.15** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
+| — | 🥉 **S4 — 3 seed deterministic** | **CHÍNH THỨC** | 789/797/796 | **79.48% ± 0.44** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
 | 5 | ResNet + Transformer + STN (report ICPR gốc)\* | Mốc tham chiếu | — | 78.70% | — | [baseline1_architecture.md](baseline1_architecture.md) |
 | 6 | J2 — ResBlock + GroupNorm + SR per-frame (kèm `edge=0.5`) | Ablation (J) | 771 ✅ | 77.18% | 1 ⚠️ | [groupnorm_sr_ablation_j1_j2.md §3b](groupnorm_sr_ablation_j1_j2.md) |
 | 7 | **CRNN + STN (report ICPR gốc)** | **Mốc chuẩn** | — | **77.00%** | — | [baseline1_architecture.md](baseline1_architecture.md) |
@@ -81,6 +82,7 @@ Thang: 1 ký tự ≈ 0.2 điểm, gốc 73.5%. `█` = số multi-seed (chính 
                                             ├────┬────┬────┬────┬────┬────┬────┤
  S3  +L_Perceptual              80.58% (1s) ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
  S4  SR ×1                      80.58% (1s) ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+▶J1  3 SEED — KHÔNG SR 🥇       80.45%±0.45 ███████████████████████████████████[██]
 ▶S1  3 SEED DETERMINISTIC       79.95%±0.15 ████████████████████████████████[▪]
  S1  Joint MF-SR-OCR λ=0.1      79.78% (1s) ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
  S2  λ_SR=0.5                   79.48% (1s) ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
@@ -121,26 +123,41 @@ Chart vector chuẩn cho paper: `tools/plot_results.py ablation`
 
 ## 1c. Kết quả multi-seed — số chính thức cho paper
 
-**Phạm vi cuối cùng (2026-08-03): 3 model J1 + S1 + S4** — bỏ J2, S2, S3. Lý do ở
-[../checklist_review.md](../checklist_review.md).
-📄 Phân tích đầy đủ 6 run (S1 & S4 × 3 seed): **[multi_seed_results.md](multi_seed_results.md)**.
+**✅ BƯỚC 1 HOÀN THÀNH — đủ 3 model có Mean ± Std** (42/100/2026, deterministic).
+📄 Phân tích đầy đủ 9 run: **[multi_seed_results.md](multi_seed_results.md)**.
 
-| Model | Vai trò trong paper | Seeds | **Mean ± Std** | Trạng thái |
-|---|---|---|---:|---|
-| **S1** — Joint MF-SR-OCR ×2 | **Phương pháp đề xuất (headline)** | 42/100/2026 | **79.95% ± 0.15** | ✅ **xong** |
-| **S4** — SR ×1, T=32 qua backbone | Biến thể rẻ: bằng điểm mà nhanh 2.3× | 42/100/2026 | **79.48% ± 0.44** | ✅ **xong** |
-| **J1** — GroupNorm, không SR (T=16) | Mốc nền: SR có ích không? | — | *chưa chạy* | 🔴 ~10 h |
-| ~~J2~~ (SR single-frame) | — | — | — | ⏭️ 1 seed, phụ lục |
-| ~~S2~~ (λ=0.5) · ~~S3~~ (+perceptual) | — | — | — | ⏭️ 1 seed, phụ lục |
+| Model | SR | `T` | GFLOPs | **Mean ± Std** | Hạng |
+|---|---|---:|---:|---:|:---:|
+| **J1** — GroupNorm, **không SR** | ❌ | 16 | **26.14** | **80.45% ± 0.45** | 🥇 |
+| **S1** — Joint MF-SR-OCR ×2 (đề xuất) | ×2 MFSR+DCN | 32 | 109.08 | **79.95% ± 0.15** | 🥈 |
+| **S4** — SR ×1, T=32 qua backbone | ×1 MFSR+DCN | 32 | chưa đo | **79.48% ± 0.44** | 🥉 |
+| ~~S2~~ · ~~S3~~ · ~~J2~~ · ~~J3~~ | — | — | — | 1 seed | phụ lục |
 
-**J1 chạy đúng cờ lịch sử** (`--stn-pool 1,1`, không domain-match/EMA/constrained)
-→ **tái lập được ~76.88%** vì J1 không dùng SR, mà mọi thay đổi code từ đó tới nay
-đều nằm ở nhánh SR.
+### 🚨 Kết quả chính — cấu hình KHÔNG SR đạt điểm cao nhất
 
-> ⚠️ **Ladder J1→S1→S4 là ablation TÍCH LUỸ**, không phải tách 1 biến: J1 khác S1 ở
-> nhiều tham số cùng lúc (SR, DCN, MFSR, STN pool, domain-match, decode, EMA). Cách
-> đọc đúng trong paper: *"gộp tất cả thay đổi được +X track"*, **không** phải
-> *"SR đóng góp +X track"*.
+| Cặp | Chênh | Sai số hiệu | Kết luận |
+|---|---:|---:|---|
+| **J1 vs S1** | +0.50 | ±0.28 | ⚠️ trong nhiễu → **hoà** |
+| **J1 vs S4** | **+0.97** | ±0.36 | ✅ **vượt 2× sai số → J1 tốt hơn thật** |
+| S1 vs S4 | +0.47 | ±0.27 | ⚠️ trong nhiễu → **hoà** |
+
+**S1 tốn 3.76× compute so với J1 để đổi lấy −0.50 điểm.**
+
+**Hai giả thuyết trung tâm bị bác bỏ:**
+
+1. **"SR đóng góp vào độ chính xác"** — ❌. J1 và S1 dùng chung toàn bộ cụm cờ nền
+   (GroupNorm + STN pool `(4,8)` + domain-match + constrained decode + EMA); S1 chỉ
+   thêm SR/DCN/MFSR. Thêm cụm đó **không cải thiện**. Phần +3.57 điểm mà J1-mới hơn
+   J1-**lịch sử** (76.88% → 80.45%) đến từ **cụm cờ nền**, không phải SR.
+2. **"`T=32` là yếu tố chính"** — ❌. J1 chạy **`T=16`** mà vẫn ngang/hơn S1 và S4
+   (đều `T=32`).
+
+> ⚠️ **J1 multi-seed KHÔNG dùng cờ lịch sử.** Run thật dùng đúng bộ cờ nền của
+> S1/S4 (STN pool `(4,8)`, domain-match, constrained, EMA), chỉ bỏ SR/DCN — tức là
+> **ablation 1-cụm-biến sạch so với S1**, tốt hơn về mặt khoa học. Nhưng vì thế
+> **không đặt chung cột với 76.88%** của J1 lịch sử (STN pool `(1,1)`, params
+> 29,313,452 vs 29,442,700). Chi tiết:
+> [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
 
 ### ✅ Kết luận chính thức đầu tiên có error bar: S1 ≈ S4
 
@@ -489,19 +506,19 @@ vẫn cần benchmark thật ([multi_seed_results.md §7](multi_seed_results.md#
 | Lệnh chạy GPU đầy đủ + bảng compute + hướng dẫn vẽ chart | [../training_runs/run_gpu.md](../training_runs/run_gpu.md) |
 | Cấu trúc dataset, plate layout, corners annotation | [../summary_project/dataset/dataset_overview.md](../summary_project/dataset/dataset_overview.md) |
 
-## 8. Bước tiếp theo (chưa chạy)
+## 8. Trạng thái & việc còn lại
 
-Cả 4 cấu hình đề xuất theo kế hoạch ban đầu (S1-S4) đã chạy 1 seed; **S1 và S4 đã
-có đủ 3 seed**. Việc còn lại:
+✅ **Bước 1 (multi-seed) đã HOÀN THÀNH** — đủ 3 model J1/S1/S4 có Mean ± Std trên
+3 seed deterministic. Không còn run GPU nào trong phạm vi đã chốt.
 
-1. 🔴 **Multi-seed J1** (~10 h) — **run GPU duy nhất còn lại**. S1 và S4 đã xong.
-   Sau đó bảng ablation của paper đủ **3 dòng có error bar** (J1 → S1 → S4).
-   Chạy cờ lịch sử `--stn-pool 1,1`, kỳ vọng ~76.88%.
-   Lệnh: [run_gpu.md §0 B4](../training_runs/run_gpu.md).
-2. **Benchmark compute cho S4** — `tools/benchmark.py --all` chưa có dòng cho cấu
-   hình `sr-scale=1`, cần đo để hoàn thiện bảng §6 (đã có số train, thiếu latency).
-3. **Ablation "T=32 không SR"** — `--width-downsample 4` **không** `--use-sr`.
-   ⚠️ **Lưu ý**: J1 **không** thay thế được run này (J1 là T=16). Đây vẫn là run
-   riêng, cần để tách dứt điểm câu hỏi S4 đặt ra (§3).
-4. Ablation tách 6 thành phần của S1 (đóng góp riêng của DCN/domain-match/EMA) —
-   giá trị thông tin cao nhưng tốn nhiều run nhất, làm sau cùng nếu còn thời gian.
+Việc còn lại (**không thuộc phạm vi 3 model**, chỉ liệt kê để tra cứu):
+
+1. **Benchmark compute cho S4 và J1** — `tools/benchmark.py --all` chưa có dòng cho
+   `sr-scale=1`, và phút/epoch của J1 mới là ước tính từ tỷ lệ GFLOPs (log seed 42
+   bị thiếu). Cần số thật trước khi in bảng chi phí.
+2. **Ablation tách cụm cờ nền** — J1 vs S1 cho biết SR không giúp, nhưng chưa tách
+   được đóng góp riêng của STN pool `(4,8)` / domain-match / constrained decode /
+   EMA. Đây là câu hỏi mở **quan trọng nhất** còn lại về mặt khoa học.
+3. **Ablation "T=32 không SR"** (`--width-downsample 4` không `--use-sr`) — nay ít
+   cấp thiết hơn vì J1 (`T=16`) đã cho thấy `T=32` không phải yếu tố quyết định.
+4. **Chạy test** — mọi số hiện tại đều là validation, chưa chạy test lần nào.

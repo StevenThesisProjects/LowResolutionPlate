@@ -1,17 +1,21 @@
-# Multi-seed S1 & S4 — kết quả chính thức đầu tiên (Mean ± Std)
+# Multi-seed J1 · S1 · S4 — kết quả chính thức (Mean ± Std)
 
-> ✅ **S1 và S4 đã có đủ 3 seed (42/100/2026), chế độ deterministic
-> (`--no-cudnn-benchmark`).** Đây là 2 cấu hình đầu tiên trong project có số liệu
-> **Mean ± Std** thay vì best-of-1-run — số trong file này là **số chính thức cho
-> paper**, thay thế mọi số 1-seed của S1/S4 đã báo cáo trước đó.
-> Còn thiếu **J1** (~10h) để hoàn thành phạm vi cuối cùng — **3 model J1 + S1 + S4**
-> (bỏ J2, S2, S3) — xem [../checklist_review.md](../checklist_review.md).
+> ✅ **ĐỦ CẢ 3 MODEL** (42/100/2026, deterministic `--no-cudnn-benchmark`).
+> **Bước 1 của review đã HOÀN THÀNH.**
 >
-> Dữ liệu nguồn: `results/multi-seed/s1_mf_sr_ocr/`, `results/multi-seed/s4_sr_scale1/`
-> (`history_*_seed{42,100,2026}.csv`, `log_*_seed{42,100,2026}.txt`,
-> `submission_*_seed{42,100,2026}.txt`). Đối chiếu bằng cách chấm trực tiếp
-> `submission_*.txt` với `plate_text` thật trong `annotations.json` của 999 track
-> val (không chỉ tin số `val_acc` in trong log/CSV).
+> 🚨 **Kết quả bất ngờ**: cấu hình **không có SR (J1) đạt điểm CAO NHẤT** —
+> **80.45% ± 0.45**, hoà S1 và **hơn S4 có ý nghĩa thống kê**. Nhánh SR chưa
+> chứng minh được đóng góp. Phân tích: [§4](#4-🚨-kết-quả-chính--sr-không-mang-lại-lợi-ích-đo-được).
+>
+> | Model | SR | `T` | **Mean ± Std** | GFLOPs |
+> |---|---|---:|---:|---:|
+> | **J1** | ❌ không SR | 16 | **80.45% ± 0.45** 🥇 | **26.14** |
+> | **S1** | ×2 multi-frame + DCN | 32 | 79.95% ± 0.15 | 109.08 |
+> | **S4** | ×1 multi-frame + DCN | 32 | 79.48% ± 0.44 | chưa đo |
+>
+> Dữ liệu: `results/multi-seed/{crnn_resblock_groupnorm_nosr_j1,s1_mf_sr_ocr,s4_sr_scale1}/`.
+> Mọi con số đã **chấm lại trực tiếp** `submission_*.txt` với `plate_text` thật
+> trong `annotations.json` của 999 track val, không chỉ tin `val_acc` in trong log.
 
 ## 1. Cấu hình đã chạy
 
@@ -29,6 +33,17 @@ for SEED in 42 100 2026; do
     --decode constrained --use-ema \
     --no-cudnn-benchmark --num-workers 8 --aug-level full \
     2>&1 | tee results/log_s1_seed${SEED}.txt
+done
+
+# J1 — 3 seed. LƯU Ý: KHÔNG dùng cờ lịch sử (STN pool 1,1) mà dùng
+# ĐÚNG bộ cờ nền của S1/S4, chỉ bỏ SR/DCN → ablation 1-cụm-biến sạch.
+for SEED in 42 100 2026; do
+  python train.py --preset stable --experiment-name j1p_seed${SEED} --seed ${SEED} \
+    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+    --backbone-norm group --lr-domain-match \
+    --decode constrained --use-ema \
+    --no-cudnn-benchmark --num-workers 8 --aug-level full \
+    2>&1 | tee results/log_j1p_seed${SEED}.txt
 done
 
 # S4 — 3 seed (đã chạy trước, xem s4_sr_scale1_mf_sr_ocr.md §5d)
@@ -49,6 +64,20 @@ experiment. `nan_batches = 0` ở mọi epoch của cả 6 run.
 
 ## 2. Kết quả từng seed
 
+### J1 (KHÔNG SR, T=16) — 🥇 điểm cao nhất
+
+| Seed | Track đúng | Val Acc | Best epoch | Tổng epoch | Val Loss | CER ↓ | Conf. TB | conf<0.55 | sai độ dài |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 42 | 799/999 | 79.98% | 22 | 40 | 0.2030 | 0.0525 | 0.9642 | 6 | 0 |
+| 100 | **808/999** | **80.88%** | 17 | 35 | 0.1855 | 0.0532 | 0.9589 | 11 | 0 |
+| 2026 | 804/999 | 80.48% | 35 | 53 | 0.2571 | 0.0518 | 0.9765 | 2 | 0 |
+| **Mean ± Std** | | **80.45% ± 0.45** | | | | **0.0525 ± 0.0007** | 0.9665 ± 0.0089 | | **0/999** |
+
+⚠️ J1 dùng **`T=16`** (không SR nên width không nhân đôi) và params 29,442,700 —
+khác J1 **lịch sử** (76.88%, STN pool `(1,1)`, params 29,313,452). Hai số này
+**không đặt chung cột**. Chi tiết:
+[groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+
 ### S1 (SR ×2, multi-frame + DCN)
 
 | Seed | Track đúng | Val Acc | Best epoch | Tổng epoch (early-stop) | Val Loss | CER ↓ | Conf. TB | Track conf <0.55 | Track sai độ dài |
@@ -67,52 +96,75 @@ experiment. `nan_batches = 0` ở mọi epoch của cả 6 run.
 | 2026 | 796/999 | 79.68% | 40 | 58 | 0.2628 | 0.0542 | 0.9743 | 1 | 0 |
 | **Mean ± Std** | | **79.48% ± 0.44** | | | | 0.0543 ± 0.0001 | 0.9691 ± 0.0096 | | |
 
-**Quan sát đầu tiên**: S1 có **std nhỏ hơn S4 gần 3 lần** (0.15 vs 0.44 điểm) —
-S1 ổn định hơn qua các seed dù kiến trúc phức tạp hơn (multi-frame SR + DCN so với
-SR đơn giản của S4). CER của S4 lại **ổn định hơn** S1 (std 0.0001 vs 0.0016) —
-hai đại lượng không nhất thiết đi cùng chiều.
+**Quan sát**: S1 có **std nhỏ nhất** (0.15, so với 0.44 của J1 và S4) — ổn định
+nhất qua các seed. Nhưng **J1 có CER tốt nhất** (0.0525) **và** là cấu hình duy nhất
+đạt **0/999 track sai độ dài ở cả 3 seed**. Độ ổn định exact-match và độ ổn định CER
+không đi cùng chiều: S4 ổn định nhất về CER (std 0.0001) nhưng kém nhất về exact match.
 
-## 3. So sánh chính thức S1 vs S4 (`tools/aggregate_seeds.py`)
+## 3. So sánh chính thức 3 model (`tools/aggregate_seeds.py`)
 
-```
-S1 (SR x2, multi-frame+DCN)
-  Số seed      : 3  (79.78%, 80.08%, 79.98%)
-  Mean ± Std   : 79.95% ± 0.15
-  Min / Max    : 79.78% / 80.08%
-  CI 95% (n=999) : ±2.48 điểm  → [77.46%, 82.43%]
+| Model | 3 seed | **Mean ± Std** | Xếp hạng |
+|---|---|---:|:---:|
+| **J1** (không SR) | 79.98 / 80.88 / 80.48 | **80.45% ± 0.45** | 🥇 |
+| **S1** (đề xuất) | 79.78 / 80.08 / 79.98 | **79.95% ± 0.15** | 🥈 |
+| **S4** (SR ×1) | 78.98 / 79.78 / 79.68 | **79.48% ± 0.44** | 🥉 |
 
-S4 (SR x1)
-  Số seed      : 3  (78.98%, 79.78%, 79.68%)
-  Mean ± Std   : 79.48% ± 0.44
-  Min / Max    : 78.98% / 79.78%
-  CI 95% (n=999) : ±2.50 điểm  → [76.98%, 81.98%]
+Kiểm định từng cặp (ngưỡng: chênh > 2× sai số hiệu mới coi là thật):
 
-============================================================
-SO SÁNH
-============================================================
-  Chênh lệch   : +0.47 điểm (S1 so với S4)
-  Sai số hiệu  : ±0.27
-  ⚠️ Chênh lệch NẰM TRONG biên độ nhiễu → chưa đủ bằng chứng kết luận.
-```
+| Cặp | Chênh | Sai số hiệu | Kết luận |
+|---|---:|---:|---|
+| **J1 vs S1** | +0.50 | ±0.28 | ⚠️ trong biên nhiễu → **hoà** |
+| **J1 vs S4** | **+0.97** | ±0.36 | ✅ **vượt 2× sai số → J1 tốt hơn thật** |
+| S1 vs S4 | +0.47 | ±0.27 | ⚠️ trong biên nhiễu → **hoà** |
 
-**Kết luận chính thức đầu tiên có error bar của project**: **S1 và S4 không khác
-biệt có ý nghĩa thống kê** (+0.47 điểm < 2× sai số ±0.27, và cũng < biên nhiễu dự
-án dùng xuyên suốt ±1.3 điểm). Claim *"S4 bằng S1 nhưng rẻ hơn 2.34×"* — đặt ra từ
-[s4_sr_scale1_mf_sr_ocr.md §5c](s4_sr_scale1_mf_sr_ocr.md) —
-**nay được xác nhận bằng multi-seed**, không còn là so sánh khập khiễng 1 bên
-multi-seed 1 bên 1-seed như trước.
+## 4. 🚨 Kết quả chính — SR không mang lại lợi ích đo được
 
-So với các mốc xa hơn, cả hai vẫn vượt rõ biên nhiễu ±1.3 điểm:
+**Cấu hình bỏ hẳn nhánh SR (J1) đạt điểm cao nhất trong cả 3 model.** J1 hoà S1
+(đề xuất) và **hơn S4 một cách có ý nghĩa thống kê**, trong khi rẻ hơn **3.76×**
+về compute.
 
-| So sánh | Chênh lệch | Trong biên nhiễu? |
-|---|---:|:---:|
-| S1 (79.95%) vs J2 1-seed (77.18%) | +2.77 | **không — vượt rõ** |
-| S1 (79.95%) vs baseline gốc (77.00%) | +2.95 | **không — vượt rõ** |
-| S4 (79.48%) vs J2 1-seed (77.18%) | +2.30 | **không — vượt rõ** |
-| S4 (79.48%) vs baseline gốc (77.00%) | +2.48 | **không — vượt rõ** |
-| **S1 (79.95%) vs S4 (79.48%)** | **+0.47** | **có — không phân biệt được** |
+| | SR | DCN | `T` | GFLOPs/track | Val Acc (3 seed) |
+|---|:---:|:---:|---:|---:|---:|
+| **J1** | ❌ | ❌ | **16** | **26.14** | **80.45% ± 0.45** |
+| S1 | ×2 multi-frame | ✅ | 32 | 109.08 (**3.76×**) | 79.95% ± 0.15 |
+| S4 | ×1 multi-frame | ✅ | 32 | chưa đo | 79.48% ± 0.44 |
 
-## 4. Bất đối xứng quan trọng — `cudnn.benchmark` KHÔNG luôn thổi phồng số
+Ở mức từng track (cùng seed, net gain của J1) — cùng chiều ở **cả 3 seed**:
+
+| So với | seed 42 | seed 100 | seed 2026 | TB |
+|---|---:|---:|---:|---:|
+| S1 | +2 | +8 | +5 | **+5.0 track** |
+| S4 | +10 | +11 | +8 | **+9.7 track** |
+
+### Hai giả thuyết trung tâm bị bác bỏ
+
+**1. "Nhánh SR đóng góp vào độ chính xác"** — ❌ không có bằng chứng.
+J1 và S1 dùng **chung toàn bộ cụm cờ nền** (GroupNorm, STN pool `(4,8)`,
+`--lr-domain-match`, constrained decode, EMA); S1 chỉ thêm SR + DCN + MFSR. Thêm
+cụm đó vào **không cải thiện** (−0.50 điểm, trong nhiễu) mà tốn **3.76× compute**.
+
+Vậy +3.57 điểm mà J1-mới hơn J1-**lịch sử** (76.88% → 80.45%) đến từ **cụm cờ nền**,
+không phải SR. Kiểm chứng mức track: J1-mới hơn J1-lịch-sử **+31 / +40 / +36 track**
+qua 3 seed.
+
+**2. "`T=32` là yếu tố chính đứng sau lợi ích của SR"** — ❌ cũng không đứng vững.
+J1 chạy **`T=16`** mà vẫn ngang/hơn S1 và S4 (đều `T=32`). Giả thuyết nêu ở
+[s4_sr_scale1_mf_sr_ocr.md §3](s4_sr_scale1_mf_sr_ocr.md) mất cơ sở: khi cụm cờ nền
+đã bật, `T=16` không hề kém `T=32`.
+
+→ **Cách đọc trung thực nhất**: cải thiện thật so với baseline gốc đến từ **cụm cờ
+nền (STN pool `(4,8)` + domain-match + constrained decode + EMA)**. **Module SR
+chưa chứng minh được đóng góp nào** trên tập validation này.
+
+### Giới hạn của kết luận này
+
+- **3 seed, n=999** — chênh J1↔S1 (+0.50) nằm trong nhiễu, nên đúng ra chỉ kết
+  luận được *"SR không giúp"*, **không** phải *"bỏ SR thì tốt hơn"*.
+- Chưa tách được **từng thành phần trong cụm cờ nền** (STN pool vs domain-match vs
+  decode vs EMA) — cần ablation riêng, ngoài phạm vi hiện tại.
+- Chỉ đo trên **validation Scenario-B**; chưa chạy test.
+
+## 5. Bất đối xứng — `cudnn.benchmark` KHÔNG luôn thổi phồng số
 
 Đây là phát hiện đáng chú ý nhất của đợt multi-seed này: hiệu ứng của
 `cudnn.benchmark=True` **không giống nhau** giữa S1 và S4.
@@ -140,12 +192,13 @@ Nhìn theo hướng khác: **con số S1 headline (79.78–80.08%, mean 79.95%) 
 nhất và đáng tin nhất trong toàn bộ project tính đến nay** — không phụ thuộc vào
 việc có bật `cudnn.benchmark` hay không.
 
-## 5. Ổn định dự đoán qua các seed — track nào đổi, track nào không
+## 6. Ổn định dự đoán qua các seed — track nào đổi, track nào không
 
 Ghép 3 file `submission_*_seed{42,100,2026}.txt` theo từng cấu hình:
 
 | Cấu hình | Track giống nhau ở cả 3 seed | Track đổi dự đoán tuỳ seed |
 |---|---:|---:|
+| **J1** | **789/999 (79.0%)** | **210/999 (21.0%)** |
 | S1 | 778/999 (77.9%) | 221/999 (22.1%) |
 | S4 | 768/999 (76.9%) | 231/999 (23.1%) |
 
@@ -154,7 +207,7 @@ riêng của một cấu hình, mà là đặc điểm chung của bài toán �
 7 ký tự (một ký tự sai là cả track sai). S1 nhạy seed **thấp hơn một chút** so với
 S4 (22.1% vs 23.1%), khớp với việc S1 có std nhỏ hơn ở mục 2.
 
-## 6. So sánh dự đoán S1 vs S4 theo từng seed — không phải cùng 1 model
+## 7. So sánh dự đoán S1 vs S4 theo từng seed — không phải cùng 1 model
 
 So `submission_s1_seed{X}.txt` với `submission_s4_seed{X}.txt` ở **cùng seed X**
 (loại yếu tố seed ra khỏi so sánh):
@@ -175,50 +228,44 @@ lệch nhỏ và nằm trong biên nhiễu đã nêu ở mục 3. Gợi ý cho h
 còn giá trị (như đã nêu ở phân tích S1 vs S2 trước đây), vì ~18% track "đổi chỗ"
 là nguồn bổ sung thông tin thật, không phải trùng lặp.
 
-## 7. Compute — xác nhận lại tỷ lệ 2.3× dưới chế độ deterministic
+## 8. Compute — J1 rẻ nhất mà điểm cao nhất
 
-| | Phút/epoch (deterministic, trung bình 3 seed) | So với 1-seed `benchmark=True` trước đó |
-|---|---:|---|
-| S1 | 9.39 | 9.21 (chỉ chậm hơn ~2.0%) |
-| S4 | 4.09 | 3.94 (chỉ chậm hơn ~3.8%) |
-| **Tỷ lệ S1/S4** | **2.30×** | 2.34× (số cũ) |
+| | Phút/epoch (deterministic, TB 3 seed) | GFLOPs/track | Latency (ms) | Val Acc (3 seed) |
+|---|---:|---:|---:|---:|
+| **J1** (không SR) | ~2.5 (ước tính) | **26.14** | **51.30** | **80.45% ± 0.45** 🥇 |
+| S1 (MFSR+DCN) | 9.39 | 109.08 (**3.76×**) | 192.75 | 79.95% ± 0.15 |
+| S4 (SR ×1) | 4.09 | chưa đo | chưa đo | 79.48% ± 0.44 |
 
-Chế độ deterministic chỉ làm chậm 2–4%, thấp hơn nhiều so với ước lượng thận trọng
-ban đầu (+25%,
-[../paper/paper_revision_plan.md](../paper/paper_revision_plan.md)) — cùng kết
-luận với S4 đã ghi nhận trước đó. **Tỷ lệ tốc độ 2.3× của S4 so với S1 giữ nguyên**
-dưới cả 2 chế độ cudnn, củng cố thêm cho claim "S4 rẻ hơn" — nay đã có cả 2 vế của
-so sánh (accuracy tương đương + tốc độ nhanh hơn) đều đến từ multi-seed.
+Chế độ deterministic chỉ làm chậm **2–4%** so với `benchmark=True` (S1: 9.39 vs
+9.21; S4: 4.09 vs 3.94) — thấp hơn nhiều so với ước lượng thận trọng ban đầu (+25%,
+[../paper/paper_revision_plan.md](../paper/paper_revision_plan.md)).
 
-## 8. Kết luận & cập nhật cho paper
+> **Con số nên đưa vào paper**: **S1 tốn 3.76× compute so với J1 để đổi lấy −0.50
+> điểm** (trong biên nhiễu). Đây là lập luận chi phí–lợi ích mạnh nhất của cả bài.
+>
+> ⚠️ Phút/epoch của J1 là **ước tính** từ tỷ lệ GFLOPs, chưa đo trực tiếp (log
+> seed 42 bị thiếu). Nên đo lại bằng `tools/benchmark.py` trước khi in số.
 
-1. **S1 và S4 không khác biệt có ý nghĩa thống kê** (79.95% ± 0.15 so với
-   79.48% ± 0.44, chênh +0.47 điểm < 2× sai số ±0.27) — đây là kết luận chính thức
-   đầu tiên có error bar của toàn bộ project.
-2. **S4 nhanh hơn S1 2.30× khi train, độ chính xác tương đương** — nếu ưu tiên chi
-   phí compute cho submission/triển khai, **S4 là lựa chọn hợp lý hơn S1** dù S1 có
-   mean acc điểm cao hơn một chút (không đáng kể về thống kê).
-3. **`cudnn.benchmark=True` không phải lúc nào cũng thổi phồng kết quả** — với S1,
-   seed 42 cho cùng 1 con số ở cả 2 chế độ; với S4 thì lệch 16 track. Đây là phát
-   hiện mới, cần nêu trong paper như một quan sát thực nghiệm, không khái quát hoá
-   thành quy luật.
-4. **Bằng chứng bổ sung cho việc S1/S4 là 2 model thực sự khác nhau** (không chỉ
-   khác điểm số): ~18-19% track đổi dự đoán ở mọi seed, ~22-23% track nhạy với seed
-   ở mỗi cấu hình riêng — cả 2 tỷ lệ đều ổn định qua 3 seed, không phải nhiễu của
-   1 lần chạy.
-5. **Việc còn lại — 1 run**: multi-seed **J1** (không SR, T=16, ~10h) cho claim
-   *"S1 vượt cấu hình không SR"* có error bar. Chạy **đúng cờ lịch sử**
-   (`--stn-pool 1,1`) → tái lập được ~76.88% vì J1 không dùng SR. Lệnh chạy:
-   [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md).
-   ⏭️ **J2 đã ra ngoài phạm vi** — ablation multi-frame vs single-frame giữ ở mức
-   1 seed (J2 77.18% vs S1 79.78%, chênh 26 track) + ghi Limitations.
-6. **Vẫn để ngỏ (ghi vào Limitations)**: câu hỏi "T confound" S4 đặt ra **chưa được
-   giải**. S1↔S4 chỉ cho biết SR×2 tương đương SR×1 khi cùng `T=32`; muốn tách đóng
-   góp của module SR khỏi đóng góp của việc tăng `T` thì cần run
-   `--width-downsample 4` **không** `--use-sr` — **J1 không thay thế được** (J1
-   dùng T=16). **J2 cũng không tách được** — bật SR ×2 tự động nâng `T` 16→32, nên
-   J1→J2 đổi 2 biến cùng lúc. J2 đáng chạy vì lý do khác: mốc single-frame để so
-   multi-frame với S1.
+## 9. Kết luận & cập nhật cho paper
 
-Cập nhật liên quan: [model_comparison_summary.md §1c](model_comparison_summary.md#1c-kết-quả-multi-seed--số-chính-thức-cho-paper),
-[../checklist_review.md](../checklist_review.md).
+1. 🚨 **Nhánh SR không mang lại lợi ích đo được.** J1 (bỏ hẳn SR/DCN/MFSR) đạt
+   **80.45% ± 0.45** — hoà S1 (+0.50, trong nhiễu) và **hơn S4 có ý nghĩa thống kê**
+   (+0.97 > 2×0.36). Đây là kết luận quan trọng nhất của đợt multi-seed.
+2. **Cải thiện thật đến từ cụm cờ nền**, không phải SR: STN pool `(4,8)` +
+   `--lr-domain-match` + constrained decode + EMA. J1-mới hơn J1-lịch-sử **+3.57
+   điểm** (76.88% → 80.45%) chỉ nhờ cụm này, với **cùng** kiến trúc không SR.
+3. **Giả thuyết `T=32` bị bác bỏ** — J1 chạy `T=16` mà vẫn ngang/hơn S1, S4 (đều
+   `T=32`). Kết luận cũ ở [s4_sr_scale1_mf_sr_ocr.md §3](s4_sr_scale1_mf_sr_ocr.md)
+   mất cơ sở.
+4. **S1 và S4 không khác biệt có ý nghĩa** (+0.47, trong nhiễu); S4 nhanh hơn S1
+   2.30× khi train.
+5. **`cudnn.benchmark=True` không phải lúc nào cũng thổi phồng** — S1 lệch 0 track,
+   S4 lệch 16 track ở cùng seed 42. Nêu như quan sát thực nghiệm, không khái quát hoá.
+6. **Bước 1 của review đã HOÀN THÀNH** — đủ 3 model có Mean ± Std trên 3 seed.
+
+### ⚠️ Việc paper phải xử lý (không thuộc phạm vi tài liệu này)
+
+- Kết luận đảo chiều so với bản thảo hiện tại (vốn coi S1 là phương pháp thắng).
+- Chưa tách được **từng thành phần trong cụm cờ nền** — cần ablation riêng.
+- 3 ablation vẫn 1 seed: multi-frame vs single-frame (J2), perceptual (S3), λ=0.5 (S2).
+- Chỉ đo validation Scenario-B; **chưa chạy test lần nào**.

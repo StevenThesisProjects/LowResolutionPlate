@@ -38,20 +38,21 @@ chính, không phải bản thân việc SR phóng to ảnh.
 > chạy `edge=0.0`. Chi tiết:
 > [groupnorm_sr_ablation_j1_j2.md §3b](../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
 
-✅ **MULTI-SEED S1 & S4 ĐÃ XONG** — số chính thức (3 seed deterministic):
+✅ **MULTI-SEED HOÀN THÀNH — đủ 3 model** (3 seed deterministic):
 
-| Cấu hình |        Mean ± Std | So với số 1-seed ở trên                           |
-| -------- | ----------------: | ------------------------------------------------- |
-| **S1**   | **79.95% ± 0.15** | 79.78% → **trụ vững** (seed 42 ra đúng cùng số)   |
-| **S4**   | **79.48% ± 0.44** | 80.58% → **thấp hơn 1.10 điểm** (1-seed lạc quan) |
+| Model | SR | `T` |        Mean ± Std | So với số 1-seed ở trên |
+| ----- | -- | --: | ----------------: | ----------------------- |
+| **J1** 🥇 | ❌ | 16 | **80.45% ± 0.45** | (J1 lịch sử 76.88% dùng cấu hình KHÁC — xem B4) |
+| **S1** 🥈 | ×2 | 32 | **79.95% ± 0.15** | 79.78% → **trụ vững** (seed 42 ra đúng cùng số) |
+| **S4** 🥉 | ×1 | 32 | **79.48% ± 0.44** | 80.58% → **thấp hơn 1.10 điểm** (1-seed lạc quan) |
 
-Chênh S1↔S4 = +0.47 điểm, sai số hiệu ±0.27 → **không khác biệt có ý nghĩa thống
-kê**; S4 rẻ hơn **2.30×** khi train. Phân tích đầy đủ:
-[multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
+> 🚨 **Cấu hình KHÔNG SR (J1) đạt điểm cao nhất** — hoà S1 (+0.50, trong nhiễu) và
+> **hơn S4 có ý nghĩa thống kê** (+0.97 > 2×0.36), trong khi rẻ hơn **3.76×** compute.
+> Giả thuyết `T=32` cũng bị bác bỏ (J1 chạy `T=16`). Phân tích:
+> [multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
 
-Số 1-seed của S2/S3 và J1/J2/J3 (mục 2) vẫn nên đọc là **exploratory** — nhưng lưu
-ý S1 cho thấy `benchmark=True` **không phải lúc nào cũng thổi phồng**. Còn J1 và
-J1 chưa chạy, xem [mục 0](#0-chạy-theo-thứ-tự-này-checklist-cho-đợt-revision).
+Số 1-seed của S2/S3 và J2/J3 (mục 2) vẫn nên đọc là **exploratory** — nhưng lưu ý
+S1 cho thấy `benchmark=True` **không phải lúc nào cũng thổi phồng**.
 
 ---
 
@@ -59,13 +60,14 @@ J1 chưa chạy, xem [mục 0](#0-chạy-theo-thứ-tự-này-checklist-cho-đ�
 
 Kế hoạch đầy đủ + lý do: [../paper/paper_revision_plan.md](../paper/paper_revision_plan.md).
 
-**Tiến độ**: B0 ✅ · B1a ✅ · B1b ✅ · B2 ✅ · B3 ✅ (S4 × 3 seed) ·
-**B4 🔄 đang dở: S1 ✅ + S4 ✅ xong, chỉ còn J1** · B5 một phần (S1↔S4 đã so) · B6 chưa.
+**Tiến độ**: B0 ✅ · B1a ✅ · B1b ✅ · B2 ✅ · B3 ✅ · **B4 ✅ XONG (đủ 3 model)** ·
+B5 ✅ · B6 chưa (chạy test).
 
-> **Cập nhật 2026-08-02**: phạm vi multi-seed ở B4 đã đổi từ (S1+S3) thành
-> **3 model: J1 + S1 + S4** — bỏ J2, S2, S3. J1 chạy **đúng cờ lịch sử**
-> (`--stn-pool 1,1`) để nối liền ladder J1→S1→S4 đã viết trong paper; J1 tái lập
-> được ~76.88% vì không dùng SR. Chi tiết:
+> **Cập nhật 2026-08-04**: phạm vi multi-seed = **3 model J1 + S1 + S4** (bỏ J2,
+> S2, S3) — ✅ **đã chạy xong cả 3**. ⚠️ J1 chạy bằng **cờ nền của S1/S4** (STN pool
+> `(4,8)`, domain-match, constrained, EMA — chỉ bỏ SR/DCN), **không** phải cờ lịch
+> sử `(1,1)` như kế hoạch cũ ghi. Đây là ablation 1-cụm-biến sạch so với S1 nên tốt
+> hơn về khoa học, nhưng số **không** so được với 76.88% lịch sử. Chi tiết:
 > [../checklist_review.md](../checklist_review.md).
 
 ### ✅ B0 — Chuẩn bị (30 giây)
@@ -184,51 +186,46 @@ for SEED in 42 100 2026; do
 done
 ```
 
-### 🔄 B4 — Multi-seed: S1 ✅ · S4 ✅ · **J1 (~10 h) — run cuối cùng**
+### ✅ B4 — Multi-seed HOÀN THÀNH: J1 ✅ · S1 ✅ · S4 ✅
 
-**Phạm vi cuối cùng (2026-08-03): 3 model J1 + S1 + S4.** Bỏ J2, S2, S3 — lý do ở
-[../checklist_review.md](../checklist_review.md).
+**Phạm vi cuối cùng: 3 model J1 + S1 + S4** (bỏ J2, S2, S3).
 
-**J1 chạy ĐÚNG CỜ LỊCH SỬ** (`--stn-pool 1,1`, không domain-match/EMA/constrained)
-để nối liền ladder J1→S1→S4 đã viết trong paper.
+| Model | SR | DCN | STN pool | `T` | **Mean ± Std** | Hạng |
+|---|---|:---:|:---:|---:|---:|:---:|
+| **J1** | ❌ | ❌ | (4,8) | 16 | **80.45% ± 0.45** | 🥇 |
+| **S1** | ×2 multi-frame | ✅ | (4,8) | 32 | **79.95% ± 0.15** | 🥈 |
+| **S4** | ×1 multi-frame | ✅ | (4,8) | 32 | **79.48% ± 0.44** | 🥉 |
 
-| Model | SR | DCN | STN pool | T | Trạng thái |
-|---|---|:---:|:---:|---:|---|
-| **J1** | ❌ | ❌ | (1,1) | 16 | 🔴 **chưa chạy (~10 h)** |
-| **S1** | ×2 multi-frame | ✅ | (4,8) | 32 | ✅ **79.95% ± 0.15** |
-| **S4** | ×1 multi-frame | ✅ | (4,8) | 32 | ✅ **79.48% ± 0.44** |
+> 🚨 **Cấu hình KHÔNG SR (J1) đạt điểm cao nhất** — hoà S1 (+0.50, trong nhiễu) và
+> **hơn S4 có ý nghĩa thống kê** (+0.97 > 2×0.36), trong khi rẻ hơn **3.76×**
+> compute. Phân tích: [multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
 
-> ✅ **J1 tái lập được số cũ (~76.88%)** — J1 không dùng SR, mà mọi thay đổi code từ
-> đó tới nay đều nằm ở nhánh SR. Nếu ra lệch nhiều hơn ±1.3 điểm → kiểm tra lại cờ.
+#### ✅ J1 — ĐÃ XONG: **80.45% ± 0.45** (42: 79.98 · 100: 80.88 · 2026: 80.48)
 
-> 📌 **J1 KHÔNG giải được "T confound"** (đừng viết nhầm trong paper):
-> `T = IMG_WIDTH × (SR_SCALE nếu USE_SR) ÷ WIDTH_DOWNSAMPLE`
-> ([`train.py:285`](../../train.py)) → J1 có `T=16`, S1/S4 có `T=32`, tức J1→S1 đổi
-> **cả `T` lẫn SR cùng lúc**. Cấu hình duy nhất tách được là `--width-downsample 4`
-> **không** `--use-sr` — ngoài phạm vi, ghi vào Limitations.
+⚠️ **Lệnh thực tế đã chạy KHÁC kế hoạch ghi trước đó.** Kế hoạch cũ định dùng cờ
+lịch sử (`--stn-pool 1,1`, không domain-match/EMA/constrained). Run thật dùng **đúng
+bộ cờ nền của S1/S4, chỉ bỏ `--use-sr` và `--use-dcn`** — xác nhận từ banner
+`log_j1p_seed100.txt`: `STN pool (4,8)` · `Decode constrained` · `EMA True` ·
+`LR domain match True` · `Model params 29,442,700`.
 
-#### 🔴 J1 — RUN CUỐI CÙNG (~10 h)
+**Đây là lựa chọn TỐT HƠN về khoa học** (ablation 1-cụm-biến sạch so với S1), nên
+giữ nguyên. Hệ quả: số **không** so được với J1 lịch sử 76.88%.
 
 ```bash
 for SEED in 42 100 2026; do
-  python train.py --preset stable --experiment-name j1_seed${SEED} --seed ${SEED} \
-    --backbone-norm group --stn-pool 1,1 \
+  python train.py --preset stable --experiment-name j1p_seed${SEED} --seed ${SEED} \
+    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+    --backbone-norm group --lr-domain-match \
+    --decode constrained --use-ema \
     --no-cudnn-benchmark --num-workers 8 --aug-level full \
-    2>&1 | tee results/log_j1_seed${SEED}.txt
+    2>&1 | tee results/log_j1p_seed${SEED}.txt
 done
 ```
 
-> ⚠️ **Không** `--use-sr` / `--use-dcn` / `--lr-domain-match` / `--decode constrained`
-> / `--use-ema` — mặc định code đã đúng (`DECODE_MODE=greedy`, `USE_EMA=False`,
-> `LR_DOMAIN_MATCH=False`). Chỉ cần ép `--stn-pool 1,1` vì mặc định nay là `(4,8)`.
-> Giữ `--preset stable` mặc định (80 epoch, batch 64) đúng như run gốc.
->
-> 🚨 **PHẢI viết `1,1` có DẤU PHẨY, không phải `1 1`.** Đã test parser
-> (`_parse_int_tuple`): `"1,1"` → `(1,1)` ✅ nhưng `"1 1"` → `(11,)` → argparse báo
-> lỗi *"--stn-pool cần đúng 2 số"* và **crash ngay lúc khởi động**.
->
-> ✅ **Điều kiện đạt**: ra ~76.9% (±1.3). Xong thì dọn file vào
-> `results/multi-seed/j1_groupnorm_nosr/`.
+> ⚠️ **Không** `--use-sr` / `--use-dcn` → `T=16` (width không nhân đôi).
+> Dữ liệu: `results/multi-seed/crnn_resblock_groupnorm_nosr_j1/`.
+> ⚠️ **Thiếu `log_j1p_seed42.txt`** — CSV/submission/checkpoint của seed 42 vẫn đủ,
+> nhưng không tra lại được banner của riêng seed đó.
 
 #### ✅ S1 — ĐÃ XONG: **79.95% ± 0.15** (42: 79.78 · 100: 80.08 · 2026: 79.98)
 
@@ -254,7 +251,7 @@ done
 Đã dọn file vào `results/multi-seed/s1_mf_sr_ocr/` như đã làm với S4.
 Thời gian thật: **9.39 phút/epoch** (42–50 epoch/seed, tổng ~21.6 h cho 3 seed).
 
-### 🔄 B5 — Tổng hợp Mean ± Std (S1↔S4 ✅ xong, chờ J1)
+### ✅ B5 — Tổng hợp Mean ± Std (đủ 3 model)
 
 ```bash
 for C in j1 s1 s4; do

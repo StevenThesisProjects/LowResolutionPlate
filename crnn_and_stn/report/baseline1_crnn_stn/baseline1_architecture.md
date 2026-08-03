@@ -186,16 +186,30 @@ Không cần: `pandas`, `matplotlib`, `seaborn` (chỉ dùng cho analysis trong 
 
 > **Xem [model_comparison_summary.md](model_comparison_summary.md) để có bảng so sánh TẤT CẢ cấu hình đã chạy (20 dòng, từ baseline gốc tới S4 + multi-seed) trong 1 file duy nhất**, thay vì đọc rải rác qua từng tài liệu bên dưới.
 
-### 🎯 Ba model cuối cùng của paper (cập nhật 2026-08-03)
+### 🎯 Ba model cuối cùng của paper — ✅ đã có đủ multi-seed (2026-08-04)
 
-| Model | Mô tả | Kết quả (3 seed deterministic) |
-|---|---|---|
-| **J1** | ResBlock + GroupNorm, **không SR**, T=16 | 🔴 *chưa chạy* (~10h, kỳ vọng ~76.88%) |
-| **S1** | **Phương pháp đề xuất** — Joint MF-SR-OCR ×2 (STN→DCN→MFSR→BiLSTM+CTC) | **79.95% ± 0.15** ✅ |
-| **S4** | Biến thể rẻ — SR ×1, T=32 qua `width_downsample=4` | **79.48% ± 0.44** ✅ |
+| Model | Mô tả | `T` | GFLOPs | Kết quả (3 seed deterministic) |
+|---|---|---:|---:|---|
+| **J1** | ResBlock + GroupNorm, **không SR** | 16 | **26.14** | **80.45% ± 0.45** 🥇 |
+| **S1** | Joint MF-SR-OCR ×2 (STN→DCN→MFSR→BiLSTM+CTC) | 32 | 109.08 | **79.95% ± 0.15** 🥈 |
+| **S4** | SR ×1, T=32 qua `width_downsample=4` | 32 | chưa đo | **79.48% ± 0.44** 🥉 |
 
-S1 và S4 **không khác biệt có ý nghĩa thống kê** (+0.47 điểm, sai số hiệu ±0.27),
-nhưng S4 **rẻ hơn 2.30× khi train**. Chi tiết: [multi_seed_results.md](multi_seed_results.md).
+> 🚨 **Cấu hình KHÔNG SR đạt điểm cao nhất.** J1 hoà S1 (+0.50, trong nhiễu) và
+> **hơn S4 có ý nghĩa thống kê** (+0.97 > 2×0.36), trong khi rẻ hơn **3.76×**
+> compute. **Nhánh SR chưa chứng minh được đóng góp nào.**
+>
+> Phần cải thiện thật so với baseline gốc đến từ **cụm cờ nền** — STN pool `(4,8)`
+> + `--lr-domain-match` + constrained decode + EMA: J1-mới hơn J1-**lịch sử**
+> **+3.57 điểm** (76.88% → 80.45%) với **cùng** kiến trúc không SR.
+>
+> Giả thuyết *"`T=32` là yếu tố chính"* cũng **bị bác bỏ** — J1 chạy `T=16`.
+>
+> Chi tiết: [multi_seed_results.md](multi_seed_results.md) ·
+> [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+
+⚠️ J1 multi-seed dùng **cờ nền của S1/S4** (STN pool `(4,8)`, domain-match,
+constrained, EMA — chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)`. Vì thế số
+**không** đặt chung cột với 76.88%.
 
 Mọi cấu hình khác (J2, J3, S2, S3, nhánh AdamW, SR-v1/v2) là **exploratory 1 seed** —
 giữ làm phụ lục, không vào bảng chính có error bar.
@@ -207,5 +221,6 @@ Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thự
 1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
 2. **AdamW tuning trên backbone gốc** (đã kết thúc, mức trần 76.28%, bị ResBlock vượt qua) — xem [optimizer_adamw_verification.md](optimizer_adamw_verification.md).
 3. **Super Resolution per-frame + GroupNorm** (J1 = 76.88%, J2 = 77.18% — cả hai trong biên nhiễu ±13 so với baseline) — xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Lịch sử các hướng SR đã thử trước đó (kể cả hướng thất bại) xem [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md).
-4. **Joint End-to-End MF-SR-OCR** (✅ **hướng thắng, nay là phương pháp đề xuất**) — gộp multi-frame SR + DCNv2 + domain-match + constrained decode + EMA. **S1 = 79.95% ± 0.15**, vượt baseline gốc 77.00% gần **3 điểm** — lần đầu tiên một cấu hình vượt rõ biên nhiễu. Xem [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md).
-5. **Biến thể rẻ SR ×1** (S4 = 79.48% ± 0.44, bằng S1 về thống kê nhưng nhanh 2.3×) — bằng chứng nghiêng về `T=32` mới là yếu tố chính, không phải việc phóng to ảnh. Xem [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md).
+4. **Cụm cờ nền** (STN pool `(4,8)` + `--lr-domain-match` + constrained decode + EMA) — ✅ **đây mới là hướng thắng thật**: áp lên đúng kiến trúc J1 (không SR) cho **80.45% ± 0.45**, hơn J1 lịch sử **+3.57 điểm** và vượt baseline gốc 77.00% hơn **3 điểm**. Xem [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+5. **Joint End-to-End MF-SR-OCR** (S1 = 79.95% ± 0.15) — thêm multi-frame SR + DCNv2 lên trên cụm cờ nền. ⚠️ **Không cải thiện** so với J1 (−0.50, trong nhiễu) mà tốn 3.76× compute. Xem [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md).
+6. **Biến thể rẻ SR ×1** (S4 = 79.48% ± 0.44) — kém J1 có ý nghĩa thống kê. Giả thuyết `T=32` bị bác bỏ. Xem [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md).

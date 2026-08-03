@@ -250,7 +250,7 @@ crnn_and_stn/summary/
 *.pickle
 
 # ── Training outputs ──
-crnn_and_stn/results/
+crnn_and_stn/results/*.pth
 crnn_and_stn/experiments/
 crnn_and_stn/outputs/
 crnn_and_stn/logs/
@@ -258,6 +258,7 @@ crnn_and_stn/runs/
 crnn_and_stn/lightning_logs/
 crnn_and_stn/wandb/
 submission_*.txt
+log*.txt
 
 # ── Báo cáo / tài liệu nặng ──
 # crnn_and_stn/report/

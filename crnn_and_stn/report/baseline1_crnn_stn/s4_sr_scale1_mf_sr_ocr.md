@@ -1,10 +1,17 @@
 # S4 — MF-SR-OCR với SR scale=1 (tách "T confound" khỏi upsampling)
 
 > ✅ **Đã có số multi-seed** (§5d: **79.48% ± 0.44**, 3 seed deterministic).
-> **S1 cũng đã xong** (79.95% ± 0.15) → so sánh S1↔S4 nay hợp lệ và cho kết quả
-> **không khác biệt có ý nghĩa thống kê**. S2/S3 trong file này vẫn là 1 seed.
-> Phân tích đầy đủ: [multi_seed_results.md](multi_seed_results.md).
-> Phạm vi cuối cùng: **3 model J1 + S1 + S4** (chỉ còn J1), xem
+> S1 = 79.95% ± 0.15 → S1↔S4 **không khác biệt có ý nghĩa thống kê**.
+>
+> 🚨 **NHƯNG S4 THUA J1 CÓ Ý NGHĨA THỐNG KÊ.** J1 (**không SR**, `T=16`, cùng bộ cờ
+> nền) đạt **80.45% ± 0.45** — hơn S4 **+0.97 điểm, vượt 2× sai số hiệu (±0.36)**.
+> Đây là cặp **duy nhất** trong 3 model cho khác biệt thật.
+>
+> **Hệ quả: giả thuyết trung tâm của tài liệu này (§3 — "`T=32` là yếu tố chính")
+> BỊ BÁC BỎ** — J1 chạy `T=16` mà vẫn hơn S4 (`T=32`). Đọc §3 với lưu ý đó.
+> Phân tích: [multi_seed_results.md](multi_seed_results.md) ·
+> [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+> Phạm vi cuối: **3 model J1 + S1 + S4** — ✅ đã xong cả 3, xem
 > [../checklist_review.md](../checklist_review.md).
 >
 > Kết quả của cấu hình S4 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
@@ -90,9 +97,19 @@ khác. Nhưng việc **2 thay đổi độc lập (S3 và S4) đều hội tụ 
 thay vì rải rác ngẫu nhiên quanh 797 — là một tín hiệu đồng thuận đáng chú ý hơn
 một điểm số đơn lẻ vượt biên nhiễu.
 
-## 3. Trả lời câu hỏi "T confound" — kết quả chính của S4
+## 3. Trả lời câu hỏi "T confound" — ⚠️ KẾT LUẬN ĐÃ BỊ BÁC BỎ
 
-Đây là phát hiện quan trọng nhất của S4, trực tiếp trả lời câu hỏi đặt ra ở mục 1:
+> 🚨 **Đọc trước:** toàn bộ mục này viết trước khi có J1 multi-seed. Kết luận
+> *"`T=32` là yếu tố chính"* **không còn đứng vững**: J1 (không SR, **`T=16`**, cùng
+> bộ cờ nền) đạt **80.45% ± 0.45**, **hơn S4 có ý nghĩa thống kê** (+0.97 > 2×0.36)
+> và hoà S1. Khi cụm cờ nền đã bật, `T=16` **không hề kém** `T=32`.
+>
+> Cách đọc đúng hiện nay: cải thiện thật đến từ **cụm cờ nền** (STN pool `(4,8)` +
+> domain-match + constrained decode + EMA), **không** phải từ SR **cũng không** phải
+> từ `T`. Giữ lại mục dưới đây làm lịch sử lập luận.
+
+Đây là phát hiện quan trọng nhất của S4 *(theo cách hiểu tại thời điểm viết)*,
+trực tiếp trả lời câu hỏi đặt ra ở mục 1:
 
 **S4 (T=32 qua `width_downsample=4`, SR không phóng to ảnh) đạt 805/999 — bằng
 hoặc cao hơn S1 (T=32 qua SR ×2 phóng to ảnh, 797/999).** Nếu lợi ích chính của
@@ -222,6 +239,18 @@ và xác nhận mối lo của Reviewer #2 là có cơ sở.
 **phụ thuộc cấu hình cụ thể**; có thể liên quan tới việc S4 dùng
 `width_downsample=4` (kiến trúc backbone khác S1) — quan sát thực nghiệm, chưa có
 lời giải thích chắc chắn, nên nêu đúng như vậy trong paper.
+
+### 🚨 So với J1 — S4 THUA có ý nghĩa thống kê
+
+```
+Chênh lệch   : +0.97 điểm (J1 80.45% so với S4 79.48%)
+Sai số hiệu  : ±0.36
+✅ Chênh lệch LỚN HƠN 2x sai số → nhiều khả năng là cải thiện thật.
+```
+
+**Đây là cặp duy nhất trong 3 model cho khác biệt có ý nghĩa.** J1 bỏ hẳn SR/DCN,
+chạy `T=16`, rẻ hơn nhiều về compute — mà vẫn hơn S4 **+9.7 track trung bình**
+(+10/+11/+8 qua 3 seed, cùng chiều cả 3).
 
 ### So với S1 — không khác biệt có ý nghĩa thống kê
 

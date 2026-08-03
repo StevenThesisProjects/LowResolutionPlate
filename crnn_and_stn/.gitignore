@@ -46,7 +46,7 @@ summary/
 *.pickle
 
 # ── Training outputs ──
-results/
+crnn_and_stn/results/*.pth
 experiments/
 outputs/
 logs/
