@@ -1,0 +1,5 @@
+=== ResTranOCR STN Ablation Summary ===
+Experiment                | Best Acc (%)
+---------------------------------------------
+restran34_no_stn          | N/A         
+restran34_with_stn        | N/A         
