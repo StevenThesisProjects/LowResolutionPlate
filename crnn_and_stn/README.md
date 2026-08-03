@@ -1,70 +1,201 @@
-# GroupNorm + SR Per-Frame — Ablation J1 & J2 (Root Cause #1, #2, #3 — issue #9)
+# Bước 1 (Multi-Seed J1/S1/S4) + Bước 2 (Metrics) + Bước 3 (Qualitative Figures)
 
-> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+`feature/run-multi-seeda-and-evulate` → `main` · 9 commits · 91 files (+8,731/−280), code 7 files (+748/−22)
 
-**Baseline chuẩn theo report ICPR của tác giả gốc là CRNN + STN (77.00%)** — không phải ResBlock backbone (76.68%, cải tiến làm sau ở PR #8). Mọi so sánh dưới đây tách rõ 2 mốc để không nhầm "vượt ResBlock" thành "vượt baseline gốc".
+> 🚨 **Kết quả đảo ngược giả định ban đầu**: cấu hình **không có SR (J1)** đạt điểm
+> **cao nhất** — hoà S1 (đề xuất) và **hơn S4 có ý nghĩa thống kê**, trong khi rẻ hơn
+> **3.76× compute**. **Nhánh SR chưa chứng minh được đóng góp nào.** Kết luận paper
+> cần viết lại theo hướng này.
 
-## 1. Vì sao tách J1 khỏi J2
+---
 
-Chẩn đoán NaN trước đó xác nhận: bật SR trên backbone `norm=none` gây NaN toàn epoch; thêm GroupNorm (`--backbone-norm group`) sửa được. Nhưng GroupNorm **tự nó** có thể đã cải thiện accuracy, không liên quan gì tới SR. Nếu không đo riêng, khi cấu hình SR+GroupNorm vượt baseline sẽ không biết công lao thuộc về SR hay GroupNorm.
+## 1. Bước 1 — Multi-Seed ✅
 
-- **J1** — chỉ GroupNorm, không SR → đo riêng lợi ích của GroupNorm (sửa Root Cause #3).
-- **J2** — GroupNorm + SR per-frame + `L_CTC + λ·L_SR` (sửa Root Cause #1 & #2) → đo thêm lợi ích của SR trên nền đã có J1.
+3 seed `42/100/2026`, deterministic (`--no-cudnn-benchmark`).
 
-## 2. Cấu hình
+| Model | SR | `T` | GFLOPs | **Mean ± Std** | CER ↓ | Hạng |
+|---|---|---:|---:|---:|---:|:---:|
+| **J1** — GroupNorm, **không SR** | ❌ | 16 | **26.14** | **80.45% ± 0.45** | **0.0525** | 🥇 |
+| **S1** — Joint MF-SR-OCR ×2 (đề xuất) | ×2 MFSR+DCN | 32 | 109.08 | 79.95% ± 0.15 | 0.0541 | 🥈 |
+| **S4** — SR ×1, `T=32` qua backbone | ×1 MFSR+DCN | 32 | chưa đo | 79.48% ± 0.44 | 0.0543 | 🥉 |
+
+**Kiểm định** (ngưỡng: chênh > 2× sai số hiệu):
+
+| Cặp | Chênh | Sai số | Kết luận |
+|---|---:|---:|---|
+| J1 vs S1 | +0.50 | ±0.28 | ⚠️ trong nhiễu → **hoà** |
+| **J1 vs S4** | **+0.97** | ±0.36 | ✅ **J1 tốt hơn thật** |
+| S1 vs S4 | +0.47 | ±0.27 | ⚠️ trong nhiễu → **hoà** |
+
+### Hai giả thuyết bị bác bỏ
+
+1. **"SR đóng góp vào độ chính xác"** — J1 và S1 dùng **chung cụm cờ nền** (GroupNorm,
+   STN pool `(4,8)`, domain-match, constrained decode, EMA); S1 chỉ thêm SR+DCN+MFSR.
+   Thêm cụm đó **không cải thiện** mà tốn 3.76× compute. Phần cải thiện thật (**+3.57
+   điểm**, 76.88% → 80.45%) đến từ **cụm cờ nền**, với cùng kiến trúc không SR.
+2. **"`T=32` là yếu tố chính"** — J1 chạy **`T=16`** mà vẫn ngang/hơn S1, S4 (đều `T=32`).
+
+### 2 lưu ý
+
+- **J1 chạy cờ nền S1/S4, không phải cờ lịch sử** (STN pool `(4,8)`, params
+  29,442,700 vs 29,313,452). Đây là ablation 1-cụm-biến sạch so với S1 — tốt hơn về
+  khoa học, nhưng **80.45% không so được với 76.88%** của J1 lịch sử.
+- **`cudnn.benchmark` ảnh hưởng không đồng đều**: cùng seed 42, S1 lệch **0 track**
+  nhưng S4 lệch **−16 track**. Không khái quát *"1-seed luôn thổi phồng"* thành quy luật.
+
+📄 Số từng seed + phân tích đầy đủ 9 run: [`multi_seed_results.md`](baseline1_crnn_stn/multi_seed_results.md)
+
+---
+
+## 2. Bước 2 — CER, NED, PSNR/SSIM ✅
+
+**CER + NED** — cài trong `Trainer.validate()`, in console mỗi epoch + 2 cột
+`val_cer`/`val_ned` trong `history_*.csv` (nay đủ **14 cột**). Số ở bảng §1. J1 tốt
+nhất cả exact match lẫn CER, và là model duy nhất đạt **0/999 sai độ dài ở cả 3 seed**.
+
+**PSNR/SSIM** — tool mới `tools/eval_sr_quality.py` (`skimage.metrics`), chạy hậu kỳ
+trên checkpoint. Con số đáng đọc là cột **Chênh** (so với `base` = ảnh chưa qua SR):
+
+| Cấu hình | Chênh PSNR | Chênh SSIM |
+|---|---:|---:|
+| S1 (×2) | +1.0717 dB | +0.0698 |
+| **S2** (×2, λ=0.5) | **+2.2879 dB** | **+0.1681** |
+| S3 (×2, perceptual) | +1.0855 dB | +0.0664 |
+| S4 (×1) | +1.0238 dB | +0.0618 |
+
+> ⚠️ **Vì sao không có J1 ở bảng này**: PSNR/SSIM đo `I_SR` với `I_HR`, mà **J1
+> không có nhánh SR nên `I_SR` không tồn tại** — giới hạn cấu trúc, không phải thiếu
+> sót. Checkpoint J1 chỉ có `backbone/fusion/head/rnn/stn`;
+> [`eval_sr_quality.py:131`](../tools/eval_sr_quality.py) chặn thẳng.
+
+### 🔬 PSNR **nghịch** với khả năng đọc biển số — 3 mức bằng chứng
+
+| Mức | Bằng chứng | Chiều |
+|---|---|---|
+| Track (n=999) | track đọc **sai** có PSNR **cao hơn ~2 dB**; r ≈ −0.35…−0.41, nhất quán 4 cấu hình | **nghịch** |
+| Cấu hình | S2 có PSNR tốt nhất (+2.29 dB, gấp đôi) nhưng OCR **kém nhất** (794/999) | **nghịch** |
+| **Kiến trúc** | **J1 bỏ hẳn SR → không có PSNR → OCR tốt nhất** | **nghịch** |
+
+→ Khi reviewer hỏi *"sao không tối ưu theo PSNR"*: **"PSNR nghịch với OCR, có bằng
+chứng ở cả 3 mức"** — chứ không chỉ "PSNR không phản ánh OCR".
+
+📄 Chi tiết: [`buoc2_metrics.md`](buoc2_metrics.md)
+
+---
+
+## 3. Bước 3 — Trực quan hoá định tính ✅
+
+Script mới `tools/visualize_paper_figures.py` — grid **4 cột**
+`I_LR → I_SR → Attention heatmap → Prediction`, **5 success + 5 failure** mỗi cấu hình.
+Mặc định `--pick extreme`: lấy case đúng **tự tin nhất** và case sai **mơ hồ nhất**
+(hai đầu phân phối), thay vì mấy track đầu danh sách.
+
+**Đã sinh đủ 4 cấu hình** — 11 file/cấu hình (10 ảnh track + 1 grid tổng):
+
+| Cấu hình | Thư mục |
+|---|---|
+| S1 | [`results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/feature/run-multi-seeda-and-evulate/crnn_and_stn/results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures) |
+| S2 | [`results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/feature/run-multi-seeda-and-evulate/crnn_and_stn/results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures) |
+| S3 | [`results/mf_sr_ocr/s3_l_perceptual/paper_figures/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/feature/run-multi-seeda-and-evulate/crnn_and_stn/results/mf_sr_ocr/s3_l_perceptual/paper_figures) |
+| S4 | [`results/mf_sr_ocr/s4_sr_scale1/paper_figures/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/feature/run-multi-seeda-and-evulate/crnn_and_stn/results/mf_sr_ocr/s4_sr_scale1/paper_figures) |
+
+### Track trùng nhau giữa các cấu hình — tiện chọn Figure 4
+
+| Track | Xuất hiện | Dùng để minh hoạ |
+|---|---|---|
+| `track_22161` | **SAI ở cả 4** | **giới hạn thật của dữ liệu**, không phải điểm yếu của một model |
+| `track_19095` | SAI ở S1, S3, S4 | case khó nhất quán |
+| `track_21455` | ĐÚNG ở S1, S2, S3 | case dễ, đọc chắc chắn |
+| `track_12478` · `track_17959` | SAI ở S2 và S3 | |
+| `track_16997` · `track_17125` | ĐÚNG ở S3 và S4 | |
+
+⚠️ **2 caveat khi chọn hình cuối:**
+
+1. **Hình sinh từ checkpoint 1-seed** (`results/mf_sr_ocr/*`), trong khi số trong
+   paper nay là **multi-seed** → hình và số đến từ 2 model khác nhau. Nên sinh lại từ
+   `results/multi-seed/*/*_seed42_best.pth` (~20 phút CPU, 0 GPU) hoặc ghi rõ trong
+   caption.
+2. **J1 chưa có hình** — cột `I_SR` không tồn tại khi không có nhánh SR (cùng lý do
+   với PSNR ở §2). Nếu paper dùng J1 làm cấu hình chính thì Figure 4 phải đổi sang
+   grid **3 cột** (`I_LR → Attention → Prediction`).
+
+> Danh sách "10 track tiêu biểu" **không tái lập chính xác khi đổi phần cứng** — thứ
+> tự theo confidence lệch ở các track có confidence gần bằng nhau (khác biệt số thực
+> GPU vs CPU). Nên chốt một bộ hình và giữ nguyên.
+
+---
+
+## 4. Thay đổi code (7 file, +748/−22)
+
+| File | |
+|---|---|
+| `tools/eval_sr_quality.py` | **mới (+282)** — PSNR/SSIM bằng `skimage.metrics`, kiến trúc suy ngược từ `state_dict` |
+| `tools/visualize_paper_figures.py` | **mới (+291)** — Bước 3: grid 4 cột, `--pick extreme` |
+| `src/training/trainer.py` | +98 — CER/NED trong `validate()`, đo thời gian mỗi epoch, 5 cột CSV mới, `build_optimizer_param_groups()` |
+| `src/data/dataset.py` · `transforms.py` | +86 — nhánh `sr_eval_mode`: augment **tất định** để PSNR/SSIM tái lập được |
+| `train.py` · `configs/config.py` | +13 — cờ `--weight-decay`, `--wd-skip-bias-norm`; banner in seed + trạng thái deterministic |
+
+> `--wd-skip-bias-norm` **mặc định TẮT** có chủ đích — bật mặc định sẽ khiến
+> multi-seed khác S1–S4 ở **hai** biến cùng lúc, không biết số đổi do biến nào.
+
+---
+
+## 5. Verify
 
 ```bash
-# J1 — GroupNorm, không SR (preset stable: batch 64, 80 epoch, lr 8e-4)
-python train.py --preset stable --experiment-name crnn_resblock_groupnorm_nosr \
- --backbone-norm group --num-workers 8 --aug-level full
+# Kiểm định claim chính: J1 (không SR) vs S1 (đề xuất)
+python tools/aggregate_seeds.py \
+  --acc 79.9800 80.8809 80.4805 --label "J1 (khong SR)" \
+  --baseline-acc 79.7798 80.0801 79.9800 --baseline-label "S1 (de xuat)"
 
-# J2 — + SR per-frame + giám sát (batch 32 + accum 2 = effective batch 64, bắt buộc
-# trên GPU 24GB vì SR phóng ảnh 32x128 -> 64x256, gấp 4 lần pixel, gây OOM ở batch 64)
-python train.py --preset stable --experiment-name crnn_resblock_sr_supervised \
- --epochs 60 --batch-size 32 --grad-accum-steps 2 \
- --use-sr --sr-scale 2 --lambda-sr 0.1 --backbone-norm group \
- --num-workers 8 --aug-level full
+# CSV phải đủ 14 cột
+head -1 results/multi-seed/s1_mf_sr_ocr/history_s1_seed42.csv
 ```
 
-Cùng seed 42; J2 chỉ khác J1 ở 3 flag `--use-sr --sr-scale 2 --lambda-sr 0.1`.
+Đã tự kiểm: 9/9 run đúng chế độ deterministic + đúng seed · `nan_batches = 0` mọi
+epoch · CSV đủ 14 cột · CER in console · **Val Acc khớp chính xác khi chấm lại**
+`submission_*.txt` với `plate_text` gốc (không chỉ tin log).
 
-## 3. Kết quả
+---
 
-| Cấu hình | Val Exact Match | vs ResBlock | vs baseline chuẩn (77.00%) |
-|---|---:|---:|---:|
-| **CRNN + STN (baseline chuẩn, report ICPR)** | **77.00%** | — | — |
-| CRNN + STN (đo thực tế trên dataset project) | 75.78% | — | −1.22 |
-| ResNet + Transformer + STN (report, tốt nhất trong report gốc)* | 78.70% | — | +1.70 |
-| ResBlock backbone (PR #8, `norm=none`, **không phải baseline**) | 76.68% | — | −0.32 |
-| J1 — ResBlock + GroupNorm | 76.88% | +0.20 | −0.12 |
-| **J2 — + SR per-frame + giám sát** | **77.18%** | **+0.50** | **+0.18** |
+## 6. Ba chỗ cố ý lệch review
 
-\* Kiến trúc khác hẳn (ResNet+Transformer), không so trực tiếp được với nhánh CRNN đang làm.
+1. **Không dùng `editdistance`** — `postprocess.py` đã có sẵn `edit_distance`
+   (Levenshtein có cache). Kết quả tương đương, không thêm dependency.
+2. **Không đo PSNR/SSIM trên Scenario-A** — val **không có track Scenario-A nào**
+   (0/999), và cả 10.000 track Scenario-A **nằm trong tập TRAIN** → đo ở đó là đo
+   trên dữ liệu đã học, **không hợp lệ**. Đã đo trên 999 track Scenario-B.
+3. **PSNR/SSIM là tool hậu kỳ**, không nằm trong log val mỗi epoch (nhét vào training
+   loop sẽ buộc multi-seed chạy lại). ⚠️ **CER/NED thì không lệch** — có đủ trong
+   console + CSV đúng như review yêu cầu.
 
-J2 > J1 (+0.30) và > ResBlock (+0.50), nhưng so với **baseline chuẩn chỉ nhỉnh hơn +0.18** — và **J1 vẫn chưa vượt được baseline chuẩn**. So với mốc mạnh nhất trong report gốc (ResNet+Transformer+STN, 78.70%) J2 còn cách **1.52 điểm** — dù kiến trúc khác hẳn nên không so trực tiếp được, con số này cho thấy trần hiện tại của nhánh CRNN vẫn còn xa mốc cao nhất report từng đạt. Xem caveat ở mục 4 trước khi kết luận bất cứ điều gì từ các con số này.
+---
 
-## 4. Caveat thống kê — quan trọng hơn mọi con số ở trên
+## 7. Limitations
 
-Trước khi chạy được J2 hoàn chỉnh, cùng một cấu hình (cùng seed) đã chạy 2 lần — lệch nhau **6.5 điểm** ở epoch 3 (42.64% vs 49.15%), do `cudnn.benchmark=True` khiến thuật toán convolution không xác định. Cộng thêm validation chỉ 999 sample → CI 95% ≈ ±2.7 điểm.
+1. Chênh J1↔S1 nằm **trong** biên nhiễu → kết luận đúng là *"SR không giúp"*,
+   **không phải** *"bỏ SR thì tốt hơn"*.
+2. **Chưa tách được từng thành phần trong cụm cờ nền** (STN pool vs domain-match vs
+   decode vs EMA) — câu hỏi mở quan trọng nhất còn lại.
+3. Ablation là **tích luỹ**, không tách 1 biến; `T` cũng nhảy 16→32 giữa J1 và S1.
+4. **3 ablation chỉ 1 seed** (phụ lục, nhãn *unverified*): multi-frame vs single-frame
+   (J2 77.18%), perceptual (S3 80.58%), `λ_SR=0.5` (S2 79.48%).
+5. **Không đo được PSNR/SSIM cho J1** — bảng PSNR không phủ được model có OCR cao nhất.
+6. **Chưa chạy test lần nào** — mọi số là validation Scenario-B; PSNR/SSIM đo trên
+   cặp synthetic.
+7. Thiếu `log_j1p_seed42.txt` (CSV/submission/checkpoint vẫn đủ); phút/epoch của J1
+   hiện là **ước tính** từ tỷ lệ GFLOPs.
+8. **Hình Bước 3 sinh từ checkpoint 1-seed**, chưa khớp với số multi-seed; **J1 chưa
+   có hình** (không có cột `I_SR`). Xem §3.
 
-**Kết luận: chênh lệch +0.18–0.50 nêu ở mục 3 nằm gọn trong biên độ nhiễu đã đo được bằng thực nghiệm — chưa đủ bằng chứng để khẳng định GroupNorm hay SR thực sự cải thiện accuracy.** Cần chạy **O1 (3 seed: 42/100/2026)** cho cả J1 và J2 trước khi kết luận chắc chắn.
+---
 
-## 5. Overfit — cùng pattern ở cả 2 run
+## 8. Việc còn lại (không thuộc PR này)
 
-| Run | Val loss chạm đáy | Best Val Acc | Train loss cuối |
-|---|---|---:|---:|
-| J1 | epoch 19 (0.2591) | 76.88% @ epoch 60 | 0.0074 |
-| J2 | epoch 15 (0.2773) | 77.18% @ epoch 57 | 0.0748 |
-
-Cả 2 run: val loss chạm đáy sớm rồi tăng dần trong khi train loss gần 0 (model thuộc lòng tập train), val acc vẫn nhích lên dù val loss tăng. **60-80 epoch là dư cho dataset ~19,000 track** — dư địa cải thiện nên nhắm vào chống overfit (augmentation mạnh hơn, dropout, weight decay) hơn là train lâu hơn hoặc thêm tham số/module mới.
-
-## 6. SR loss của J2 — giảm thật, chỉ bị che bởi nhiễu batch-cuối
-
-Trung bình `sr_loss` 10 epoch đầu: 0.804 → 10 epoch cuối: 0.674 (giảm ~16%). Module SR học đúng hướng tái tạo ảnh HR; xu hướng giảm chỉ bị che nếu nhìn giá trị batch-cuối từng epoch (dao động 0.61–0.90) thay vì trung bình cả epoch.
-
-## 7. Kết luận & bước tiếp theo
-
-- GroupNorm sửa đúng Root Cause #3 (hết NaN), gần như miễn phí compute (+15K params, FLOPs không đổi).
-- SR per-frame + giám sát cho tín hiệu tích cực (+0.30 so với J1) nhưng tốn **3.66x FLOPs / latency** — xem bảng chi phí trong `run_gpu.md`.
-- **Chưa cấu hình nào (J1 lẫn J2) vượt rõ ràng baseline chuẩn của tác giả (77.00%)** khi tính đến biên độ nhiễu — đây là điều quan trọng nhất cần nêu khi báo cáo, không nên nói "đã vượt baseline". Càng chưa gần mốc mạnh nhất report gốc (78.70%, ResNet+Transformer+STN — còn cách 1.52 điểm).
-- Bước tiếp theo: chạy **O1 (multi-seed)** trước khi đầu tư thêm vào J3 (+DCNv2) — J2 kỹ thuật đủ điều kiện `J2 ≥ J1` để chạy J3, nhưng xây tiếp trên một kết quả 1-seed chưa xác nhận là rủi ro không đáng.
+- [ ] 🚨 Viết lại kết luận chính của paper — SR không chứng minh được đóng góp
+- [ ] Sửa **4 lỗi công thức loss** (bỏ warp kép · L1 không phải Smooth L1 · thêm
+      stop-gradient `sg[θ]` · vị trí `λ_Perceptual`) — chi tiết ở
+      [`checklist_review.md`](checklist_review.md) mục Nhóm 1
+- [ ] Benchmark compute cho J1 và S4 — cần cho claim *"S1 tốn 3.76× để đổi lấy −0.50 điểm"*
+- [ ] Chọn hình cuối cho Figure 4 (cân nhắc sinh lại từ checkpoint multi-seed)
+- [ ] Nhóm 3 — chống overfitting · Bước 4 — so sánh SOTA (PARSeq/SVTR)
