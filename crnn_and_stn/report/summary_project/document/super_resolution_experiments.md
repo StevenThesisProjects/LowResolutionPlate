@@ -1,6 +1,6 @@
 # Super Resolution cho CRNN + STN — Lịch sử nghiên cứu & bằng chứng root cause
 
-> Tài liệu lịch sử các hướng SR đã thử **trước khi** phát hiện root cause thật (issue #9) và triển khai `FrameSR` thật trong [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Đọc file đó trước nếu chỉ cần biết trạng thái SR hiện tại — file này chỉ để tra cứu lại vì sao các hướng cũ thất bại.
+> Tài liệu lịch sử các hướng SR đã thử **trước khi** phát hiện root cause thật (issue #9) và triển khai `FrameSR` thật trong [groupnorm_sr_ablation_j1_j2.md](../../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md). Đọc file đó trước nếu chỉ cần biết trạng thái SR hiện tại — file này chỉ để tra cứu lại vì sao các hướng cũ thất bại.
 
 ## 0. Mốc kết quả SR đã đo
 
@@ -9,9 +9,9 @@
 | SR stacked-input v1 | 49.25% | Gộp 5 frame → 1 frame SR rồi nhân bản — bug thiết kế |
 | SR stacked-input v2 | 55.06% | Vẫn kém hẳn baseline |
 | `LightEdgeSR` (mục 4 cũ, edge-preserving per-frame) | **Chưa từng chạy — code không tồn tại** | Xem cảnh báo ở mục 4 |
-| `FrameSR` per-frame + giám sát pixel-level (triển khai thật) | 77.18% (J2) | Xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md) |
+| `FrameSR` per-frame + giám sát pixel-level (triển khai thật) | 77.18% (J2) | Xem [groupnorm_sr_ablation_j1_j2.md](../../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md) |
 
-Baseline CRNN+STN/ResBlock để đối chiếu: xem bảng đầy đủ tại [../training_runs/run_gpu.md](../training_runs/run_gpu.md) — không lặp lại ở đây để tránh 2 nguồn số liệu.
+Baseline CRNN+STN/ResBlock để đối chiếu: xem bảng đầy đủ tại [../training_runs/run_gpu.md](../../training_runs/run_gpu.md) — không lặp lại ở đây để tránh 2 nguồn số liệu.
 
 **Kết luận cốt lõi từ lịch sử này**: SR stacked-input (gộp 5 frame → 1 → nhân bản) làm giảm accuracy rất mạnh — nguyên nhân là phá vỡ đa dạng frame mà `AttentionFusion` cần khai thác. Đây chính là **Root Cause #1** được xác định lại và sửa đúng trong đợt fix issue #9 (`FrameSR` chạy per-frame, không gộp).
 
@@ -23,7 +23,7 @@ Report đặt 4 hướng làm "Future of Work" (slide 52-83), thuần lý thuy�
 
 | Hướng | Slide | Ghi chú áp dụng |
 |---|---|---|
-| Backbone ResBlock | 53, 56-59 | → đã triển khai thật, xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md) |
+| Backbone ResBlock | 53, 56-59 | → đã triển khai thật, xem [resblock_backbone_upgrade.md](../../baseline1_crnn_stn/resblock_backbone_upgrade.md) |
 | Channel Attention | 54, 60-66 | Chưa thử riêng — cần kiểm chứng có tăng OCR accuracy thật hay chỉ tăng chất lượng hiển thị |
 | PixelShuffle | 55, 67-76 | Dùng trong `FrameSR` hiện tại (mục upsample) |
 | Stacked Inputs | 82 | Đã thử bản gộp-thô (mục 3 dưới) — thất bại vì lỗi thiết kế, không phải vì ý tưởng sai |
@@ -56,11 +56,11 @@ Một phiên làm việc trước đã viết tài liệu mô tả module `Light
 
 **Bài học quy trình**: từ nay, mọi tài liệu ghi "đã triển khai" phải kèm bằng chứng kiểm chứng được (đường dẫn file, kết quả log thật) — không suy diễn từ ý định thiết kế.
 
-**Hướng thay thế đã triển khai thật**: `FrameSR` trong `src/models/components.py` — thiết kế tương tự về ý tưởng (per-frame, sau STN, PixelShuffle) nhưng là code mới viết và đã chạy thật, kết quả J2 = 77.18%. Xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md).
+**Hướng thay thế đã triển khai thật**: `FrameSR` trong `src/models/components.py` — thiết kế tương tự về ý tưởng (per-frame, sau STN, PixelShuffle) nhưng là code mới viết và đã chạy thật, kết quả J2 = 77.18%. Xem [groupnorm_sr_ablation_j1_j2.md](../../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
 
 ## 5. Kết luận
 
 - SR stacked-input (gộp-nhân-bản) đã thử và thất bại rõ ràng (49-55%) — bằng chứng thực cho Root Cause #1.
 - Thiết kế `LightEdgeSR` mô tả ở tài liệu cũ **chưa từng được viết thành code** — đã sửa lại nhận định trong file này.
-- `FrameSR` (triển khai thật, per-frame + giám sát pixel-level) đạt 77.18% (J2) — xem chi tiết và caveat thống kê tại [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md).
+- `FrameSR` (triển khai thật, per-frame + giám sát pixel-level) đạt 77.18% (J2) — xem chi tiết và caveat thống kê tại [groupnorm_sr_ablation_j1_j2.md](../../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
 - Nguyên tắc xuyên suốt vẫn đúng: đánh giá SR bằng OCR exact-match, không phải PSNR/SSIM; ưu tiên "đọc được biển số" hơn "đẹp ảnh".

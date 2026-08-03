@@ -1,5 +1,11 @@
 # S1 — Joint End-to-End MF-SR-OCR (Proposed Method)
 
+> ✅ **MULTI-SEED ĐÃ XONG** — số chính thức là **79.95% ± 0.15** (3 seed
+> deterministic), xem [§8](#8-multi-seed-review-bước-1--xác-nhận-7978) và
+> [multi_seed_results.md](multi_seed_results.md). Con số 79.78% trong tài liệu này
+> là 1 seed, và **trùng khớp chính xác với seed 42 của multi-seed** — khác S4, số
+> 1-seed của S1 không hề bị thổi phồng.
+>
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`, `sr_quality_s1.csv`, `mf_sr_ocr.pth`.
@@ -36,8 +42,15 @@ python train.py --preset stable --experiment-name s1_proposed \
 | Decode | greedy | **constrained** (layout `LLLNLNN,LLLNNNN`, beam 16) |
 | EMA | không | **có** (decay 0.999) |
 | SR target alignment | lệch geometry (bug) | **đã sửa** — augment 1 lần ở cỡ target, warp target theo `theta` của STN |
+| **Sobel edge loss** | **`edge=0.5` (BẬT)** | **`edge=0.0` (TẮT)** |
 | T (timestep CTC) | 32 (do SR tăng width) | 32 |
 | Params | 29,426,895 | **29,577,214** |
+
+> ⚠️ **Dòng `edge loss` bổ sung 2026-08-03** sau khi đọc lại banner `log_j2.txt`:
+> J2 chạy kèm Sobel edge loss trọng số 0.5, còn S1 tắt hẳn. Nghĩa là S1 khác J2 ở
+> **7 biến chứ không phải 6** — càng khẳng định J2 lịch sử **không** dùng làm mốc
+> so 1-biến cho S1 được. Chi tiết:
+> [groupnorm_sr_ablation_j1_j2.md §3b](groupnorm_sr_ablation_j1_j2.md).
 
 Toàn bộ 5 bước của pipeline đề xuất đều bật: STN per-frame → DCNv2 align → MFSR ×2
 (+`L_SR` = L1, không Sobel/Perceptual) → backbone + Attention Fusion → BiLSTM + CTC,
@@ -170,9 +183,11 @@ Hình định tính (5 đúng + 5 sai): `results/mf_sr_ocr/s1_mf_sr_ocr/paper_fi
 
 ## 6. Giới hạn cần nêu khi báo cáo
 
-1. **1 run, không multi-seed** — kết luận "+26 track so với J2" vượt biên nhiễu
-   ±13 nên đáng tin hơn nhiều so với chênh lệch J1/J2/J3 trước đây, nhưng chưa
-   được xác nhận qua nhiều seed (nằm ngoài phạm vi J1-J3+S1-S4 hiện tại).
+1. ~~**1 run, không multi-seed**~~ — ✅ **đã giải quyết**: 3 seed deterministic cho
+   **79.95% ± 0.15**, xem [§8](#8-multi-seed-review-bước-1--xác-nhận-7978). Kết
+   luận "+26 track so với J2" **vẫn chỉ dựa trên J2 1-seed** — J2 multi-seed đã bị
+   bỏ để tiết kiệm GPU, nên khoảng cách này sẽ không được xác nhận bằng error bar.
+   Ghi vào Limitations.
 2. **Gộp 6 thay đổi trong 1 run** — không tách được đóng góp riêng của MFSR vs
    DCN vs domain-match vs STN pool vs EMA. Mục 3 chỉ tách được decode vs phần còn
    lại, không tách sâu hơn.
@@ -224,7 +239,67 @@ quan trọng: `T=32` (nhiều bước CTC hơn), không phải bản thân việ
 (vốn chạy ở `T=16`). Cần thêm 1 ablation "`width_downsample=4` không SR" để tách
 dứt điểm — chưa nằm trong phạm vi S1-S4 đã hoàn thành.
 
-Cả 4 cấu hình S1-S4 theo kế hoạch trong `run_gpu.md` đã chạy xong. Bước tiếp
-theo: multi-seed (O1) trên **S1, S3, S4** (3 ứng viên tốt nhất hiện tại, không
-chỉ S1) để biết cấu hình nào thật sự tốt hơn một cách đáng tin cậy, rồi Chart +
-Submission. Bảng so sánh đầy đủ cả 4: [model_comparison_summary.md](model_comparison_summary.md).
+Cả 4 cấu hình S1-S4 theo kế hoạch trong `run_gpu.md` đã chạy xong 1 seed.
+Bảng so sánh đầy đủ: [model_comparison_summary.md](model_comparison_summary.md).
+
+---
+
+## 8. Multi-seed (review Bước 1) — xác nhận 79.78%
+
+Chạy lại 3 seed ở chế độ **deterministic** (`--no-cudnn-benchmark`), mọi cờ khác giữ
+nguyên. Dữ liệu: `results/multi-seed/s1_mf_sr_ocr/`.
+
+| Seed | Track đúng | Val Acc | Best epoch | Số epoch | Val Loss | CER ↓ | Conf. TB | conf<0.55 | sai độ dài |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 42 | 797/999 | 79.78% | 28 | 46 | 0.2094 | 0.0541 | 0.9655 | 6 | 0 |
+| 100 | 800/999 | 80.08% | 32 | 50 | 0.2141 | 0.0525 | 0.9692 | 4 | 0 |
+| 2026 | 799/999 | 79.98% | 24 | 42 | 0.1988 | 0.0556 | 0.9585 | 12 | 1 |
+| **Mean ± Std** | | **79.95% ± 0.15** | | | | **0.0541 ± 0.0016** | 0.9644 ± 0.0054 | | |
+
+### ✅ Số 1-seed của S1 KHÔNG bị thổi phồng — khác hẳn S4
+
+| Cùng seed 42, chỉ đổi chế độ cudnn | Track đúng | Val Acc | Best epoch |
+|---|---:|---:|---:|
+| `benchmark=True` (lần chạy gốc, mục 2) | 797/999 | 79.78% | 37 |
+| `deterministic=True` (multi-seed) | 797/999 | 79.78% | 28 |
+| **Chênh** | **0 track** | **0.00 điểm** | (khác epoch đạt đỉnh) |
+
+Đây là điều **không xảy ra với S4** (lệch 16 track, −1.60 điểm — xem
+[s4_sr_scale1_mf_sr_ocr.md §5d](s4_sr_scale1_mf_sr_ocr.md)). Cùng seed, hai chế độ
+cudnn khác nhau, S1 ra **đúng cùng một con số**. Hai hệ quả:
+
+1. **Con số headline của paper (79.78 → 79.95%) là con số ổn định nhất đã đo** —
+   không phụ thuộc chế độ cudnn, và std giữa các seed cũng nhỏ nhất (0.15, so với
+   0.44 của S4).
+2. **Không được khái quát hoá "1-seed + `benchmark=True` luôn thổi phồng"** thành
+   quy luật chung. Mức nhạy cảm phụ thuộc cấu hình cụ thể — quan sát thực nghiệm,
+   chưa có lời giải thích chắc chắn, nên nêu đúng như vậy trong paper.
+
+### So với S4 — không khác biệt có ý nghĩa thống kê
+
+```
+Chênh lệch   : +0.47 điểm (S1 79.95% so với S4 79.48%)
+Sai số hiệu  : ±0.27
+⚠️ Chênh lệch NẰM TRONG biên độ nhiễu → chưa đủ bằng chứng kết luận.
+```
+
+Claim *"S4 bằng S1 nhưng rẻ hơn 2.3×"* nay được xác nhận đúng cách (trước đây so 1
+bên multi-seed với 1 bên 1-seed). Thời gian train của S1 dưới chế độ deterministic:
+**9.39 phút/epoch** (so với 9.21 ở lần chạy gốc — chỉ chậm hơn 2.0%).
+
+Nghịch lý đáng nêu: **S1 ổn định hơn S4 về exact match** (std 0.15 vs 0.44, nhỏ hơn
+3 lần) nhưng **kém ổn định hơn về CER** (std 0.0016 vs 0.0001, lớn hơn 16 lần) — hai
+đại lượng không đi cùng chiều, quan sát chỉ multi-seed mới thấy được.
+
+Ổn định dự đoán: **778/999 track (77.9%) được cả 3 seed dự đoán giống hệt nhau** —
+tức 22.1% số track đổi kết quả tuỳ seed (S4: 23.1%).
+
+Phân tích đầy đủ 6 run + so sánh chi tiết S1↔S4: **[multi_seed_results.md](multi_seed_results.md)**.
+
+Việc còn lại trong phạm vi multi-seed đã chốt (**J1 + S1 + S4**): chỉ còn **J1**
+(không SR, T=16, ~10h) — mốc nền cho claim **"S1 vượt cấu hình không SR"** có error
+bar. Chạy **đúng cờ lịch sử** (`--stn-pool 1,1`) → tái lập được ~76.88%.
+Phạm vi cuối cùng là **3 model: J1 + S1 + S4**.
+⏭️ J2 ra ngoài phạm vi: ablation multi-frame vs single-frame giữ 1 seed (J2 77.18%
+vs S1 79.78%, chênh 26 track = gấp đôi biên nhiễu) + ghi Limitations.
+Lệnh: [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md).

@@ -1,5 +1,12 @@
 # S4 — MF-SR-OCR với SR scale=1 (tách "T confound" khỏi upsampling)
 
+> ✅ **Đã có số multi-seed** (§5d: **79.48% ± 0.44**, 3 seed deterministic).
+> **S1 cũng đã xong** (79.95% ± 0.15) → so sánh S1↔S4 nay hợp lệ và cho kết quả
+> **không khác biệt có ý nghĩa thống kê**. S2/S3 trong file này vẫn là 1 seed.
+> Phân tích đầy đủ: [multi_seed_results.md](multi_seed_results.md).
+> Phạm vi cuối cùng: **3 model J1 + S1 + S4** (chỉ còn J1), xem
+> [../checklist_review.md](../checklist_review.md).
+>
 > Kết quả của cấu hình S4 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s4_sr_scale1/history_s4_sr_scale1.csv`,
 > `log_s4.txt`, `submission_s4_sr_scale1.txt`.
@@ -178,6 +185,81 @@ chưa chạy cho `sr_scale=1` nên chưa có số cho bảng compute chính th�
 
 Dữ liệu: `results/mf_sr_ocr/s4_sr_scale1/log_s4.txt`.
 
+## 5d. Multi-seed (review Bước 1) — số chính thức **79.48% ± 0.44**
+
+Chạy lại 3 seed ở chế độ **deterministic** (`--no-cudnn-benchmark`), mọi cờ khác giữ
+nguyên. Dữ liệu: `results/multi-seed/s4_sr_scale1/`.
+
+| Seed | Track đúng | Val Acc | Best epoch | Số epoch | Val Loss | CER ↓ | Conf. TB | conf<0.55 | sai độ dài |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 42 | 789/999 | 78.98% | 41 | 59 | 0.2887 | 0.0543 | 0.9748 | 0 | 0 |
+| 100 | 797/999 | 79.78% | 23 | 41 | 0.1945 | 0.0543 | 0.9580 | 11 | 1 |
+| 2026 | 796/999 | 79.68% | 40 | 58 | 0.2628 | 0.0542 | 0.9743 | 1 | 0 |
+| **Mean ± Std** | | **79.48% ± 0.44** | | | | **0.0543 ± 0.0001** | 0.9691 ± 0.0096 | | |
+
+### ⚠️ Số 1-seed của S4 BỊ thổi phồng — khác hẳn S1
+
+**So với con số 1-seed đã báo cáo (80.58%): thấp hơn 1.10 điểm.** Và 80.58% nằm **cao
+hơn cả 3 seed** (max chỉ 79.78%) — tức đó là một lần chạy may mắn, không phải mức điển
+hình của cấu hình này.
+
+Cùng **seed 42**, chỉ khác chế độ cudnn:
+
+| | Track đúng | Val Acc | Best epoch |
+|---|---:|---:|---:|
+| `benchmark=True` (lần chạy gốc, mục 2) | 805/999 | 80.58% | 40 |
+| `deterministic=True` (multi-seed) | 789/999 | 78.98% | 41 |
+| **Chênh lệch** | **−16 track** | **−1.60 điểm** | |
+
+**16 track > biên nhiễu ±13** — riêng tính không xác định của thuật toán convolution
+đã đủ tạo chênh lệch vượt ngưỡng dự án dùng để phán xét "có cải thiện hay không". Đây
+là bằng chứng thực nghiệm mạnh nhất cho việc **bắt buộc deterministic + multi-seed**,
+và xác nhận mối lo của Reviewer #2 là có cơ sở.
+
+⚠️ **Nhưng KHÔNG được khái quát hoá thành quy luật**: S1 ở đúng phép thử này lệch
+**0 track** (797/999 ở cả 2 chế độ — xem
+[s1_proposed_mf_sr_ocr.md §8](s1_proposed_mf_sr_ocr.md)). Mức nhạy cảm với cudnn
+**phụ thuộc cấu hình cụ thể**; có thể liên quan tới việc S4 dùng
+`width_downsample=4` (kiến trúc backbone khác S1) — quan sát thực nghiệm, chưa có
+lời giải thích chắc chắn, nên nêu đúng như vậy trong paper.
+
+### So với S1 — không khác biệt có ý nghĩa thống kê
+
+```
+Chênh lệch   : +0.47 điểm (S1 79.95% so với S4 79.48%)
+Sai số hiệu  : ±0.27
+⚠️ Chênh lệch NẰM TRONG biên độ nhiễu → chưa đủ bằng chứng kết luận.
+```
+
+→ **Claim *"S4 bằng S1 nhưng rẻ hơn 2.3×"* nay được xác nhận đúng cách** (trước đây
+so 1 bên multi-seed với 1 bên 1-seed, khập khiễng). Thời gian train của S4 dưới chế
+độ deterministic: **4.04–4.05 phút/epoch** ở cả 3 seed (so với 3.94 ở lần chạy gốc —
+chỉ chậm hơn ~2.5%, rẻ hơn nhiều so với ước lượng +25% ban đầu). Tỷ lệ so S1 giữ
+nguyên **2.30×**.
+
+Nghịch lý đáng nêu: **S4 kém ổn định hơn S1 về exact match** (std 0.44 vs 0.15,
+gấp 3 lần) nhưng **ổn định hơn hẳn về CER** (std 0.0001 vs 0.0016, nhỏ hơn 16 lần) —
+hai đại lượng không đi cùng chiều, quan sát chỉ multi-seed mới thấy được.
+
+Ổn định dự đoán: **768/999 track (76.9%) được cả 3 seed dự đoán giống hệt nhau** —
+tức 23.1% số track đổi kết quả tuỳ seed (S1: 22.1%).
+
+Phân tích đầy đủ 6 run + so sánh chi tiết S1↔S4: **[multi_seed_results.md](multi_seed_results.md)**.
+
+### Hệ quả (cập nhật sau khi có S1 multi-seed)
+
+1. ~~Mọi con số 1-seed của S1/S2/S3 cũng có khả năng bị thổi phồng tương tự~~ —
+   ⚠️ **SAI, đã bị bác bỏ**. S1 multi-seed cho thấy cùng seed 42, đổi chế độ cudnn
+   ra **đúng cùng 1 con số**. Hiệu ứng của `benchmark=True` **phụ thuộc cấu hình**.
+   S2/S3 vẫn chưa biết (không nằm trong phạm vi multi-seed).
+2. **Thế hoà S3 ↔ S4 ở 805/999 có thể không tồn tại** — S4 đã được chứng minh là
+   lạc quan (mức thật 79.48%); S3 sẽ không được multi-seed nên điều này **không**
+   được xác nhận trực tiếp. Ghi rõ là giới hạn đã biết trong paper.
+3. ✅ **Đã so được S4 với S1** — xem khối trên.
+4. **Việc còn lại**: chỉ còn **J1** (không SR, T=16, ~10h) để hoàn thành phạm vi
+   cuối cùng **3 model J1 + S1 + S4**. Chạy đúng cờ lịch sử (`--stn-pool 1,1`) →
+   tái lập được ~76.88%.
+
 ## 6. Giới hạn cần nêu khi báo cáo
 
 1. **Không phải ablation 1-biến sạch** — đổi cả `sr-scale` lẫn `width-downsample`
@@ -203,7 +285,15 @@ chí bỏ hẳn SR, chỉ cần `width_downsample=4`) để đạt độ chính 
 chi phí compute thấp hơn nhiều — cần benchmark + 1 ablation "T=32 không SR" để
 xác nhận trước khi coi đây là kết luận cuối.
 
-Bước tiếp theo: chạy ablation "`--width-downsample 4` không `--use-sr`" để tách
-dứt điểm T khỏi SR (chưa có trong kế hoạch S1-S4 ban đầu, nên cân nhắc bổ sung);
-sau đó multi-seed (O1) trên bộ 3 ứng viên tốt nhất hiện tại — **S1, S3, S4** —
-trước khi chốt cấu hình cuối để nộp submission.
+**Cập nhật 2026-08-02**: phạm vi multi-seed cuối cùng đã chốt là
+**3 model J1 + S1 + S4** (thay vì S1+S3+S4 như dự kiến ban đầu). J1 (không SR,
+T=16) — chạy lại với **đúng cờ lịch sử của nó**
+(GroupNorm + STN pool `4,8` + domain-match + decode constrained + EMA, khác J1/J2
+lịch sử ở §3 tài liệu này) — là 2 mốc cần thiết để trả lời dứt điểm câu hỏi "T
+confound" mà S4 đặt ra — **câu hỏi đó vẫn để ngỏ**. J2 (SR single-frame ×2) từng
+được cân nhắc cho việc này nhưng **đã bị bỏ**, và thực ra nó cũng không giải được:
+bật `--use-sr --sr-scale 2` tự động nâng `T` từ 16 lên 32, nên J1→J2 đổi cả 2
+biến cùng lúc. Ablation "`width_downsample=4` không SR" (T=32, không SR) vẫn là run
+riêng duy nhất tách được, **không** bị thay thế bởi J1 (J1 dùng T=16) — xem §6 mục 3. Lý do đầy đủ + lệnh chạy:
+[../checklist_review.md](../checklist_review.md),
+[../training_runs/run_gpu.md](../training_runs/run_gpu.md).

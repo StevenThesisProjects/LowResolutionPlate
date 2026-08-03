@@ -24,10 +24,34 @@ không cải thiện).** [s2_lam05_mf_sr_ocr.md](../baseline1_crnn_stn/s2_lam05_
 chính, không phải bản thân việc SR phóng to ảnh.
 [s4_sr_scale1_mf_sr_ocr.md](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
 
-**Cả 4 cấu hình S1-S4 đã chạy xong.** Bảng so sánh đầy đủ + đánh giá:
+**Cả 4 cấu hình S1-S4 đã chạy xong (1 seed).** Bảng so sánh đầy đủ + đánh giá:
 [model_comparison_summary.md](../baseline1_crnn_stn/model_comparison_summary.md).
 
 > Val 999 track → biên nhiễu **±1.3 điểm (±13 track)**. Chênh lệch nhỏ hơn = nhiễu.
+
+> 🆕 **J1/J2 lịch sử vẫn còn artefact trên đĩa** — `results/crnn_resblock_groupnorm_nosr_j1/`
+> (`.pth` + submission) và `results/crnn_resblock_sr_supervised_j2/` (`.pth` + CSV +
+> `log_j2.txt` + submission). Đã chấm lại: **768/999** và **771/999**, khớp chính xác
+> 76.88% / 77.18%. ⚠️ **Lệnh J2 ở [mục 2](#2-kết-quả-đã-có-mốc-tham-chiếu) thiếu
+> `--sr-edge-weight 0.5`** (chỉ quan trọng nếu sau này chạy lại J2 — hiện J2 đã ra
+> ngoài phạm vi). Banner log cho thấy J2 chạy `edge=0.5` trong khi S1/S4
+> chạy `edge=0.0`. Chi tiết:
+> [groupnorm_sr_ablation_j1_j2.md §3b](../baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
+
+✅ **MULTI-SEED S1 & S4 ĐÃ XONG** — số chính thức (3 seed deterministic):
+
+| Cấu hình |        Mean ± Std | So với số 1-seed ở trên                           |
+| -------- | ----------------: | ------------------------------------------------- |
+| **S1**   | **79.95% ± 0.15** | 79.78% → **trụ vững** (seed 42 ra đúng cùng số)   |
+| **S4**   | **79.48% ± 0.44** | 80.58% → **thấp hơn 1.10 điểm** (1-seed lạc quan) |
+
+Chênh S1↔S4 = +0.47 điểm, sai số hiệu ±0.27 → **không khác biệt có ý nghĩa thống
+kê**; S4 rẻ hơn **2.30×** khi train. Phân tích đầy đủ:
+[multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
+
+Số 1-seed của S2/S3 và J1/J2/J3 (mục 2) vẫn nên đọc là **exploratory** — nhưng lưu
+ý S1 cho thấy `benchmark=True` **không phải lúc nào cũng thổi phồng**. Còn J1 và
+J1 chưa chạy, xem [mục 0](#0-chạy-theo-thứ-tự-này-checklist-cho-đợt-revision).
 
 ---
 
@@ -35,7 +59,14 @@ chính, không phải bản thân việc SR phóng to ảnh.
 
 Kế hoạch đầy đủ + lý do: [../paper/paper_revision_plan.md](../paper/paper_revision_plan.md).
 
-**Tiến độ**: B0 ✅ · B1a ✅ · B1b ✅ · B2 ✅ · **B3 🔄 đang chạy** · B4–B6 chưa.
+**Tiến độ**: B0 ✅ · B1a ✅ · B1b ✅ · B2 ✅ · B3 ✅ (S4 × 3 seed) ·
+**B4 🔄 đang dở: S1 ✅ + S4 ✅ xong, chỉ còn J1** · B5 một phần (S1↔S4 đã so) · B6 chưa.
+
+> **Cập nhật 2026-08-02**: phạm vi multi-seed ở B4 đã đổi từ (S1+S3) thành
+> **3 model: J1 + S1 + S4** — bỏ J2, S2, S3. J1 chạy **đúng cờ lịch sử**
+> (`--stn-pool 1,1`) để nối liền ladder J1→S1→S4 đã viết trong paper; J1 tái lập
+> được ~76.88% vì không dùng SR. Chi tiết:
+> [../checklist_review.md](../checklist_review.md).
 
 ### ✅ B0 — Chuẩn bị (30 giây)
 
@@ -127,7 +158,19 @@ head -2 results/history_smoke.csv
 **Điều kiện đạt** — dòng header phải có đủ 14 cột, kết thúc bằng:
 `...,nan_batches,val_cer,val_ned,train_time_s,val_time_s,epoch_time_s`
 
-### 🔄 B3 — Multi-seed S4 (~16 h) — ĐANG CHẠY trên GPU thuê
+### ✅ B3 — Multi-seed S4 — XONG: **79.48% ± 0.44**
+
+| Seed | Track đúng | Val Acc |
+| ---- | ---------: | ------: |
+| 42   |    789/999 |  78.98% |
+| 100  |    797/999 |  79.78% |
+| 2026 |    796/999 |  79.68% |
+
+⚠️ Thấp hơn con số 1-seed đã báo cáo (80.58%) **1.10 điểm**. Cùng seed 42 mà đổi
+`benchmark=True` → `deterministic` đã lệch **16 track**. Chi tiết:
+[s4_sr_scale1_mf_sr_ocr.md §5d](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
+
+Lệnh đã chạy (tham chiếu):
 
 ```bash
 for SEED in 42 100 2026; do
@@ -141,20 +184,57 @@ for SEED in 42 100 2026; do
 done
 ```
 
-### ⬜ B4 — Multi-seed S1 (~33 h) và S3 (~36–45 h)
+### 🔄 B4 — Multi-seed: S1 ✅ · S4 ✅ · **J1 (~10 h) — run cuối cùng**
 
-**Phạm vi đã chốt: S1 + S3 + S4. Bỏ S2** (kết quả âm tính, giữ 1 seed là đủ) — lý do
-đầy đủ ở [../checklist_review.md](../checklist_review.md).
+**Phạm vi cuối cùng (2026-08-03): 3 model J1 + S1 + S4.** Bỏ J2, S2, S3 — lý do ở
+[../checklist_review.md](../checklist_review.md).
 
-Đổi cờ theo từng cấu hình, lệnh gốc ở
-[mục 5](#5-s--proposed-method-joint-end-to-end-mf-sr-ocr):
+**J1 chạy ĐÚNG CỜ LỊCH SỬ** (`--stn-pool 1,1`, không domain-match/EMA/constrained)
+để nối liền ladder J1→S1→S4 đã viết trong paper.
 
-| Cấu hình | Cờ khác so với S4 |
-|---|---|
-| **S1** | `--sr-scale 2` · **bỏ** `--width-downsample 4` |
-| **S3** | `--sr-scale 2 --sr-perceptual-weight 0.1` · **bỏ** `--width-downsample 4` |
+| Model | SR | DCN | STN pool | T | Trạng thái |
+|---|---|:---:|:---:|---:|---|
+| **J1** | ❌ | ❌ | (1,1) | 16 | 🔴 **chưa chạy (~10 h)** |
+| **S1** | ×2 multi-frame | ✅ | (4,8) | 32 | ✅ **79.95% ± 0.15** |
+| **S4** | ×1 multi-frame | ✅ | (4,8) | 32 | ✅ **79.48% ± 0.44** |
 
-Ví dụ cho S1 (S3 chỉ thêm `--sr-perceptual-weight 0.1`):
+> ✅ **J1 tái lập được số cũ (~76.88%)** — J1 không dùng SR, mà mọi thay đổi code từ
+> đó tới nay đều nằm ở nhánh SR. Nếu ra lệch nhiều hơn ±1.3 điểm → kiểm tra lại cờ.
+
+> 📌 **J1 KHÔNG giải được "T confound"** (đừng viết nhầm trong paper):
+> `T = IMG_WIDTH × (SR_SCALE nếu USE_SR) ÷ WIDTH_DOWNSAMPLE`
+> ([`train.py:285`](../../train.py)) → J1 có `T=16`, S1/S4 có `T=32`, tức J1→S1 đổi
+> **cả `T` lẫn SR cùng lúc**. Cấu hình duy nhất tách được là `--width-downsample 4`
+> **không** `--use-sr` — ngoài phạm vi, ghi vào Limitations.
+
+#### 🔴 J1 — RUN CUỐI CÙNG (~10 h)
+
+```bash
+for SEED in 42 100 2026; do
+  python train.py --preset stable --experiment-name j1_seed${SEED} --seed ${SEED} \
+    --backbone-norm group --stn-pool 1,1 \
+    --no-cudnn-benchmark --num-workers 8 --aug-level full \
+    2>&1 | tee results/log_j1_seed${SEED}.txt
+done
+```
+
+> ⚠️ **Không** `--use-sr` / `--use-dcn` / `--lr-domain-match` / `--decode constrained`
+> / `--use-ema` — mặc định code đã đúng (`DECODE_MODE=greedy`, `USE_EMA=False`,
+> `LR_DOMAIN_MATCH=False`). Chỉ cần ép `--stn-pool 1,1` vì mặc định nay là `(4,8)`.
+> Giữ `--preset stable` mặc định (80 epoch, batch 64) đúng như run gốc.
+>
+> 🚨 **PHẢI viết `1,1` có DẤU PHẨY, không phải `1 1`.** Đã test parser
+> (`_parse_int_tuple`): `"1,1"` → `(1,1)` ✅ nhưng `"1 1"` → `(11,)` → argparse báo
+> lỗi *"--stn-pool cần đúng 2 số"* và **crash ngay lúc khởi động**.
+>
+> ✅ **Điều kiện đạt**: ra ~76.9% (±1.3). Xong thì dọn file vào
+> `results/multi-seed/j1_groupnorm_nosr/`.
+
+#### ✅ S1 — ĐÃ XONG: **79.95% ± 0.15** (42: 79.78 · 100: 80.08 · 2026: 79.98)
+
+Dữ liệu: `results/multi-seed/s1_mf_sr_ocr/`. Phân tích:
+[multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
+Lệnh đã chạy (tham chiếu):
 
 ```bash
 for SEED in 42 100 2026; do
@@ -168,21 +248,49 @@ for SEED in 42 100 2026; do
 done
 ```
 
-### ⬜ B5 — Tổng hợp Mean ± Std
+> ⚠️ **S1 KHÔNG có `--width-downsample 4`** (dùng mặc định 8) và **có `--sr-scale 2`**.
+> Đây là 2 chỗ khác S4 — gõ nhầm là dựng sai kiến trúc, chạy 26h ra kết quả vô nghĩa.
+
+Đã dọn file vào `results/multi-seed/s1_mf_sr_ocr/` như đã làm với S4.
+Thời gian thật: **9.39 phút/epoch** (42–50 epoch/seed, tổng ~21.6 h cho 3 seed).
+
+### 🔄 B5 — Tổng hợp Mean ± Std (S1↔S4 ✅ xong, chờ J1)
 
 ```bash
-for C in s1 s3 s4; do
+for C in j1 s1 s4; do
   python tools/aggregate_seeds.py --from-logs results/log_${C}_seed*.txt --label "${C:u}"
 done
 ```
 
-So sánh trực tiếp 2 cấu hình (kèm kiểm định chênh lệch có ý nghĩa không):
+Sau khi có J1, thêm phép so quan trọng nhất của paper — **claim headline**:
 
 ```bash
 python tools/aggregate_seeds.py \
-  --acc <3 số S4> --label "S4 (SR ×1)" \
-  --baseline-acc <3 số S1> --baseline-label "S1 (SR ×2)"
+  --acc 79.7798 80.0801 79.9800 --label "S1 (đề xuất)" \
+  --baseline-acc <3 số J1> --baseline-label "J1 (không SR)"
 ```
+
+So sánh trực tiếp 2 cấu hình (kèm kiểm định chênh lệch có ý nghĩa không) —
+**đã chạy cho S1 ↔ S4**:
+
+```bash
+python tools/aggregate_seeds.py \
+  --acc 79.7798 80.0801 79.9800 --label "S1 (SR ×2)" \
+  --baseline-acc 78.9790 79.7798 79.6797 --baseline-label "S4 (SR ×1)"
+```
+
+Kết quả:
+
+```
+S1 (SR ×2)   Mean ± Std : 79.95% ± 0.15   (79.78%, 80.08%, 79.98%)
+S4 (SR ×1)   Mean ± Std : 79.48% ± 0.44   (78.98%, 79.78%, 79.68%)
+────────────────────────────────────────────────────────────
+Chênh lệch : +0.47 điểm · Sai số hiệu ±0.27
+⚠️ NẰM TRONG biên độ nhiễu → chưa đủ bằng chứng kết luận.
+```
+
+→ **S1 ≈ S4 về accuracy; S4 rẻ hơn 2.30× khi train.** Chi tiết:
+[multi_seed_results.md](../baseline1_crnn_stn/multi_seed_results.md).
 
 ### ⬜ B6 — Chốt cấu hình → chạy test
 
@@ -400,6 +508,12 @@ python train.py \
 Có sẵn 3 chart (`tools/plot_results.py`) + ảnh định tính (`tools/visualize.py`).
 Chưa có heatmap. Cần `pip install matplotlib`.
 
+> Lệnh dưới đây vẽ trên số **1-seed** hiện có (S1–S4, J1-J3 lịch sử). Sau khi B4/B5
+> xong, đổi input sang `history_j1_seed*.csv` /
+> `history_s1_seed*.csv` / `history_s4_seed*.csv` và dùng Mean ± Std thay vì 1 điểm
+> — biểu đồ dạng text tương đương đã có sẵn ở
+> [model_comparison_summary.md §1b](../baseline1_crnn_stn/model_comparison_summary.md#1b-biểu-đồ-so-sánh-trực-quan).
+
 ```bash
 D=results/mf_sr_ocr
 
@@ -540,7 +654,7 @@ multi-seed xong và đã chốt cấu hình (mục 0, B6).
 
 > 🚨 **`--submission-mode` KHÔNG phải chỉ là inference — nó train lại từ đầu** trên
 > toàn bộ 20.000 track (`full_train=True`), **bỏ validation** → `Trainer.fit()` **tắt
-> early stopping** và lưu checkpoint theo *train loss* (thứ gần như luôn giảm).
+> early stopping** và lưu checkpoint theo _train loss_ (thứ gần như luôn giảm).
 > Chạy đủ 60 epoch ở chế độ này sẽ **lưu ra model của epoch cuối, đã overfit nặng**
 > (S1 đỉnh val ở epoch 37 rồi tụt; S3 ở 25; S4 ở 40).
 >

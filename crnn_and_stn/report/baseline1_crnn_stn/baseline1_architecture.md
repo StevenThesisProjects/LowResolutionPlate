@@ -184,10 +184,28 @@ Không cần: `pandas`, `matplotlib`, `seaborn` (chỉ dùng cho analysis trong 
 
 ## 3. Các bước cải tiến sau Baseline 1
 
-> **Xem [model_comparison_summary.md](model_comparison_summary.md) để có bảng so sánh TẤT CẢ cấu hình đã chạy (10 dòng, từ baseline gốc tới S2) trong 1 file duy nhất**, thay vì đọc rải rác qua từng tài liệu bên dưới.
+> **Xem [model_comparison_summary.md](model_comparison_summary.md) để có bảng so sánh TẤT CẢ cấu hình đã chạy (20 dòng, từ baseline gốc tới S4 + multi-seed) trong 1 file duy nhất**, thay vì đọc rải rác qua từng tài liệu bên dưới.
 
-Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thực tế của project — xem [training_runs/run_gpu.md](../training_runs/run_gpu.md)) là điểm khởi đầu cho 2 hướng nâng cấp đã/đang thử:
+### 🎯 Ba model cuối cùng của paper (cập nhật 2026-08-03)
+
+| Model | Mô tả | Kết quả (3 seed deterministic) |
+|---|---|---|
+| **J1** | ResBlock + GroupNorm, **không SR**, T=16 | 🔴 *chưa chạy* (~10h, kỳ vọng ~76.88%) |
+| **S1** | **Phương pháp đề xuất** — Joint MF-SR-OCR ×2 (STN→DCN→MFSR→BiLSTM+CTC) | **79.95% ± 0.15** ✅ |
+| **S4** | Biến thể rẻ — SR ×1, T=32 qua `width_downsample=4` | **79.48% ± 0.44** ✅ |
+
+S1 và S4 **không khác biệt có ý nghĩa thống kê** (+0.47 điểm, sai số hiệu ±0.27),
+nhưng S4 **rẻ hơn 2.30× khi train**. Chi tiết: [multi_seed_results.md](multi_seed_results.md).
+
+Mọi cấu hình khác (J2, J3, S2, S3, nhánh AdamW, SR-v1/v2) là **exploratory 1 seed** —
+giữ làm phụ lục, không vào bảng chính có error bar.
+
+### Lịch sử các hướng đã thử
+
+Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thực tế của project — xem [training_runs/run_gpu.md](../training_runs/run_gpu.md)) là điểm khởi đầu:
 
 1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
 2. **AdamW tuning trên backbone gốc** (đã kết thúc, mức trần 76.28%, bị ResBlock vượt qua) — xem [optimizer_adamw_verification.md](optimizer_adamw_verification.md).
-3. **Super Resolution per-frame + GroupNorm** (đang active — J2 = 77.18%, còn cần multi-seed để xác nhận có vượt baseline chuẩn 77.00% một cách chắc chắn hay không) — xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Lịch sử các hướng SR đã thử trước đó (kể cả hướng thất bại) xem [super_resolution_experiments.md](super_resolution_experiments.md).
+3. **Super Resolution per-frame + GroupNorm** (J1 = 76.88%, J2 = 77.18% — cả hai trong biên nhiễu ±13 so với baseline) — xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Lịch sử các hướng SR đã thử trước đó (kể cả hướng thất bại) xem [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md).
+4. **Joint End-to-End MF-SR-OCR** (✅ **hướng thắng, nay là phương pháp đề xuất**) — gộp multi-frame SR + DCNv2 + domain-match + constrained decode + EMA. **S1 = 79.95% ± 0.15**, vượt baseline gốc 77.00% gần **3 điểm** — lần đầu tiên một cấu hình vượt rõ biên nhiễu. Xem [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md).
+5. **Biến thể rẻ SR ×1** (S4 = 79.48% ± 0.44, bằng S1 về thống kê nhưng nhanh 2.3×) — bằng chứng nghiêng về `T=32` mới là yếu tố chính, không phải việc phóng to ảnh. Xem [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md).

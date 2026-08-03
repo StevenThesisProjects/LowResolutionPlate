@@ -63,16 +63,31 @@ S2 và S3 mất vĩnh viễn dữ liệu timing chỉ vì thiếu `tee`.
 ### Dự toán GPU cho multi-seed
 
 Chế độ deterministic (`cudnn.deterministic=True, benchmark=False`) thường **chậm hơn
-10–40%** với mạng conv. Lấy +25% làm ước lượng thận trọng:
+10–40%** với mạng conv. Lấy +25% làm ước lượng thận trọng.
+
+> ⚠️ Bảng gốc dưới đây ước lượng cho S1+S3+S4 (kế hoạch ban đầu). **Phạm vi cuối
+> cùng (2026-08-03) là J1+S1+S4** — xem bảng cập nhật ngay sau.
 
 | Cấu hình | 1 run (đã +25% det.) | × 3 seed | Ghi chú |
 |---|---:|---:|---|
 | S1 | ~11 h | **~33 h** | phương pháp đề xuất của paper — bắt buộc |
-| S4 | ~5.3 h | **~16 h** | rẻ nhất, đang đồng hạng nhất — bắt buộc |
-| S3 | ~12–15 h (ước lượng, chưa có log) | ~36–45 h | có thêm VGG16 forward mỗi batch |
+| S4 | ~5.3 h | **~16 h** | rẻ nhất, đang đồng hạng nhất — bắt buộc, **đã xong** |
+| ~~S3~~ | ~12–15 h (ước lượng) | ~36–45 h | ⏭️ loại — có thêm VGG16 forward mỗi batch, chi phí không đáng so với giá trị thông tin thêm |
 
-- **Tối thiểu (khuyến nghị): S1 + S4 = ~49 h ≈ 2 ngày GPU liên tục.**
-- Đủ cả 3: ~85 h ≈ 3.5 ngày.
+**Bảng cập nhật — phạm vi đã chốt**:
+
+| Cấu hình | × 3 seed | Trạng thái |
+|---|---:|---|
+| S4 | ~12 h thật | ✅ xong — **79.48% ± 0.44** |
+| S1 | ~22 h thật | ✅ xong — **79.95% ± 0.15** |
+| J1 | ~10 h | 🔴 **run cuối cùng** (cờ lịch sử `--stn-pool 1,1`) |
+| ~~J2~~ | ~27 h | ⏭️ **đã bỏ** — giữ 1 seed 77.18% cho phụ lục |
+
+**Tổng còn lại: ~10 h GPU — đúng 1 run (J1).** Đã trừ S1 + S4 xong.
+
+> ✅ Ước lượng "+25% cho deterministic" là **quá thận trọng** — số thật chỉ chậm
+> hơn **2–4%** (S1: 9.39 vs 9.21 phút/epoch; S4: 4.09 vs 3.94). Dùng con số này
+> để ước tính J1 thay vì +25%.
 
 ---
 
@@ -113,14 +128,25 @@ Chế độ deterministic (`cudnn.deterministic=True, benchmark=False`) thườn
 | `results/submission_<exp>.txt` | cùng lúc với `.pth` | dự đoán trên **validation** (999 dòng), không phải bài nộp |
 | `results/log_<exp>.txt` | **chỉ khi có `2>&1 \| tee`** | ⚠️ khâu duy nhất còn phụ thuộc thao tác tay — S2/S3 mất log vì quên |
 
-### P1 — Multi-seed verification (nội dung chính của review, ~49 h GPU)
+### P1 — Multi-seed verification (nội dung chính của review) — 🟡 còn ~10 h GPU
 
 Đây là việc quan trọng nhất: nó xác nhận (hoặc bác bỏ) chính con số headline của paper.
 
 #### Chọn cấu hình nào để multi-seed?
 
-**Khuyến nghị: S1 + S3 + S4** (không phải S1 + S2 + S4). Lý do quan trọng nhất nằm
-ngay trong công thức của review:
+> **🔄 Cập nhật 2026-08-02 — quyết định cuối cùng đã đổi.** Phần dưới đây (khuyến
+> nghị ban đầu: S1+S3+S4) được giữ lại làm lịch sử quyết định, nhưng **không còn là
+> kế hoạch đang thực hiện**. Phạm vi chốt cuối là **J1 + S1 + S4** — bỏ S3 và J2,
+> thêm J1 (chạy lại J1 với đúng bộ cờ nền của S1/S4). Lý do đổi: J1/J2 lịch
+> sử không so 1-biến được với S1/S4 (lệch 5-6 tham số), nên không thể trả lời câu
+> hỏi "T confound" mà S4 đặt ra ([s4_sr_scale1_mf_sr_ocr.md §3](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md#3-trả-lời-câu-hỏi-t-confound--kết-quả-chính-của-s4))
+> bằng số có error bar; multi-seed thêm S3 (vốn đã đồng hạng 1-seed với S4) được
+> đánh giá là giá trị thông tin thấp hơn so với việc đóng lập luận T-confound. Lệnh
+> chạy + checklist mới nhất: [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md#-b4--multi-seed-j1-8-h-s1-26-h-j2-26-h--ladder-sạch),
+> [../checklist_review.md](../checklist_review.md).
+
+**Khuyến nghị ban đầu (lịch sử): S1 + S3 + S4** (không phải S1 + S2 + S4). Lý do
+quan trọng nhất nằm ngay trong công thức của review:
 
 ```
 L_Total = L_CTC + λ_SR·L_SR + λ_Perceptual·L_VGG      (λ_Perceptual = 0.01)
@@ -128,59 +154,50 @@ L_Total = L_CTC + λ_SR·L_SR + λ_Perceptual·L_VGG      (λ_Perceptual = 0.01)
 
 Công thức này **có số hạng perceptual** — tức là theo cách hiểu của reviewer,
 **phương pháp đề xuất của paper đã bao gồm perceptual loss**, và đó chính là S3
-(xem chứng minh ở mục 0). Nếu multi-seed mà bỏ S3, ta sẽ không có error bar cho
-đúng cấu hình mà reviewer đang mô tả là phương pháp chính.
+(xem chứng minh ở mục 0). Multi-seed mà bỏ S3 nghĩa là không có error bar cho
+đúng cấu hình mà reviewer đang mô tả là phương pháp chính — **đây là đánh đổi đã
+chấp nhận** ở quyết định cuối cùng: công thức trong paper vẫn giữ nguyên (không
+sửa), nhưng số hạng `λ_Perceptual` phải ghi rõ là ablation 1-seed chưa xác nhận.
 
 | Cấu hình | Nên multi-seed? | Lý do |
 |---|:---:|---|
 | **S1** (λ_SR=0.1) | ✅ bắt buộc | Phương pháp đề xuất hiện tại của paper, là con số headline |
-| **S3** (+perceptual) | ✅ bắt buộc | **Chính là công thức review mô tả**; đang đồng hạng cao nhất (805) |
-| **S4** (SR ×1) | ✅ bắt buộc | Đồng hạng cao nhất + rẻ hơn 2.34× — đóng góp riêng về hiệu quả |
-| S2 (λ_SR=0.5) | ⚠️ ưu tiên thấp nhất | Kết quả âm tính đã rõ ở 1 seed (794, thấp nhất nhóm S). Không ai sẽ dùng cấu hình này |
+| **S3** (+perceptual) | ⏭️ **đã loại (2026-08-02)** | Chính là công thức review mô tả, nhưng đồng hạng 1-seed với S4 — giữ 1 seed, chuyển ngân sách sang J1 |
+| **S4** (SR ×1) | ✅ bắt buộc | Đồng hạng cao nhất + rẻ hơn 2.34× — đóng góp riêng về hiệu quả — **đã xong** |
+| **J1** (không SR) | ✅ **bổ sung** | Mốc nền T=16 của ladder — chạy **cờ lịch sử** (`--stn-pool 1,1`), tái lập được ~76.9% |
+| ~~J2~~ (SR single-frame) | ⏭️ **đã loại (2026-08-03)** | Tốn ~27h. Ablation multi-frame vs single-frame giữ ở mức 1 seed (J2 77.18% vs S1 79.78%) + ghi Limitations |
+| S2 (λ_SR=0.5) | ❌ loại | Kết quả âm tính đã rõ ở 1 seed (794, thấp nhất nhóm S). Không ai sẽ dùng cấu hình này |
 
-**Khi nào S2 mới đáng chạy**: chỉ khi paper có **bảng ablation riêng cho `λ_SR`**
-(0.1 vs 0.5) và muốn error bar để bảo vệ khẳng định "0.1 tốt hơn". Nếu paper chỉ
-nhắc S2 một dòng trong phần ablation thì 1 seed là đủ — không đáng ~33 h GPU.
+**Khi nào S2/S3 mới đáng multi-seed sau này**: chỉ khi paper cần bảng ablation
+riêng cho `λ_SR` (S2) hoặc muốn tách rạch ròi lợi ích của riêng perceptual loss
+(S3) khỏi cụm S1/S4 đã có error bar. Ở phạm vi hiện tại, 1 seed kèm nhãn "chưa xác
+nhận" là đủ cho cả hai.
 
-Nếu ngân sách GPU chỉ đủ 2 cấu hình: **S1 + S4** (rẻ nhất mà vẫn giữ được cả
-headline lẫn đóng góp về hiệu quả), rồi bổ sung S3 sau.
-
-**Lệnh** — lưu ý: `train.py` trơn **không** tái lập S1/S3/S4 (mặc định là nhánh
-ResBlock cũ), phải ghi đủ flag. Thêm `--no-cudnn-benchmark` để bật deterministic:
+**Lệnh** — lưu ý: `train.py` trơn **không** tái lập S1/S4/J1 (mặc định là
+nhánh ResBlock cũ), phải ghi đủ flag. Thêm `--no-cudnn-benchmark` để bật
+deterministic. S1 và S4 đã xong; chỉ còn J1 (~10h). Bản đầy đủ:
+[../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md#-b4--multi-seed-j1-8-h-s1-26-h-j2-26-h--ladder-sạch).
 
 ```bash
 for SEED in 42 100 2026; do
-  # S1
-  python train.py --preset stable --experiment-name s1_seed${SEED} --seed ${SEED} \
-    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
-    --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
-    --backbone-norm group --lr-domain-match --decode constrained --use-ema \
+  # J1 — mốc nền: GroupNorm, KHÔNG SR. Cờ lịch sử: ép --stn-pool 1,1
+  # (mặc định nay là 4,8); không domain-match/EMA/constrained (mặc định đã đúng).
+  python train.py --preset stable --experiment-name j1_seed${SEED} --seed ${SEED} \
+    --backbone-norm group --stn-pool 1,1 \
     --no-cudnn-benchmark --num-workers 8 --aug-level full \
-    2>&1 | tee results/log_s1_seed${SEED}.txt
+    2>&1 | tee results/log_j1_seed${SEED}.txt
 
-  # S3 — cấu hình khớp công thức review (có perceptual)
-  python train.py --preset stable --experiment-name s3_seed${SEED} --seed ${SEED} \
-    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
-    --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 --sr-perceptual-weight 0.1 \
-    --backbone-norm group --lr-domain-match --decode constrained --use-ema \
-    --no-cudnn-benchmark --num-workers 8 --aug-level full \
-    2>&1 | tee results/log_s3_seed${SEED}.txt
-
-  # S4
-  python train.py --preset stable --experiment-name s4_seed${SEED} --seed ${SEED} \
-    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
-    --use-sr --sr-scale 1 --use-dcn --lambda-sr 0.1 \
-    --backbone-norm group --lr-domain-match --width-downsample 4 \
-    --decode constrained --use-ema \
-    --no-cudnn-benchmark --num-workers 8 --aug-level full \
-    2>&1 | tee results/log_s4_seed${SEED}.txt
 done
 ```
 
-> Nếu đã làm P0.3 (tách `--lambda-perceptual` thành flag riêng) thì lệnh S3 đổi
-> `--sr-perceptual-weight 0.1` → `--lambda-perceptual 0.01`, khớp 1-1 với công thức
-> trong paper. Nhớ ghi rõ trong paper là hai cách viết cho **cùng một cấu hình**,
-> để không ai hiểu nhầm là hai thí nghiệm khác nhau.
+> ✅ **J1 tái lập được ~76.88%** vì không dùng SR — mọi thay đổi code từ đó tới nay
+> đều nằm ở nhánh SR. Nếu ra lệch hơn ±1.3 điểm thì kiểm tra lại cờ.
+>
+> 🚨 Viết `--stn-pool 1,1` **có dấu phẩy**; `1 1` sẽ parse thành `(11,)` và crash.
+
+> **Trạng thái**: S1 (79.95% ± 0.15) và S4 (79.48% ± 0.44) **đã xong**, không cần
+> chạy lại. Chỉ còn **J1** — lệnh ở
+> [../training_runs/run_gpu.md §0 B4](../training_runs/run_gpu.md).
 
 Tổng hợp — **`tools/aggregate_seeds.py` đã có sẵn**, tính Mean ± Std + CI 95% + kiểm
 định so sánh 2 cấu hình, không cần viết mới:

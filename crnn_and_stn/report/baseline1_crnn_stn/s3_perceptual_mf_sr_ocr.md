@@ -1,5 +1,10 @@
 # S3 — MF-SR-OCR với L_Perceptual (α=0.1)
 
+> ⚠️ **1 seed, `benchmark=True` — chưa xác nhận.** Phạm vi multi-seed đã chốt
+> (2026-08-03) là **3 model J1 + S1 + S4**, không có S3 — lý do chi phí ở
+> [../checklist_review.md](../checklist_review.md). 805/999 vẫn là điểm 1-seed
+> cao nhất từng đo, nhưng không có error bar; đừng báo cáo như số cuối cho paper.
+>
 > Kết quả của cấu hình S3 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s3_l_perceptual/history_s3_perceptual.csv`,
 > `submission_s3_perceptual.txt`. Không có `log_s3.txt` (không chạy `tee` khi train run này).
@@ -147,10 +152,12 @@ cao nhất trong toàn bộ lịch sử thử nghiệm** — 805/999 (80.58%), +
 và +11 so với S2 — nhưng khoảng cách với S1 vẫn nằm trong biên nhiễu ±13 track nên
 **chưa thể khẳng định chắc chắn perceptual loss cải thiện thật**, chỉ có thể nói
 đây là hướng đáng ưu tiên xác nhận trước khi loại bỏ. Khác biệt so với S2 (kết quả
-âm tính rõ ràng): S3 là ứng viên hợp lý nhất hiện tại để đưa vào multi-seed (O1)
-cùng với S1, thay vì chỉ chạy multi-seed trên riêng cấu hình S1 như kế hoạch ban đầu.
+âm tính rõ ràng): S3 từng là ứng viên hợp lý nhất để đưa vào multi-seed cùng S1.
 
-Bước tiếp theo: **S4** (`--sr-scale 1`, kiểm tra giới hạn ~55% nội suy) vẫn cần
-chạy để hoàn thành bộ ablation theo kế hoạch trong `run_gpu.md`; sau đó multi-seed
-(O1) nên chạy trên **cả S1 và S3** (không chỉ S1) vì S3 hiện là điểm ước lượng tốt
-nhất, trước khi chốt cấu hình cuối để nộp submission.
+**Cập nhật 2026-08-02**: phạm vi multi-seed cuối cùng đã đổi thành
+**3 model J1 + S1 + S4** (không có S3) — để tiết kiệm chi phí GPU và ưu tiên đóng
+lập luận "T=32 confound" (câu hỏi mà chính S4 đặt ra ở §3 file này thực ra thuộc
+về S4) bằng mốc nền J1 có error bar, thay vì multi-seed thêm một ablation loss
+(S3) vốn đã đồng hạng với S4. Lý do đầy đủ:
+[../checklist_review.md](../checklist_review.md). CER của S3 (0.0522, tốt nhất 4
+cấu hình) vẫn là một tín hiệu đáng nêu trong paper, kèm nhãn "1 seed, chưa xác nhận".

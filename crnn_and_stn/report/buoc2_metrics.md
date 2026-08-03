@@ -4,6 +4,25 @@
 > xuất ra console và log validation.
 > Trạng thái: **đã xong**, có số cho cả S1–S4. Ba chỗ lệch so với nguyên văn review
 > nêu ở mục 4 — cần ghi vào paper.
+>
+> ⚠️ **Toàn bộ số dưới đây là 1 seed** (`benchmark=True`). Phạm vi multi-seed đã
+> cuối cùng (2026-08-03) là **3 model J1 + S1 + S4**
+> ([../checklist_review.md](checklist_review.md)) — S2 và S3 sẽ **không** có
+> CER/NED/PSNR multi-seed; đọc số của 2 cấu hình đó như tham khảo, không phải kết
+> luận cuối. J1 sẽ tự động có `val_cer`/`val_ned` trong `history_*.csv` khi
+> chạy xong.
+>
+> ✅ **CER multi-seed đã có cho S1 và S4** — thay thế 2 dòng tương ứng ở mục 1:
+>
+> | Cấu hình | Exact Match | CER ↓ |
+> |---|---:|---:|
+> | S1 — 3 seed | **79.95% ± 0.15** | **0.0541 ± 0.0016** |
+> | S4 — 3 seed | **79.48% ± 0.44** | **0.0543 ± 0.0001** |
+>
+> Phát hiện chỉ multi-seed mới thấy: **S4 ổn định hơn 16× về CER** (std 0.0001 vs
+> 0.0016) nhưng **kém ổn định hơn 3× về exact match** (std 0.44 vs 0.15) — hai đại
+> lượng không đi cùng chiều. Chi tiết:
+> [baseline1_crnn_stn/multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
 
 ---
 
@@ -24,6 +43,16 @@
 | S2 (λ_SR=0.5) | 79.48% | 0.0549 | 0.0549 | 0.9451 |
 | **S3 (+perceptual)** | **80.58%** | **0.0522** | **0.0522** | **0.9478** |
 | S4 (SR ×1) | 80.58% | 0.0532 | 0.0532 | 0.9468 |
+| **J2 (lịch sử)** 🆕 | 77.18% | **0.0645** | 0.0645 | 0.9355 |
+| **J1 (lịch sử)** 🆕 | 76.88% | **0.0608** | 0.0608 | 0.9392 |
+
+🆕 **Bổ sung 2026-08-03 — J1/J2 tính được mà không cần train lại**, vì `submission_*.txt`
+của 2 run đó vẫn còn trên đĩa. Kết quả đáng chú ý: **J2 có CER TỆ hơn J1** (0.0645 vs
+0.0608) dù exact match cao hơn 3 track, và J2 có **18/999 track sai độ dài** so với
+**0/999** của J1 (J2 dùng greedy decode, `T` tăng 16→32 nên CTC dễ chèn ký tự thừa).
+→ Đây là ví dụ thứ hai (sau S2) cho thấy **exact match giấu mất thông tin** — và lần
+này CER chỉ **ngược chiều** với exact match. Chi tiết:
+[baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md §3b](baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
 
 **Hai điều exact match không cho thấy:**
 
