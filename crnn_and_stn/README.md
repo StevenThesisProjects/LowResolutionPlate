@@ -79,7 +79,7 @@ trên checkpoint. Con số đáng đọc là cột **Chênh** (so với `base` =
 → Khi reviewer hỏi *"sao không tối ưu theo PSNR"*: **"PSNR nghịch với OCR, có bằng
 chứng ở cả 3 mức"** — chứ không chỉ "PSNR không phản ánh OCR".
 
-📄 Chi tiết: [`buoc2_metrics.md`](buoc2_metrics.md)
+📄 Chi tiết: [`buoc2_metrics.md`](crnn_and_stn/report/buoc2_metrics.md))
 
 ---
 
