@@ -43,7 +43,7 @@
 - **`cudnn.benchmark` ảnh hưởng không đồng đều**: cùng seed 42, S1 lệch **0 track**
   nhưng S4 lệch **−16 track**. Không khái quát *"1-seed luôn thổi phồng"* thành quy luật.
 
-📄 Số từng seed + phân tích đầy đủ 9 run: [`multi_seed_results.md`](baseline1_crnn_stn/multi_seed_results.md)
+📄 Số từng seed + phân tích đầy đủ 9 run: https://github.com/StevenThesisProjects/LowResolutionPlate/blob/feature/run-multi-seeda-and-evulate/crnn_and_stn/report/baseline1_crnn_stn/multi_seed_results.md
 
 ---
 
