@@ -3,15 +3,20 @@
 > ✅ **ĐỦ CẢ 3 MODEL** (42/100/2026, deterministic `--no-cudnn-benchmark`).
 > **Bước 1 của review đã HOÀN THÀNH.**
 >
-> 🚨 **Kết quả bất ngờ**: cấu hình **không có SR (J1) đạt điểm CAO NHẤT** —
-> **80.45% ± 0.45**, hoà S1 và **hơn S4 có ý nghĩa thống kê**. Nhánh SR chưa
-> chứng minh được đóng góp. Phân tích: [§4](#4-🚨-kết-quả-chính--sr-không-mang-lại-lợi-ích-đo-được).
+> 🎯 **Quyết định (2026-08-04): chọn S1 làm phương pháp đề xuất chính của paper** —
+> vì **ổn định nhất** (std `0.15`, nhỏ hơn 3× J1/S4) và **bất biến với
+> `cudnn.benchmark`** (lệch 0 track ở seed 42). J1 và S4 đóng vai **ablation**.
 >
-> | Model | SR | `T` | **Mean ± Std** | GFLOPs |
-> |---|---|---:|---:|---:|
-> | **J1** | ❌ không SR | 16 | **80.45% ± 0.45** 🥇 | **26.14** |
-> | **S1** | ×2 multi-frame + DCN | 32 | 79.95% ± 0.15 | 109.08 |
-> | **S4** | ×1 multi-frame + DCN | 32 | 79.48% ± 0.44 | chưa đo |
+> 🚨 **Kết quả âm tính đi kèm, bắt buộc công bố**: cấu hình **không có SR (J1) có
+> điểm trung bình CAO NHẤT** — **80.45% ± 0.45**, **hoà** S1 (chênh trong nhiễu) và
+> **hơn S4 có ý nghĩa thống kê**, trong khi rẻ hơn **3.76× compute**. Nhánh SR chưa
+> chứng minh được đóng góp đo được. Phân tích: [§4](#4-🚨-kết-quả-chính--sr-không-mang-lại-lợi-ích-đo-được).
+>
+> | Model | SR | `T` | **Mean ± Std** | Std | GFLOPs | Vai trò |
+> |---|---|---:|---:|---:|---:|---|
+> | **S1** | ×2 multi-frame + DCN | 32 | **79.95% ± 0.15** | **0.15** 🥇 | 109.08 | 🎯 **đề xuất** |
+> | **J1** | ❌ không SR | 16 | 80.45% ± 0.45 | 0.45 | **26.14** | ablation "bỏ SR" |
+> | **S4** | ×1 multi-frame + DCN | 32 | 79.48% ± 0.44 | 0.44 | chưa đo | ablation "bỏ upscale" |
 >
 > Dữ liệu: `results/multi-seed/{crnn_resblock_groupnorm_nosr_j1,s1_mf_sr_ocr,s4_sr_scale1}/`.
 > Mọi con số đã **chấm lại trực tiếp** `submission_*.txt` với `plate_text` thật
@@ -248,9 +253,13 @@ Chế độ deterministic chỉ làm chậm **2–4%** so với `benchmark=True`
 
 ## 9. Kết luận & cập nhật cho paper
 
+0. 🎯 **Phương pháp chính đã chốt: S1** (`79.95% ± 0.15`). Lý do: std nhỏ nhất
+   (0.15 vs 0.45/0.44), bất biến với `cudnn.benchmark` (mục 5), và J1 **không** hơn
+   S1 có ý nghĩa nên không có cơ sở đổi cấu hình đề xuất. J1/S4 = ablation.
 1. 🚨 **Nhánh SR không mang lại lợi ích đo được.** J1 (bỏ hẳn SR/DCN/MFSR) đạt
    **80.45% ± 0.45** — hoà S1 (+0.50, trong nhiễu) và **hơn S4 có ý nghĩa thống kê**
-   (+0.97 > 2×0.36). Đây là kết luận quan trọng nhất của đợt multi-seed.
+   (+0.97 > 2×0.36). Đây là kết luận quan trọng nhất của đợt multi-seed, và là
+   **Limitation bắt buộc** phải nêu kèm khi trình bày S1.
 2. **Cải thiện thật đến từ cụm cờ nền**, không phải SR: STN pool `(4,8)` +
    `--lr-domain-match` + constrained decode + EMA. J1-mới hơn J1-lịch-sử **+3.57
    điểm** (76.88% → 80.45%) chỉ nhờ cụm này, với **cùng** kiến trúc không SR.
