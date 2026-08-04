@@ -128,15 +128,20 @@ to) — nhưng vẫn **chậm hơn J1 1.65×** trong khi điểm thấp hơn có
 
 | | PSNR (SR) | PSNR (base) | Chênh | SSIM (SR) | SSIM (base) | Chênh |
 |---|---:|---:|---:|---:|---:|---:|
-| S4 (×1) | 17.5249 | 16.5011 | +1.0238 dB | 0.5027 | 0.4408 | +0.0618 |
+| S4 (×1) | 17.4613 | 16.4241 | +1.0372 dB | 0.4955 | 0.4199 | +0.0756 |
 
+> ✅ Đo trên **checkpoint multi-seed seed 42** (2026-08-05), cùng nguồn với bảng
+> accuracy Mean ± Std. Val acc in ra lúc chạy: **789/999**, khớp chính xác.
+>
 > ⚠️ **PSNR tuyệt đối của S4 không so được với S1** — S4 xuất ảnh 32×128, S1 xuất
 > 64×256, hai thang khác nhau. Chỉ so được cột "Chênh".
 >
 > Với `sr_scale=1`, mốc `base` là **ảnh giữ nguyên** (không nội suy), nên chênh
-> +1.02 dB đọc là *"SR có hơn việc không làm gì"*.
+> +1.04 dB đọc là *"SR có hơn việc không làm gì"*.
 >
-> ⚠️ Đo trên checkpoint **1 seed**, khác nguồn với bảng accuracy multi-seed.
+> 🔬 **Nghịch lý đáng nêu**: S4 tái tạo ảnh **tốt hơn S1** (+1.04 vs +0.72 dB) nhưng
+> **đọc kém hơn** (79.48% vs 79.95%) — thêm một bằng chứng PSNR nghịch với OCR.
+> Ở mức từng track: track đọc **sai** có PSNR cao hơn **2.21 dB** (r = −0.4044, n=999).
 
 Chi tiết + tương quan PSNR ↔ đọc đúng: [../buoc2_metrics.md](../buoc2_metrics.md).
 

@@ -48,6 +48,27 @@ duy nhất đạt **0/999 track sai độ dài ở cả 3 seed** — tức khi J
 độ dài", không chèn/thiếu ký tự. Đây là tiêu chí phụ tách được các cấu hình mà exact
 match cho gần bằng nhau.
 
+### 🔬 Vì sao CER thấp (0.054) mà exact match chỉ 79.95% — phân bố lỗi
+
+Phân tích **202 track sai** của S1 (seed 42), đếm số ký tự sai trên tổng 7:
+
+| Số ký tự sai (/7) | Số track | Tỷ lệ |
+|---:|---:|---:|
+| **1** | **114** | **56.4%** |
+| 2 | 37 | 18.3% |
+| 3 | 30 | 14.9% |
+| 4 | 12 | 5.9% |
+| 5–7 | 9 | 4.5% |
+
+📌 **56.4% lỗi chỉ sai ĐÚNG 1 ký tự** — đây chính là lý do CER (mức ký tự) chỉ 0.054
+trong khi exact match (phạt sai 1 ký tự như sai cả biển) tụt xuống 79.95%. Con số này
+**giải thích trực tiếp khoảng cách giữa 2 chỉ số**, rất đáng đưa vào paper khi lập luận
+*"vì sao cần báo cáo cả CER lẫn exact match"*.
+
+🔬 **Cảnh báo hiệu chuẩn**: **103/202 track sai (51%) có confidence > 0.9** — model
+**tự tin sai** ở một nửa số lỗi (conf trung bình của track sai = 0.868, cao nhất 0.9993).
+→ **Không dùng confidence làm ngưỡng lọc lỗi được** — sẽ bỏ sót quá nửa.
+
 ---
 
 ## 2. PSNR và SSIM
@@ -82,9 +103,9 @@ multi-seed seed 42** (`results/multi-seed/`), cùng nguồn với bảng accurac
 > Đây là **giới hạn cấu trúc**, không phải thiếu sót. Hệ quả: bảng PSNR **không phủ
 > được cấu hình có điểm trung bình cao nhất** — phải nêu trong Limitations.
 >
-> ⏳ **Bảng tương quan "PSNR nghịch với OCR" ở mức từng track (mục 3.1 dưới đây) vẫn
-> tính từ CSV cũ** — cần CSV mới (`sr_quality_s1_seed42.csv`, `sr_quality_s4_seed42.csv`)
-> để tính lại hệ số tương quan $r$.
+> ✅ **Bảng tương quan ở mục 3.1 cũng đã tính lại** từ `sr_quality_s1_seed42.csv` /
+> `sr_quality_s4_seed42.csv` — toàn bộ số PSNR/SSIM trong tài liệu này nay cùng một
+> nguồn (checkpoint multi-seed seed 42).
 
 ⚠️ **Con số dao động ~±0.05 dB giữa các lần chạy.** Pipeline degradation (blur/noise/JPEG)
 là ngẫu nhiên; cờ `--seed` chỉ seed tiến trình chính, còn `--num-workers > 0` thì mỗi
@@ -101,17 +122,26 @@ hai thang khác nhau. Chỉ so được cột "Chênh" vì mỗi cấu hình so 
 
 ### 3.1. Bằng chứng mức từng track (n = 999) — mạnh nhất
 
-Ghép PSNR từng track (`sr_quality_*.csv`) với kết quả đúng/sai từng track
-(`submission_*.txt`), tính hệ số tương quan điểm-nhị phân:
+Ghép PSNR từng track (`sr_quality_*_seed42.csv`) với kết quả đúng/sai từng track
+(`submission_*_seed42.txt`), tính hệ số tương quan điểm-nhị phân:
 
-| Cấu hình | PSNR ở track **đọc đúng** | PSNR ở track **đọc sai** | Chênh | r(PSNR, đúng) |
-|---|---:|---:|---:|---:|
-| **S1** | 16.288 | 18.240 | **−1.952 dB** | **−0.362** |
-| **S4** | 17.080 | 19.371 | **−2.291 dB** | **−0.400** |
+| Cấu hình | Track đúng | PSNR ở track **đọc đúng** | PSNR ở track **đọc sai** | Chênh | r(PSNR, đúng) |
+|---|---:|---:|---:|---:|---:|
+| **S1** | 797/999 | 16.124 | 18.419 | **−2.295 dB** | **−0.4106** |
+| **S4** | 789/999 | 16.996 | 19.210 | **−2.215 dB** | **−0.4044** |
 
-**Track mà model đọc SAI lại có PSNR CAO hơn ~2 dB so với track đọc đúng.** Tương quan
-âm rõ rệt (r ≈ −0.36 và −0.40), **nhất quán ở cả hai cấu hình có nhánh SR**, mỗi cấu
+✅ **Tính trên checkpoint multi-seed seed 42** (2026-08-05), cùng nguồn với bảng
+accuracy Mean ± Std. Track đúng chấm lại từ `submission_*_seed42.txt` với `plate_text`
+gốc — ra đúng **797/999** và **789/999**, khớp chính xác
+[multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
+
+**Track mà model đọc SAI lại có PSNR CAO hơn ~2.2 dB so với track đọc đúng.** Tương quan
+âm rõ rệt (**r ≈ −0.41** ở cả hai), **nhất quán ở cả hai cấu hình có nhánh SR**, mỗi cấu
 hình đo trên **n = 999 track độc lập**.
+
+> 📌 So với bản đo trên checkpoint 1-seed cũ (S1: r = −0.362, chênh −1.952 dB; S4:
+> r = −0.400, chênh −2.291 dB) — hiệu ứng nghịch **mạnh hơn một chút** ở S1 và gần như
+> không đổi ở S4. Kết luận không đổi, chỉ vững thêm.
 
 Nghĩa là PSNR không chỉ *vô dụng* với OCR — nó **gây hiểu lầm**: tối ưu theo PSNR sẽ
 đẩy model đi sai hướng.
@@ -128,8 +158,11 @@ hai thứ nghịch nhau.
 | | Chất lượng ảnh SR | Đọc biển số (3 seed) |
 |---|---|---|
 | **J1** | **không có nhánh SR** — không tái tạo ảnh gì cả | **80.45% ± 0.45** — cao nhất |
-| **S1** | +1.07 dB, +0.070 SSIM | 79.95% ± 0.15 |
-| **S4** | +1.02 dB, +0.062 SSIM | 79.48% ± 0.44 |
+| **S1** | +0.72 dB, +0.043 SSIM | 79.95% ± 0.15 |
+| **S4** | +1.04 dB, +0.076 SSIM | 79.48% ± 0.44 |
+
+📌 Thêm một tầng nghịch nữa: **S4 tái tạo ảnh tốt hơn S1** (+1.04 vs +0.72 dB) nhưng
+**đọc kém hơn** (79.48% vs 79.95%) — cùng chiều với tương quan âm ở mục 3.1.
 
 **Cấu hình bỏ hẳn việc tái tạo ảnh lại đọc biển số tốt nhất.** Đây là bằng chứng mạnh
 hơn mọi hệ số tương quan: không cần đo PSNR để thấy rằng chất lượng ảnh tái tạo **không

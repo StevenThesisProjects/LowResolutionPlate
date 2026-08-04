@@ -565,14 +565,16 @@ python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 --width-downsa
 ```
 
 **Con số đáng đọc là cột "Chênh"** (so với `base` = ảnh chưa qua SR), không phải PSNR
-tuyệt đối. Bảng dưới đây vẫn là số đo trên checkpoint **1-seed cũ** (chưa chạy lại lệnh
-trên) — cập nhật sau khi có kết quả từ checkpoint multi-seed:
+tuyệt đối. ✅ **Đã chạy 2026-08-05 trên checkpoint multi-seed seed 42**:
 
 | Cấu hình | PSNR (SR) | PSNR (base) | **Chênh** | SSIM (SR) | SSIM (base) | **Chênh** |
 |---|---:|---:|---:|---:|---:|---:|
-| **Lần 2 — S1** (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
-| **Lần 3 — S4** (×1) | 17.5249 | 16.5011 | +1.0238 dB | 0.5027 | 0.4408 | +0.0618 |
+| **Lần 2 — S1** (×2) | 16.5882 ± 3.1938 | 15.8717 ± 2.7812 | +0.7166 dB | 0.3971 ± 0.1952 | 0.3536 ± 0.1787 | +0.0434 |
+| **Lần 3 — S4** (×1) | 17.4613 ± 3.1172 | 16.4241 ± 2.8200 | +1.0372 dB | 0.4955 ± 0.2060 | 0.4199 ± 0.1961 | +0.0756 |
 | **Lần 1 — J1** | — | — | — | — | — | — |
+
+> 📌 Số đổi so với bản 1-seed cũ (S1: +1.0717→+0.7166 dB; S4: +1.0238→+1.0372 dB) vì
+> là checkpoint khác. Nay **cùng nguồn** với bảng accuracy Mean ± Std.
 
 > ⚠️ **Không đặt PSNR tuyệt đối của S4 chung cột với S1**: S1 xuất ảnh 64×256,
 > S4 xuất 32×128 — **hai thang khác nhau**. Chỉ so được cột "Chênh".
@@ -585,14 +587,18 @@ trên) — cập nhật sau khi có kết quả từ checkpoint multi-seed:
 
 | Mức | Bằng chứng | Chiều |
 |---|---|---|
-| **Track** (n=999) | Track đọc **sai** có PSNR **cao hơn ~2 dB**; $r \approx -0.35 \ldots -0.41$, nhất quán cả 4 cấu hình | **nghịch** |
-| **Cấu hình** | Ablation có PSNR cao nhất toàn dự án (+2.29 dB) lại có OCR **kém nhất** | **nghịch** |
-| **Kiến trúc** | **Lần 1 (J1) bỏ hẳn SR → không có PSNR nào → OCR không hề thua** (điểm TB cao nhất) | **nghịch** |
+| **Track** (n=999) | Track đọc **sai** có PSNR **cao hơn ~2.2 dB**; $r \approx -0.41$ ở cả 2 cấu hình có SR | **nghịch** |
+| **Cấu hình** | **S4 tái tạo ảnh tốt hơn S1** (+1.04 vs +0.72 dB) nhưng **đọc kém hơn** (79.48% vs 79.95%) | **nghịch** |
+| **Kiến trúc** | **Lần 1 (J1) bỏ hẳn SR → không có PSNR nào → OCR cao nhất** (80.45%) | **nghịch** |
 
-| Cấu hình | PSNR track **đọc đúng** | PSNR track **đọc sai** | Chênh | $r$(PSNR, đúng) |
-|---|---:|---:|---:|---:|
-| S1 | 16.288 | 18.240 | **−1.952 dB** | **−0.362** |
-| S4 | 17.080 | 19.371 | −2.291 dB | −0.400 |
+| Cấu hình | Track đúng | PSNR track **đọc đúng** | PSNR track **đọc sai** | Chênh | $r$(PSNR, đúng) |
+|---|---:|---:|---:|---:|---:|
+| **S1** | 797/999 | 16.124 | 18.419 | **−2.295 dB** | **−0.4106** |
+| **S4** | 789/999 | 16.996 | 19.210 | **−2.215 dB** | **−0.4044** |
+
+✅ Tính từ `sr_quality_*_seed42.csv` ghép với `submission_*_seed42.txt` (2026-08-05).
+Track đúng chấm lại từ nhãn gốc — ra **797/999** và **789/999**, khớp chính xác bảng
+multi-seed ở PHẦN B.
 
 → Khi reviewer hỏi _"sao không tối ưu theo PSNR"_, câu trả lời không còn là "PSNR không
 phản ánh OCR" mà là **"PSNR NGHỊCH với OCR, có bằng chứng ở cả 3 mức"**.
@@ -616,61 +622,42 @@ cần _"ảnh này chứa bao nhiêu chi tiết đọc được"_.
 - [x] CER/NED cho các run 1-seed cũ (tính lại từ submission, không train lại)
 - [x] **CER Mean ± Std cho cả 3 lần chạy**
 - [x] `tools/eval_sr_quality.py` — PSNR/SSIM bằng `skimage.metrics`
-- [x] PSNR/SSIM cho 4 cấu hình S1–S4 (999 track mỗi cấu hình)
-- [x] Tương quan PSNR ↔ đọc đúng ở mức từng track (n=999)
+- [x] 🆕 **PSNR/SSIM trên checkpoint multi-seed seed 42** (2026-08-05) — S1 và S4,
+      999 track mỗi cấu hình → `results/multi-seed/<cfg>/sr_quality_*_seed42.csv`
+- [x] 🆕 **Tương quan PSNR ↔ đọc đúng tính lại từ CSV mới** (n=999, r ≈ −0.41)
+- [x] ✅ **Toàn bộ số PSNR/SSIM nay cùng nguồn với bảng accuracy Mean ± Std**
 - [x] Báo cáo: [buoc2_metrics.md](buoc2_metrics.md)
-- [ ] _(nếu muốn)_ Chạy lại PSNR/SSIM trên checkpoint **multi-seed seed 42** để cùng
-      nguồn với bảng accuracy
 
 ---
 
-## 🟠 Bước 3 — Trực quan hoá định tính ✅ gần xong
+## 🟠 Bước 3 — Trực quan hoá định tính ✅ **XONG**
 
 > **Review yêu cầu**: script `tools/visualize_paper_figures.py` trích 10 track tiêu
 > biểu (5 success + 5 failure), xuất grid **4 cột**
 > $I_{LR} \rightarrow I_{SR} \rightarrow \text{Attention Heatmap} \rightarrow \text{Prediction}$.
 
-### 📍 CHẠY Ở ĐÂU, VÀ VÌ SAO LÀ **4** BỘ HÌNH MÀ CHỈ **3** LẦN CHẠY
+### ✅ Đã sinh hình cho CẢ 3 LẦN CHẠY, trên checkpoint multi-seed
 
-Đây là chỗ dễ nhầm nhất: **"4 bộ hình" và "3 model multi-seed" là hai tập hợp khác nhau.**
+Chạy 2026-08-05, đều dùng `*_seed42_best.pth` trong `results/multi-seed/`:
 
-| | Có hình (Bước 3) | Có multi-seed (Bước 1) |
-|---|:---:|:---:|
-| **Lần 2 — S1** | ✅ | ✅ |
-| **Lần 3 — S4** | ✅ | ✅ |
-| **Lần 1 — J1** | 🟡 chạy được, chưa sinh | ✅ |
+| Lần chạy | Thư mục hình | Val acc in ra lúc chạy | Cột $I_{SR}$ |
+|---|---|---:|---|
+| **1 — J1** | `crnn_resblock_groupnorm_nosr_j1/paper_figures/` | **799/999** (79.98%) | placeholder `"(khong co SR)"` |
+| **2 — S1** 🎯 | `s1_mf_sr_ocr/paper_figures/` | **797/999** (79.78%) | ảnh SR thật |
+| **3 — S4** | `s4_sr_scale1/paper_figures/` | **789/999** (78.98%) | ảnh SR thật |
 
-- **Vài ablation 1-seed cũng có hình**: lúc sinh hình thì cả 4 checkpoint S-series
-  đã nằm sẵn trên đĩa, sinh thêm 2 bộ rất rẻ (~20 phút CPU, 0 GPU) và có ích để so
-  **cùng một track qua nhiều cấu hình**. Quyết định cắt chúng khỏi multi-seed đến **sau đó**.
-- **Lần 1 (J1) chưa sinh hình, nhưng chạy được** — không giống PSNR ở Bước 2. Tool
-  `tools/visualize_paper_figures.py::frame_column` **tự chặn `frames is None`** và vẽ
-  placeholder `"(khong co SR)"` ở cột $I_{SR}$ thay vì crash, nên chạy y nguyên với
-  checkpoint J1, không cần sửa code.
+Mỗi thư mục có **11 file**: `figure4_qualitative_grid.png` + 10 ảnh track riêng
+(5 đúng `NN_ok_*`, 5 sai `NN_err_*`).
 
-### ⏱️ Thứ tự thời gian — hình chạy **TRƯỚC** multi-seed, không phải sau
+✅ **Val acc in ra khớp chính xác** bảng multi-seed ở PHẦN B — xác nhận đúng checkpoint,
+đúng cấu hình. **Hình và số nay cùng một model**, không còn lệch nguồn như bộ hình
+1-seed cũ (sinh 02/08, trước cả khi có checkpoint multi-seed — đã gỡ khỏi repo).
 
-mtime thật trên đĩa:
+> 📌 **J1 chạy được, không cần sửa code** — `visualize_paper_figures.py::frame_column`
+> tự chặn `frames is None` và vẽ placeholder thay vì crash. Khác hẳn PSNR ở Bước 2
+> (`eval_sr_quality.py:131` chặn thẳng bằng `raise SystemExit`).
 
-```
-2026-08-01 17:27   mf_sr_ocr/*/*.pth            ← checkpoint 1-seed (nguồn của hình)
-2026-08-02 00:39   mf_sr_ocr/*/paper_figures/   ← 4 bộ hình sinh ở đây
-2026-08-02 23:57   multi-seed/{s1,s4}/*.pth     ← multi-seed Lần 2 + Lần 3 về sau
-2026-08-04 00:34   multi-seed/j1/*.pth          ← multi-seed Lần 1 cuối cùng
-```
-
-→ Hình đi trước checkpoint multi-seed sớm nhất gần **1 ngày**, và trước Lần 1 tận
-**2 ngày**. Toàn bộ hình hiện có đều sinh từ checkpoint **1 seed**.
-
-| Đã sinh hình cho | Nguồn checkpoint | Có multi-seed không |
-|---|---|---|
-| S1, S4 (+ 2 ablation 1-seed) | `backup/mf_sr_ocr/<cfg>/*.pth` — **1 seed** (lịch sử, đã gỡ khỏi repo) | ❌ |
-| **Lần 1 — J1** | **chưa sinh, nhưng chạy được** | ❌ |
-
-> ✅ **Lệnh chạy lại — trên checkpoint multi-seed**, không dùng `backup/mf_sr_ocr/` nữa.
-> **S1** (bắt buộc, dùng cho Figure 4) và **S4** (nên, để so cùng track qua 2 kiến trúc)
-> — **không chạy S2/S3** (ngoài phạm vi). **J1** chạy được (tuỳ chọn, cho phụ lục) —
-> tool tự vẽ placeholder ở cột `I_SR` thay vì crash, xem đính chính ở mục trên.
+### Lệnh đã chạy
 
 ```bash
 # S1 — BẮT BUỘC, cấu hình chính cho Figure 4
@@ -699,38 +686,53 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
 > 🚨 `*.pth` **không đi theo `git pull`** (113 MB/file) — phải upload checkpoint trước.
 > Gặp `❌ Không tìm thấy checkpoint` là do thiếu file, không phải lỗi lệnh.
 
-### Track trùng nhau giữa các cấu hình — tiện chọn Figure 4
+### 🖼️ Link ảnh — Figure 4
 
-| Track | Xuất hiện | Dùng để minh hoạ |
+**Grid tổng (dùng cho Figure 4):**
+
+| Lần chạy | Grid |
+|---|---|
+| **2 — S1** 🎯 | [`figure4_qualitative_grid.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/figure4_qualitative_grid.png) |
+| 1 — J1 | [`figure4_qualitative_grid.png`](../results/multi-seed/crnn_resblock_groupnorm_nosr_j1/paper_figures/figure4_qualitative_grid.png) |
+| 3 — S4 | [`figure4_qualitative_grid.png`](../results/multi-seed/s4_sr_scale1/paper_figures/figure4_qualitative_grid.png) |
+
+**10 ảnh track riêng của S1** (cấu hình chính) — `GT → Pred`, confidence:
+
+| # | Ảnh | Track | Kết quả | conf |
+|---|---|---|---|---:|
+| 00 | [`00_ok_track_15810.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/00_ok_track_15810.png) | 15810 | `TET3D34` ✅ | 1.0000 |
+| 01 | [`01_ok_track_17125.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/01_ok_track_17125.png) | 17125 | `SFB0I97` ✅ | 1.0000 |
+| 02 | [`02_ok_track_16305.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/02_ok_track_16305.png) | 16305 | `FPX2A49` ✅ | 1.0000 |
+| 03 | [`03_ok_track_13594.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/03_ok_track_13594.png) | 13594 | `AYI4J06` ✅ | 1.0000 |
+| 04 | [`04_ok_track_15867.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/04_ok_track_15867.png) | 15867 | `AUY0G33` ✅ | 1.0000 |
+| 05 | [`05_err_track_22161.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/05_err_track_22161.png) | 22161 | `BAD5H01` → `ATI5C01` | 0.4196 |
+| 06 | [`06_err_track_14442.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/06_err_track_14442.png) | 14442 | `BEL7F17` → `ALL7F32` | 0.4270 |
+| 07 | [`07_err_track_17959.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/07_err_track_17959.png) | 17959 | `RHP9H06` → `TBD5951` | 0.4366 |
+| 08 | [`08_err_track_12247.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/08_err_track_12247.png) | 12247 | `QHL1560` → `BAL5744` | 0.4795 |
+| 09 | [`09_err_track_19095.png`](../results/multi-seed/s1_mf_sr_ocr/paper_figures/09_err_track_19095.png) | 19095 | `TBX1G58` → `TAK5I10` | 0.4943 |
+
+**Track trùng giữa 3 bộ hình**: `19095` và `17959` **SAI ở cả 3 model** — minh hoạ
+*"giới hạn của dữ liệu, không phải điểm yếu của riêng model nào"*.
+
+| Lần chạy | 5 ĐÚNG | 5 SAI |
 |---|---|---|
-| `track_22161` | **SAI ở cả 4** | **giới hạn thật của dữ liệu**, không phải điểm yếu của một model |
-| `track_19095` | SAI ở S1 và S4 | case khó nhất quán |
-| `track_21455` | ĐÚNG ở S1 | case dễ, đọc chắc chắn |
+| 1 — J1 | 17125 · 21455 · 20818 · 19291 · 16831 | 19095 · 16413 · 10253 · 17959 · 12478 |
+| 2 — S1 | 15810 · 17125 · 16305 · 13594 · 15867 | 22161 · 14442 · 17959 · 12247 · 19095 |
+| 3 — S4 | 14103 · 10100 · 17819 · 13002 · 15810 | 17959 · 18999 · 19095 · 19725 · 12478 |
 
-### ⚠️ 2 caveat khi chốt hình
-
-1. **Hình sinh từ checkpoint 1-seed**, trong khi số trong paper nay là multi-seed →
-   hình và số đến từ **2 model khác nhau**. Với **Lần 3 (S4)** chênh này lớn nhất
-   (checkpoint 1-seed đạt 805/999 còn mức thật ~794). Với **Lần 2 (S1)** chênh **bằng 0**
-   (seed 42 ra đúng 797/999 ở cả 2 chế độ cudnn) → **dùng S1 làm Figure 4 là an toàn nhất**.
-2. ✅ **Đã chốt cấu hình chính là S1** nên Figure 4 có cột $I_{SR}$ **thật**. Nếu muốn
-   thêm hình cho Lần 1 (J1) ở phụ lục thì chạy được **ngay với grid 4 cột có sẵn** —
-   cột $I_{SR}$ sẽ chỉ là placeholder vì J1 không có nhánh SR, không cần sửa code
-   sang grid 3 cột như tài liệu này từng ghi nhầm.
-
-> Danh sách "10 track tiêu biểu" **không tái lập chính xác khi đổi phần cứng** — thứ tự
-> theo confidence lệch ở các track có confidence gần bằng nhau (khác biệt số thực
-> GPU vs CPU). Nên chốt một bộ hình và giữ nguyên.
+> ⚠️ Khi viết caption Figure 4, nhớ nêu: 5 case sai là **confidence thấp nhất**
+> (`--pick extreme`), sai 4–7/7 ký tự — trong khi **56.4% lỗi thực tế chỉ sai 1 ký tự**
+> (xem phân bố ở [buoc2_metrics.md §1](buoc2_metrics.md)).
 
 ### ✅ Checklist Bước 3
 
 - [x] `tools/visualize_paper_figures.py` — grid 4 cột, 5 đúng + 5 sai, `--pick extreme`
-- [x] Verify chạy được (bản 2 track, tự tái lập đúng 805/999)
-- [x] Chốt cấu hình cho Figure 4 = **S1** → giữ grid 4 cột
-- [ ] 🖼️ **Sinh hình từ checkpoint multi-seed** — lệnh ở trên, chạy **S1** (bắt buộc) +
-      **S4** (nên) trên `results/multi-seed/*/*_seed42_best.pth` (~5 phút GPU / ~20
-      phút CPU mỗi cấu hình). Bộ hình 1-seed cũ đã gỡ khỏi repo, không dùng nữa.
-- [ ] 🟠 **Chọn 10 hình cuối cho Figure 4** từ bộ hình mới sinh
+- [x] Chốt cấu hình cho Figure 4 = **S1** → giữ grid 4 cột có $I_{SR}$ thật
+- [x] 🆕 **Sinh hình từ checkpoint multi-seed seed 42 cho CẢ 3 model** (2026-08-05) —
+      11 file mỗi cấu hình, val acc in ra khớp chính xác bảng multi-seed
+- [x] ✅ **Hình và số cùng một model** — hết lệch nguồn
+- [x] 🆕 **Link đầy đủ 33 ảnh** (3 grid + 30 ảnh track) ở bảng trên
+- [ ] 🟠 **Chọn hình cuối cho Figure 4** — quyết định của người viết paper
 
 ---
 
@@ -761,8 +763,8 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
 | Nhóm 2 — quy trình deterministic | ✅ **4/4 XONG**, verify trên 9 run thật | 0 |
 | Nhóm 3 — chống overfitting | ⏭️ **đã chốt không áp dụng** — code sẵn, đưa vào Future work | 0 |
 | **Bước 1 — Multi-seed** | ✅ **9/9 XONG** — đủ 3 lần chạy có Mean ± Std | 0 |
-| **Bước 2 — CER/NED/PSNR/SSIM** | ✅ **7/8 XONG** (3 chỗ cố ý lệch, có lý do) | 0 |
-| **Bước 3 — hình định tính** | 🟡 4/6 — còn chọn 10 hình cuối | 0 |
+| **Bước 2 — CER/NED/PSNR/SSIM** | ✅ **8/8 XONG** — PSNR/SSIM đã chạy trên checkpoint multi-seed (3 chỗ cố ý lệch, có lý do) | 0 |
+| **Bước 3 — hình định tính** | ✅ **4/5 XONG** — đã sinh hình cả 3 model từ checkpoint multi-seed; còn chọn 10 hình cuối (thủ công) | 0 |
 | Bước 4 — PARSeq/SVTR | ❌ 0/4 — để cuối cùng, cắt được | riêng |
 
 **Không còn việc nào cần GPU** trong phạm vi đã chốt.
@@ -775,7 +777,7 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
 3. 🚨 Viết lại phần _"đóng góp của nhánh SR"_ — **không** đổi phương pháp chính, mà
    đổi **lời giải thích vì sao nó hoạt động**
 4. ✍️ Cập nhật **Limitations** (danh sách đầy đủ ngay dưới)
-5. 🖼️ Chọn 10 hình cuối cho Figure 4
+5. 🖼️ Chọn 10 hình cuối cho Figure 4 từ `results/multi-seed/s1_mf_sr_ocr/paper_figures/`
 6. 📏 Benchmark GFLOPs/latency cho Lần 1 và Lần 3 (`tools/benchmark.py` chưa có dòng
    cho `sr-scale=1`) — phút/epoch thì **đã có số đo thật** từ cột `epoch_time_s`
 
@@ -791,8 +793,9 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
    single-frame, perceptual loss, $\lambda_{SR}=0.5$ — dữ liệu ở `backup/`.
 5. **Không đo được PSNR/SSIM cho Lần 1** — bảng PSNR không phủ được cấu hình có điểm
    TB cao nhất (không có $I_{SR}$ để đo).
-6. **PSNR/SSIM và hình định tính đo trên checkpoint 1 seed**, khác nguồn với bảng
-   accuracy Mean ± Std.
+6. ✅ ~~PSNR/SSIM và hình định tính đo trên checkpoint 1 seed~~ — **đã khắc phục
+   2026-08-05**: cả hai nay chạy trên checkpoint multi-seed seed 42, **cùng nguồn**
+   với bảng accuracy Mean ± Std.
 7. **Chưa chạy test lần nào** — mọi số là validation Scenario-B (999 track);
    PSNR/SSIM đo trên **cặp synthetic**.
 8. **Lần 1 dùng cờ nền của S1/S4**, nên 80.45% **không so được** với J1 lịch sử 76.88%.

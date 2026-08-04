@@ -117,11 +117,14 @@ khoá cứng 6/7 vị trí lớp chữ/số, beam 16.
 
 | | PSNR (SR) | PSNR (base) | Chênh | SSIM (SR) | SSIM (base) | Chênh |
 |---|---:|---:|---:|---:|---:|---:|
-| S1 (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
+| S1 (×2) | 16.5882 | 15.8717 | +0.7166 dB | 0.3971 | 0.3536 | +0.0434 |
 
-> ⚠️ Đo trên checkpoint **1 seed**, khác nguồn với bảng accuracy multi-seed.
-> 🔬 Track model đọc **sai** lại có PSNR **cao hơn ~2 dB** (r = −0.362, n=999) — PSNR
-> **nghịch** với khả năng đọc. Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
+> ✅ Đo trên **checkpoint multi-seed seed 42** (2026-08-05), cùng nguồn với bảng
+> accuracy Mean ± Std. Val acc in ra lúc chạy: **797/999**, khớp chính xác.
+>
+> 🔬 Track model đọc **sai** lại có PSNR **cao hơn 2.30 dB** (16.124 vs 18.419,
+> **r = −0.4106**, n=999) — PSNR **nghịch** với khả năng đọc.
+> Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
 
 ## 8. Overfit
 

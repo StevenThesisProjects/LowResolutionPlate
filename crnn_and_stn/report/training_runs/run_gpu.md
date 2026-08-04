@@ -164,7 +164,7 @@ python tools/aggregate_seeds.py \
 
 ---
 
-## 4. PSNR/SSIM + hình định tính (KHÔNG train)
+## 4. PSNR/SSIM + hình định tính (KHÔNG train) — ✅ **ĐÃ CHẠY XONG (2026-08-05)**
 
 > Chạy ở đâu cũng được — inference thuần trên `.pth`. GPU ~5–10 phút/cấu hình,
 > CPU ~20 phút. Kiến trúc suy ngược từ `state_dict`, trừ `--width-downsample` và
@@ -172,6 +172,17 @@ python tools/aggregate_seeds.py \
 >
 > ⚠️ `*.pth` **không đi theo `git pull`** (112–113 MB/file). Gặp
 > `❌ Không tìm thấy checkpoint` là do thiếu file, không phải lỗi lệnh.
+
+**Kết quả đã có** (đều trên checkpoint multi-seed `*_seed42_best.pth`):
+
+| | PSNR/SSIM | Hình định tính | Val acc in ra |
+|---|:---:|:---:|---:|
+| **S1** 🎯 | ✅ `sr_quality_s1_seed42.csv` — **+0.7166 dB / +0.0434 SSIM** | ✅ 11 file | 797/999 |
+| **S4** | ✅ `sr_quality_s4_seed42.csv` — **+1.0372 dB / +0.0756 SSIM** | ✅ 11 file | 789/999 |
+| **J1** | ❌ không chạy được (không có nhánh SR) | ✅ 11 file (cột `I_SR` = placeholder) | 799/999 |
+
+✅ Val acc in ra **khớp chính xác** bảng multi-seed ở đầu tài liệu — xác nhận đúng
+checkpoint, đúng cấu hình. Phân tích: [../buoc2_metrics.md](../buoc2_metrics.md).
 
 ```bash
 # PSNR/SSIM — dùng --num-workers 0 để tái lập tuyệt đối
@@ -194,10 +205,26 @@ python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 --width-downsa
 
 ```bash
 # Figure 4 — grid 4 cột (I_LR -> I_SR -> Attention -> Prediction), 5 đúng + 5 sai
+# S1 — cấu hình chính cho Figure 4
 python tools/visualize_paper_figures.py --decode constrained --pick extreme \
   --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
   --output-dir results/multi-seed/s1_mf_sr_ocr/paper_figures
+
+# S4 — BẮT BUỘC --width-downsample 4
+python tools/visualize_paper_figures.py --decode constrained --pick extreme \
+  --width-downsample 4 \
+  --checkpoint results/multi-seed/s4_sr_scale1/s4_seed42_best.pth \
+  --output-dir results/multi-seed/s4_sr_scale1/paper_figures
+
+# J1 — chạy được, cột I_SR là placeholder "(khong co SR)", không phải lỗi
+python tools/visualize_paper_figures.py --decode constrained --pick extreme \
+  --checkpoint results/multi-seed/crnn_resblock_groupnorm_nosr_j1/j1p_seed42_best.pth \
+  --output-dir results/multi-seed/crnn_resblock_groupnorm_nosr_j1/paper_figures
 ```
+
+📌 **Track sai ở cả 3 model**: `track_19095`, `track_17959` — 2 case mạnh nhất minh hoạ
+*"giới hạn của dữ liệu"*. Danh sách đầy đủ 10 track mỗi cấu hình:
+[../tong_hop_3_lan_chay.md §Bước 3](../tong_hop_3_lan_chay.md).
 
 > ⚠️ **zsh không tách từ khi expand biến** (khác bash). Đừng gom cờ vào biến kiểu
 > `$extra` rồi truyền vào — `--width-downsample 4` sẽ thành **một** tham số và argparse
