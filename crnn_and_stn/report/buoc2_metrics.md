@@ -63,21 +63,28 @@ nguyên với `sr_scale=1`). **Con số đáng đọc là cột "Chênh"**, khô
 
 | Cấu hình | PSNR (SR) | PSNR (base) | **Chênh** | SSIM (SR) | SSIM (base) | **Chênh** |
 |---|---:|---:|---:|---:|---:|---:|
-| **S1** (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
-| **S4** (×1) | 17.5249 | 16.5011 | +1.0238 dB | 0.5027 | 0.4408 | +0.0618 |
+| **S1** (×2) | 16.5882 ± 3.1938 | 15.8717 ± 2.7812 | +0.7166 dB | 0.3971 ± 0.1952 | 0.3536 ± 0.1787 | +0.0434 |
+| **S4** (×1) | 17.4613 ± 3.1172 | 16.4241 ± 2.8200 | +1.0372 dB | 0.4955 ± 0.2060 | 0.4199 ± 0.1961 | +0.0756 |
 | **J1** (không SR) | — | — | — | — | — | — |
 
-999 track validation, mỗi track 5 frame (4.995 ảnh).
+999 track validation, mỗi track 5 frame (4.995 ảnh). ✅ **Đo trên checkpoint
+multi-seed seed 42** (`results/multi-seed/`), cùng nguồn với bảng accuracy Mean ± Std
+— đã chạy lại 2026-08-05, không còn dùng số của checkpoint 1-seed cũ.
 
+> 📌 **Số đổi so với bản 1-seed trước đó** (S1: +1.0717→+0.7166 dB, S4: +1.0238→
+> +1.0372 dB) — vì là checkpoint khác (multi-seed seed42 deterministic, không phải
+> 1-seed `benchmark=True`). Val acc in ra lúc chạy (S1 797/999, S4 789/999) khớp
+> chính xác với [multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md),
+> xác nhận đúng checkpoint.
+>
 > 🚨 **J1 không có PSNR/SSIM và không thể có** — J1 không có nhánh SR nên `I_SR`
 > **không tồn tại**; [`eval_sr_quality.py:131`](../tools/eval_sr_quality.py) chặn thẳng.
 > Đây là **giới hạn cấu trúc**, không phải thiếu sót. Hệ quả: bảng PSNR **không phủ
 > được cấu hình có điểm trung bình cao nhất** — phải nêu trong Limitations.
 >
-> ⚠️ **Số đo trên checkpoint 1 seed** (`backup/mf_sr_ocr/`), khác nguồn với bảng
-> accuracy Mean ± Std. Muốn khớp nguồn thì chạy lại `tools/eval_sr_quality.py` trên
-> checkpoint `seed42_best.pth` trong `results/multi-seed/` (inference thuần, ~5–10
-> phút/cấu hình).
+> ⏳ **Bảng tương quan "PSNR nghịch với OCR" ở mức từng track (mục 3.1 dưới đây) vẫn
+> tính từ CSV cũ** — cần CSV mới (`sr_quality_s1_seed42.csv`, `sr_quality_s4_seed42.csv`)
+> để tính lại hệ số tương quan $r$.
 
 ⚠️ **Con số dao động ~±0.05 dB giữa các lần chạy.** Pipeline degradation (blur/noise/JPEG)
 là ngẫu nhiên; cờ `--seed` chỉ seed tiến trình chính, còn `--num-workers > 0` thì mỗi

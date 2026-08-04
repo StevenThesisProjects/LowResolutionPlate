@@ -141,30 +141,22 @@ Con số đáng đọc là cột **Chênh** (so với `base` = ảnh chưa qua S
 
 | Cấu hình    | Chênh PSNR | Chênh SSIM |
 | ----------- | ---------: | ---------: |
-| **S1** (×2) | +1.0717 dB |    +0.0698 |
-| **S4** (×1) | +1.0238 dB |    +0.0618 |
+| **S1** (×2) | +0.7166 dB |    +0.0434 |
+| **S4** (×1) | +1.0372 dB |    +0.0756 |
 | **J1**      |          — |          — |
 
-> ⚠️ **Bảng trên đo trên checkpoint 1-seed cũ** (`backup/mf_sr_ocr/`), khác nguồn với
-> bảng accuracy Mean ± Std ở §Bước 1. **Chạy lại sau khi multi-seed xong**, trỏ vào
-> checkpoint seed 42 để cùng nguồn với các số khác trong bài:
->
-> ```bash
-> # S1 — BẮT BUỘC. --num-workers 0 để tái lập tuyệt đối (mặc định gây dao động ±0.05 dB)
-> python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 \
->   --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
->   --output-csv results/multi-seed/s1_mf_sr_ocr/sr_quality_s1_seed42.csv
->
-> # S4 — NÊN chạy. sr_scale=1 => BẮT BUỘC --width-downsample 4
-> python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 --width-downsample 4 \
->   --checkpoint results/multi-seed/s4_sr_scale1/s4_seed42_best.pth \
->   --output-csv results/multi-seed/s4_sr_scale1/sr_quality_s4_seed42.csv
-> ```
->
+✅ **Đo trên checkpoint multi-seed seed 42** (`results/multi-seed/`, chạy 2026-08-05)
+— cùng nguồn với bảng accuracy Mean ± Std, không còn dùng số của checkpoint 1-seed cũ.
+Val acc in ra lúc chạy (S1 797/999, S4 789/999) khớp chính xác `multi_seed_results.md`,
+xác nhận đúng checkpoint.
+
 > 🚨 **J1 vẫn không chạy được ở tool này** (khác với Bước 3) — PSNR/SSIM đo `I_SR` với
 > `I_HR`, mà **J1 không có nhánh SR nên `I_SR` không tồn tại** — giới hạn cấu trúc,
 > không phải thiếu sót. `eval_sr_quality.py:131` chặn thẳng bằng `raise SystemExit`.
 > Hệ quả: bảng PSNR **không phủ được cấu hình có điểm trung bình cao nhất**.
+>
+> ⏳ Bảng tương quan "PSNR nghịch với OCR" ở mức từng track (bên dưới) vẫn tính từ CSV
+> cũ — cần CSV mới (`sr_quality_s1_seed42.csv`, `sr_quality_s4_seed42.csv`) để cập nhật.
 >
 > ⚠️ **Không đặt PSNR tuyệt đối của S4 chung cột với S1** — S1 xuất 64×256, S4 xuất
 > 32×128, hai thang khác nhau.
