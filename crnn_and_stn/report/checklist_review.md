@@ -475,9 +475,12 @@ phản ánh OCR" mà là **"PSNR nghịch với OCR, có bằng chứng trên 99
 - [x] Chạy full 10 track trên checkpoint 1-seed → `figure4_qualitative_grid.png`
       + 10 ảnh track riêng cho mỗi cấu hình
 
-> 🚨 **J1 không có hình và không thể có**: grid 4 cột cần cột `I_SR`, mà J1 không có
-> nhánh SR nên `I_SR` **không tồn tại** (cùng lý do với PSNR ở Bước 2). Muốn có hình
-> J1 cho phụ lục thì phải đổi sang grid **3 cột**.
+> 📌 **Đính chính**: từng ghi sai "J1 không có hình và không thể có, phải đổi sang grid
+> 3 cột". Đọc lại code `tools/visualize_paper_figures.py::frame_column` mới phát hiện
+> tool đã tự chặn `frames is None` và vẽ placeholder `"(khong co SR)"` ở cột `I_SR` thay
+> vì crash — **J1 chạy được y nguyên với `--checkpoint` của nó**, không cần sửa code.
+> Cái thật sự chặn J1 là PSNR/SSIM (`tools/eval_sr_quality.py`, `raise SystemExit` ở
+> dòng 131) — mục đó ở Bước 2 vẫn đúng như đã ghi.
 >
 > ⏱️ **Thứ tự thời gian — hình chạy TRƯỚC multi-seed, không phải sau** (mtime thật):
 >
@@ -488,8 +491,8 @@ phản ánh OCR" mà là **"PSNR nghịch với OCR, có bằng chứng trên 99
 > 2026-08-04 00:34   multi-seed/j1/*.pth          ← multi-seed J1 cuối cùng
 > ```
 - [ ] 🟠 **Chọn hình cuối cho Figure 4** — việc duy nhất còn lại của Bước 3, không
-      tốn GPU, làm được ngay. ✅ **Đã chốt cấu hình: S1** → giữ được grid **4 cột**
-      (có cột `I_SR`), không phải đổi layout như khi dùng J1
+      tốn GPU, làm được ngay. ✅ **Đã chốt cấu hình: S1** → có cột `I_SR` thật (J1
+      chạy được nhưng cột đó chỉ là placeholder, chỉ hữu ích cho phụ lục)
 
 ⚠️ **Lưu ý mới sau multi-seed**: hình hiện có sinh từ checkpoint **1-seed** của
 S1–S4 (`backup/mf_sr_ocr/`), trong khi con số trong paper nay là multi-seed. Với

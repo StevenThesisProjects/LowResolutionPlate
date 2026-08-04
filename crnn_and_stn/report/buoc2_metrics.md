@@ -161,16 +161,20 @@ vẫn theo dõi được qua 2 cột `sr_loss` vs `sr_loss_bilinear` có sẵn t
 
 ## 5. Cách tạo lại số liệu
 
+> ✅ **Chạy trên checkpoint multi-seed** (seed 42), không dùng `backup/mf_sr_ocr/` (1
+> seed cũ) nữa — để số PSNR khớp nguồn với bảng accuracy Mean ± Std. Chạy sau khi
+> multi-seed đã xong.
+
 ```bash
-D=backup/mf_sr_ocr
+# S1 — BẮT BUỘC. --num-workers 0 để tái lập tuyệt đối (mặc định gây dao động ±0.05 dB)
+python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --output-csv results/multi-seed/s1_mf_sr_ocr/sr_quality_s1_seed42.csv
 
-# PSNR/SSIM — S1 dùng mặc định; S4 BẮT BUỘC --width-downsample 4 (J1 không chạy được)
-python tools/eval_sr_quality.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
-  --lr-domain-match --output-csv $D/s1_mf_sr_ocr/sr_quality_s1.csv
-
-python tools/eval_sr_quality.py --checkpoint $D/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --width-downsample 4 --lr-domain-match \
-  --output-csv $D/s4_sr_scale1/sr_quality_s4.csv
+# S4 — NÊN chạy. sr_scale=1 => BẮT BUỘC --width-downsample 4 (J1 không chạy được)
+python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 --width-downsample 4 \
+  --checkpoint results/multi-seed/s4_sr_scale1/s4_seed42_best.pth \
+  --output-csv results/multi-seed/s4_sr_scale1/sr_quality_s4_seed42.csv
 ```
 
 ⚠️ zsh không tách từ khi expand biến — đừng gom cờ vào biến rồi truyền, viết thẳng.

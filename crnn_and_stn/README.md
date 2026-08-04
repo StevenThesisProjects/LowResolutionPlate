@@ -145,10 +145,26 @@ Con số đáng đọc là cột **Chênh** (so với `base` = ảnh chưa qua S
 | **S4** (×1) | +1.0238 dB |    +0.0618 |
 | **J1**      |          — |          — |
 
-> 🚨 **Vì sao không có J1**: PSNR/SSIM đo `I_SR` với `I_HR`, mà **J1 không có nhánh SR
-> nên `I_SR` không tồn tại** — giới hạn cấu trúc, không phải thiếu sót.
-> `eval_sr_quality.py:131` chặn thẳng. Hệ quả: bảng PSNR **không phủ được cấu hình có
-> điểm trung bình cao nhất**.
+> ⚠️ **Bảng trên đo trên checkpoint 1-seed cũ** (`backup/mf_sr_ocr/`), khác nguồn với
+> bảng accuracy Mean ± Std ở §Bước 1. **Chạy lại sau khi multi-seed xong**, trỏ vào
+> checkpoint seed 42 để cùng nguồn với các số khác trong bài:
+>
+> ```bash
+> # S1 — BẮT BUỘC. --num-workers 0 để tái lập tuyệt đối (mặc định gây dao động ±0.05 dB)
+> python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 \
+>   --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+>   --output-csv results/multi-seed/s1_mf_sr_ocr/sr_quality_s1_seed42.csv
+>
+> # S4 — NÊN chạy. sr_scale=1 => BẮT BUỘC --width-downsample 4
+> python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 --width-downsample 4 \
+>   --checkpoint results/multi-seed/s4_sr_scale1/s4_seed42_best.pth \
+>   --output-csv results/multi-seed/s4_sr_scale1/sr_quality_s4_seed42.csv
+> ```
+>
+> 🚨 **J1 vẫn không chạy được ở tool này** (khác với Bước 3) — PSNR/SSIM đo `I_SR` với
+> `I_HR`, mà **J1 không có nhánh SR nên `I_SR` không tồn tại** — giới hạn cấu trúc,
+> không phải thiếu sót. `eval_sr_quality.py:131` chặn thẳng bằng `raise SystemExit`.
+> Hệ quả: bảng PSNR **không phủ được cấu hình có điểm trung bình cao nhất**.
 >
 > ⚠️ **Không đặt PSNR tuyệt đối của S4 chung cột với S1** — S1 xuất 64×256, S4 xuất
 > 32×128, hai thang khác nhau.
@@ -182,7 +198,13 @@ Mặc định `--pick extreme`: lấy case đúng **tự tin nhất** và case s
 | -------- | :--------------------: | --------------------------------------------------------------------------------------------------------------------------------- |
 | **S1**   |    ✅ **bắt buộc**     | Cấu hình chính → Figure 4 của paper. Có `I_SR` nên giữ được grid **4 cột**                                                        |
 | **S4**   |       🟡 **nên**       | Để so **cùng một track qua 2 kiến trúc** — hữu ích cho hình ablation ở phụ lục                                                    |
-| **J1**   | ❌ **không chạy được** | Không có nhánh SR → `I_SR` không tồn tại. Muốn có hình J1 thì phải sửa tool sang grid **3 cột** (`I_LR → Attention → Prediction`) |
+| **J1**   |    🟡 **chạy được**    | Không có nhánh SR, nhưng tool **tự xử lý gracefully** — cột `I_SR` hiện placeholder `"(khong co SR)"` thay vì crash, không cần sửa code. Chỉ hữu ích cho phụ lục |
+
+> 📌 **Đính chính**: trước đây ghi sai là "J1 không chạy được, phải sửa tool sang grid
+> 3 cột". Đọc lại code `tools/visualize_paper_figures.py::frame_column` mới phát hiện
+> tool đã tự chặn `frames is None` và vẽ placeholder — **không** crash, **không** cần
+> sửa gì. Cái thật sự chặn J1 là `tools/eval_sr_quality.py` (PSNR/SSIM,
+> `raise SystemExit` ở dòng 131) — mục đó vẫn đúng như đã ghi.
 
 ### Lệnh chạy
 
@@ -200,6 +222,12 @@ python tools/visualize_paper_figures.py \
   --checkpoint results/multi-seed/s4_sr_scale1/s4_seed42_best.pth \
   --width-downsample 4 --decode constrained --pick extreme \
   --output-dir results/multi-seed/s4_sr_scale1/paper_figures
+
+# TUỲ CHỌN — J1, cho phụ lục. Cột I_SR sẽ là placeholder, không phải lỗi
+python tools/visualize_paper_figures.py \
+  --checkpoint results/multi-seed/crnn_resblock_groupnorm_nosr_j1/j1p_seed42_best.pth \
+  --decode constrained --pick extreme \
+  --output-dir results/multi-seed/crnn_resblock_groupnorm_nosr_j1/paper_figures
 ```
 
 Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng
@@ -301,8 +329,8 @@ CSV đủ 14 cột · CER in console · **Val Acc khớp chính xác khi chấm 
 6. **PSNR/SSIM đo trên checkpoint 1 seed**, khác nguồn với bảng accuracy Mean ± Std.
 7. **Chưa chạy test lần nào** — mọi số là validation Scenario-B (999 track);
    PSNR/SSIM đo trên **cặp synthetic**.
-8. **Hình Bước 3 chưa sinh lại** từ checkpoint multi-seed; **J1 không thể có hình**
-   grid 4 cột.
+8. **Hình Bước 3 chưa sinh lại** từ checkpoint multi-seed cho S1/S4 (bắt buộc/nên).
+   J1 **chạy được** nhưng cột `I_SR` chỉ là placeholder — không có nhánh SR để vẽ.
 9. Thiếu `log_j1p_seed42.txt` (CSV/submission/checkpoint vẫn đủ).
 10. **Biên nhiễu ±13 track (±1.3 điểm)** trên val 999 track — chênh nhỏ hơn ngưỡng này
     không kết luận được.
