@@ -809,22 +809,26 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
 ```bash
 ## Phương án B — train lại toàn bộ data rồi predict test.
 ## ⚠️ --submission-mode TRAIN LẠI TỪ ĐẦU và TẮT early stopping, không phải chỉ inference.
-## Đổi --epochs theo epoch tốt nhất của S1 (24-32), KHÔNG để 60.
+## --epochs 28 = trung bình best epoch S1 qua 3 seed (28/32/24), tính từ
+## results/multi-seed/s1_mf_sr_ocr/history_s1_seed*.csv
 python train.py \
-  --preset stable --experiment-name submission_final \
-  --epochs <epoch_tot_nhat> --batch-size 32 --grad-accum-steps 2 \
+  --preset stable --experiment-name submission_s1_final \
+  --epochs 28 --batch-size 32 --grad-accum-steps 2 \
   --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
   --backbone-norm group --lr-domain-match \
   --decode constrained --use-ema \
   --submission-mode --num-workers 8 --aug-level full \
-  2>&1 | tee results/log_submission.txt
+  2>&1 | tee results/log_submission_s1.txt
 ```
 
 > ⚠️ Cờ trên đã đổi sang cấu hình **S1** (Lần chạy 2) theo quyết định chốt phương pháp.
 > Chạy đủ 60 epoch ở chế độ này sẽ **lưu ra model của epoch cuối, đã overfit nặng**
 > (S1 đỉnh val ở epoch 24–32 rồi tụt).
 >
+> ⚠️ Model ra từ lệnh này **khác** 3 checkpoint `s1_seed*_best.pth` đã có — train mới
+> trên 20.000 track (thêm 5%, gồm cả val), không phải checkpoint cũ được inference lại.
+>
 > **Phương án an toàn hơn**: dùng lại checkpoint đã được validate, chỉ chạy inference
 > trên test — số val và số test đến từ **cùng một model**. Hiện chưa có tool
 > (`tools/eval_decode.py` chỉ chạy `mode="val"`), cần viết thêm ~1 giờ.
-> Phân tích đánh đổi: [paper/paper_revision_plan.md §2b](paper/paper_revision_plan.md).
+> Phân tích đánh đổi: [paper/paper_revision_plan.md §3](paper/paper_revision_plan.md).

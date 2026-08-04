@@ -296,23 +296,28 @@ Mọi số ở trên đều là **validation**. Chỉ chạy test sau khi đã c
 > Chạy đủ 60 epoch ở chế độ này sẽ **lưu ra model của epoch cuối, đã overfit nặng**
 > (S1 đỉnh val ở epoch 24–32).
 >
-> → Nếu dùng, **bắt buộc đặt `--epochs` bằng epoch tốt nhất học được từ validation**.
+> → Nếu dùng, **bắt buộc đặt `--epochs` bằng epoch tốt nhất học được từ validation**
+> (S1: trung bình **28** qua 3 seed 28/32/24 — tính từ
+> `results/multi-seed/s1_mf_sr_ocr/history_s1_seed*.csv`).
 
 ```bash
 python train.py \
-  --preset stable --experiment-name submission_final \
-  --epochs <epoch_tot_nhat> --batch-size 32 --grad-accum-steps 2 \
+  --preset stable --experiment-name submission_s1_final \
+  --epochs 28 --batch-size 32 --grad-accum-steps 2 \
   --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
   --backbone-norm group --lr-domain-match \
   --decode constrained --use-ema \
   --submission-mode --num-workers 8 --aug-level full \
-  2>&1 | tee results/log_submission.txt
+  2>&1 | tee results/log_submission_s1.txt
 ```
+
+> ⚠️ Model ra từ lệnh này **khác** 3 checkpoint `s1_seed*_best.pth` đã có — train mới
+> trên 20.000 track (thêm 5%, gồm cả val), không phải checkpoint cũ được inference lại.
 
 **Phương án an toàn hơn (khuyến nghị)**: dùng lại checkpoint đã được validate, chỉ chạy
 inference trên test — số val và số test đến từ **cùng một model**. Hiện chưa có tool
 (`tools/eval_decode.py` chỉ chạy `mode="val"`), cần viết thêm ~1 giờ.
-Phân tích đánh đổi: [../paper/paper_revision_plan.md §2b](../paper/paper_revision_plan.md).
+Phân tích đánh đổi: [../paper/paper_revision_plan.md §3](../paper/paper_revision_plan.md).
 
 Test public 1.000 track, test blind 3.000 track — file ra là
 `submission_<tên>_final.txt`, khác `submission_<tên>.txt` (dự đoán validation).

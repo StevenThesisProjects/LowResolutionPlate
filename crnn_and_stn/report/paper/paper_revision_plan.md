@@ -90,6 +90,28 @@ tạo ra một model mà **không cách nào biết nó tốt hay xấu** trư�
 Nếu vẫn muốn B: chạy **cả hai**, nộp bản A trước để có mốc an toàn, rồi so bản B trên
 public test.
 
+**Lệnh phương án B, sẵn để chạy** (`--epochs 28` = trung bình best epoch của S1 qua
+3 seed: 28/32/24 — tính từ `results/multi-seed/s1_mf_sr_ocr/history_s1_seed*.csv`):
+
+```bash
+python train.py \
+  --preset stable --experiment-name submission_s1_final \
+  --epochs 28 --batch-size 32 --grad-accum-steps 2 \
+  --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
+  --backbone-norm group --lr-domain-match \
+  --decode constrained --use-ema \
+  --submission-mode --num-workers 8 --aug-level full \
+  2>&1 | tee results/log_submission_s1.txt
+```
+
+> ⚠️ Model ra từ lệnh này **khác hẳn** 3 checkpoint `s1_seed*_best.pth` đã có — đây là
+> 1 lần train mới trên 20.000 track (thêm 5% dữ liệu, gồm cả 999 track val), dùng seed
+> mặc định của `--preset stable`. Số val đã có (79.78–80.08%) **không phải** số của
+> chính model này.
+>
+> Phương án A (khuyến nghị, dùng `s1_seed42_best.pth` có sẵn + inference thuần trên
+> test) **chưa có lệnh sẵn** — cần viết thêm tool trước (~1 giờ, xem bảng trên).
+
 ### Thứ tự đúng
 
 ```

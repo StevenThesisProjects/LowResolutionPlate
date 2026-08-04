@@ -526,8 +526,9 @@ nhưng cách A vẫn sạch hơn nếu còn thời gian.
       ✅ **S1** (2026-08-04), chọn vì std nhỏ nhất (0.15) và bất biến với
       `cudnn.benchmark`. Quyết định này được chốt khi **chưa** có bất kỳ số test nào
 - [ ] Inference test public — ⚠️ `--submission-mode` **train lại từ đầu và tắt early
-      stopping**, không phải chỉ inference; xem
-      [paper/paper_revision_plan.md §2b](paper/paper_revision_plan.md)
+      stopping**, không phải chỉ inference; lệnh sẵn dùng (`--epochs 28`, trung bình
+      best epoch 3 seed S1) + phân tích 2 phương án A/B ở
+      [paper/paper_revision_plan.md §3](paper/paper_revision_plan.md)
 - [ ] Test blind cuối cùng
 
 ---

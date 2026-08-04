@@ -352,6 +352,7 @@ CSV đủ 14 cột · CER in console · **Val Acc khớp chính xác khi chấm 
 - [ ] 📏 **Benchmark GFLOPs/latency cho S4** — `tools/benchmark.py` thiếu cờ `--sr-scale`
       và `--width-downsample`. _(Phút/epoch thì đã có **số đo thật** từ cột
       `epoch_time_s` của 424 epoch, không cần chạy lại.)_
-- [ ] Chạy test — xem [`paper_revision_plan.md §3`](report/paper/paper_revision_plan.md)
-      trước, vì `--submission-mode` **train lại từ đầu và tắt early stopping**
+- [ ] Chạy test — lệnh sẵn dùng (`--epochs 28`, trung bình best epoch 3 seed S1) ở
+      [`paper_revision_plan.md §3`](report/paper/paper_revision_plan.md);
+      đọc trước vì `--submission-mode` **train lại từ đầu và tắt early stopping**
 - [ ] Nhóm 3 — chống overfitting (Future work) · Bước 4 — PARSeq/SVTR
