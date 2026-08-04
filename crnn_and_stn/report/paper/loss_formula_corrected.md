@@ -12,7 +12,43 @@
 
 ## 1. Khối công thức chính — DÁN THAY CHO KHỐI CŨ
 
-### 1.1. Bản LaTeX (Overleaf)
+### 1.1. 👁️ Bản HIỂN THỊ — đọc/review trực tiếp ở đây
+
+Hàm mất mát tổng:
+
+$$\mathcal{L}_{\text{Total}} = \mathcal{L}_{\text{CTC}} + \lambda_{\text{SR}} \cdot \mathcal{L}_{\text{SR}}$$
+
+Thành phần SR:
+
+$$\mathcal{L}_{\text{SR}} = \underbrace{\frac{1}{N}\sum_{i=1}^{N} \left\| I_{\text{SR}}^{(i)} - \mathrm{Warp}_{\mathrm{sg}[\theta_i]}\!\left(I_{\text{HR}}^{(i)}\right) \right\|_1}_{\text{L1 thuần — không phải Smooth L1}} + \alpha \cdot \mathcal{L}_{\text{VGG}}$$
+
+Quy đổi sang ký hiệu quen thuộc trong review:
+
+$$\lambda_{\text{Perceptual}} = \lambda_{\text{SR}} \cdot \alpha$$
+
+**Đọc từng ký hiệu:**
+
+| Ký hiệu | Nghĩa |
+|---|---|
+| $\mathcal{L}_{\text{CTC}}$ | CTC loss cho chuỗi 7 ký tự biển số |
+| $I_{\text{SR}}^{(i)}$ | ảnh SR do model sinh ra cho frame $i$ — **không** bị warp |
+| $I_{\text{HR}}^{(i)}$ | ảnh HR ground-truth của frame $i$ |
+| $\theta_i$ | tham số affine **6 chiều** do STN sinh ra cho frame $i$ |
+| $\mathrm{sg}[\cdot]$ | **stop-gradient** — gradient của $\mathcal{L}_{\text{SR}}$ **không** chảy ngược vào STN |
+| $\mathrm{Warp}_{\mathrm{sg}[\theta_i]}(\cdot)$ | nắn ảnh HR về đúng khung mà STN đã nắn, nhưng chặn gradient |
+| $\lVert \cdot \rVert_1$ | chuẩn **L1** (`F.l1_loss`), **không** phải Smooth L1 |
+| $\alpha$ | trọng số perceptual — **bằng 0** ở mọi cấu hình báo cáo |
+| $N$ | số ảnh có HR target trong batch (đã flatten sample × frame) |
+
+**Diễn giải bằng lời** (dùng được luôn cho phần Method):
+
+> Tổng loss gồm CTC cho nhận dạng ký tự, cộng thêm $\lambda_{\text{SR}} = 0.1$ nhân
+> với loss tái tạo pixel. Loss tái tạo so ảnh SR **trực tiếp** với ảnh HR đã được nắn
+> theo cùng phép biến đổi affine của STN — chỉ warp **một vế** (ảnh HR), vì ảnh SR vốn
+> đã nằm trong khung đã nắn. Phép warp này **chặn gradient**, nên nhánh SR chỉ được
+> phép làm ảnh nét hơn chứ không kéo STN về hình học dễ tái tạo nhất.
+
+### 1.2. 📋 Bản LaTeX thô — copy vào Overleaf
 
 ```latex
 \begin{equation}
@@ -30,18 +66,11 @@
   + \alpha \cdot \mathcal{L}_{\text{VGG}}
 \label{eq:sr}
 \end{equation}
+
+% Quy đổi: \lambda_{\text{Perceptual}} = \lambda_{\text{SR}} \cdot \alpha
 ```
 
-Với $\mathrm{sg}[\cdot]$ là toán tử **stop-gradient** và $\theta_i$ là tham số affine
-6 chiều do STN sinh ra cho frame $i$.
-
-**Quan hệ với ký hiệu $\lambda_{\text{Perceptual}}$ quen thuộc:**
-
-```latex
-\lambda_{\text{Perceptual}} = \lambda_{\text{SR}} \cdot \alpha
-```
-
-### 1.2. Bản Unicode (Word)
+### 1.3. ✍️ Bản Unicode — copy vào Word
 
 ```
 L_Total = L_CTC + λ_SR · L_SR
@@ -51,7 +80,7 @@ L_SR    = (1/N) Σᵢ ‖ I_SR⁽ⁱ⁾ − Warp_sg[θᵢ](I_HR⁽ⁱ⁾) ‖₁
 λ_Perceptual = λ_SR · α
 ```
 
-### 1.3. Giá trị siêu tham số
+### 1.4. Giá trị siêu tham số
 
 | Cấu hình | $\lambda_{\text{SR}}$ | $\alpha$ | $\lambda_{\text{Perceptual}}$ hiệu dụng |
 |---|---:|---:|---:|
