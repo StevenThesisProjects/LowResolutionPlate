@@ -140,7 +140,7 @@ Tăng trọng số SR (S2) **làm ảnh đẹp hơn thật** — hơn gấp đô
 mục 3.1.
 
 Đây là bằng chứng số cho nguyên tắc đã đặt ra từ đầu project trong
-[super_resolution_experiments.md](summary_project/document/super_resolution_experiments.md):
+[super_resolution_experiments.md](../backup/report/summary_project/document/super_resolution_experiments.md):
 *"đánh giá SR bằng OCR exact-match, không phải PSNR/SSIM; ưu tiên đọc được biển số hơn
 đẹp ảnh"*. Trước đây đó mới là lập luận thiết kế; nay có bằng chứng ở **cả hai mức** —
 4 cấu hình và 999 track.
@@ -175,7 +175,7 @@ vẫn theo dõi được qua 2 cột `sr_loss` vs `sr_loss_bilinear` có sẵn t
 ## 5. Cách tạo lại số liệu
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 # PSNR/SSIM — S1/S2/S3 dùng mặc định; S4 BẮT BUỘC --width-downsample 4
 python tools/eval_sr_quality.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \

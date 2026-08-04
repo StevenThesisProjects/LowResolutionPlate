@@ -6,17 +6,17 @@ Chỉ lệnh + kết quả. Phân tích tại [../baseline1_crnn_stn/](../baseli
 metrics, hình) — checklist ở [mục 0](#0-chạy-theo-thứ-tự-này-checklist-cho-đợt-revision),
 theo dõi tiến độ ở [../checklist_review.md](../checklist_review.md).
 
-> **Dữ liệu S1–S4 nằm ở `results/mf_sr_ocr/<cấu hình>/`** (đã chuyển khỏi
+> **Dữ liệu S1–S4 nằm ở `backup/mf_sr_ocr/<cấu hình>/`** (đã chuyển khỏi
 > `report/csv-report-process/`). Thư mục `results/` bị **gitignore** → nhớ backup riêng.
 
 **S1 đã chạy — 79.78% (797/999 track), vượt J2 26 track.** Phân tích đầy đủ:
 [s1_proposed_mf_sr_ocr.md](../baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md).
 
 **S2 đã chạy — 79.48% (794/999 track), chênh S1 chỉ 3 track (trong biên nhiễu,
-không cải thiện).** [s2_lam05_mf_sr_ocr.md](../baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md).
+không cải thiện).** [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md).
 
 **S3 đã chạy — 80.58% (805/999 track), điểm cao nhất đã đo, +8 track so với S1
-(vẫn trong biên nhiễu, chưa kết luận chắc).** [s3_perceptual_mf_sr_ocr.md](../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md).
+(vẫn trong biên nhiễu, chưa kết luận chắc).** [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md).
 
 **S4 đã chạy — 80.58% (805/999 track), hoà tuyệt đối với S3 (mô hình khác nhau,
 185/999 dự đoán khác nhau).** SR scale=1 (không phóng to ảnh) + `T=32` qua
@@ -29,8 +29,8 @@ chính, không phải bản thân việc SR phóng to ảnh.
 
 > Val 999 track → biên nhiễu **±1.3 điểm (±13 track)**. Chênh lệch nhỏ hơn = nhiễu.
 
-> 🆕 **J1/J2 lịch sử vẫn còn artefact trên đĩa** — `results/crnn_resblock_groupnorm_nosr_j1/`
-> (`.pth` + submission) và `results/crnn_resblock_sr_supervised_j2/` (`.pth` + CSV +
+> 🆕 **J1/J2 lịch sử vẫn còn artefact trên đĩa** — `backup/crnn_resblock_groupnorm_nosr_j1/`
+> (`.pth` + submission) và `backup/crnn_resblock_sr_supervised_j2/` (`.pth` + CSV +
 > `log_j2.txt` + submission). Đã chấm lại: **768/999** và **771/999**, khớp chính xác
 > 76.88% / 77.18%. ⚠️ **Lệnh J2 ở [mục 2](#2-kết-quả-đã-có-mốc-tham-chiếu) thiếu
 > `--sr-edge-weight 0.5`** (chỉ quan trọng nếu sau này chạy lại J2 — hiện J2 đã ra
@@ -90,52 +90,52 @@ pip install scikit-image        # cho PSNR/SSIM; thiếu thì chỉ có PSNR
 
 #### ✅ B1a — PSNR/SSIM: ĐÃ CHẠY XONG CẢ 4 CẤU HÌNH
 
-Kết quả ở `results/mf_sr_ocr/<cấu hình>/sr_quality_*.csv` (999 dòng mỗi file).
+Kết quả ở `backup/mf_sr_ocr/<cấu hình>/sr_quality_*.csv` (999 dòng mỗi file).
 Số liệu + phân tích: [../buoc2_metrics.md](../buoc2_metrics.md).
 
 Chỉ chạy lại nếu cần (lưu ý **chỉ S4 mới có `--width-downsample 4`**):
 
 ```bash
 python tools/eval_sr_quality.py --lr-domain-match \
-  --checkpoint results/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
-  --output-csv results/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv
+  --checkpoint backup/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-csv backup/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv
 
 python tools/eval_sr_quality.py --lr-domain-match \
-  --checkpoint results/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
-  --output-csv results/mf_sr_ocr/s2_mf_sr_ocr_lam05/sr_quality_s2.csv
+  --checkpoint backup/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --output-csv backup/mf_sr_ocr/s2_mf_sr_ocr_lam05/sr_quality_s2.csv
 
 python tools/eval_sr_quality.py --lr-domain-match \
-  --checkpoint results/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
-  --output-csv results/mf_sr_ocr/s3_l_perceptual/sr_quality_s3.csv
+  --checkpoint backup/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
+  --output-csv backup/mf_sr_ocr/s3_l_perceptual/sr_quality_s3.csv
 
 python tools/eval_sr_quality.py --lr-domain-match --width-downsample 4 \
-  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --output-csv results/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv
+  --checkpoint backup/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --output-csv backup/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv
 ```
 
 #### ✅ B1b — Hình định tính (Bước 3 của review): ĐÃ CHẠY XONG CẢ 4
 
-Kết quả ở `results/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
+Kết quả ở `backup/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
 `figure4_qualitative_grid.png` + 10 ảnh từng track (5 đúng `NN_ok_*`, 5 sai `NN_err_*`).
 
 Lệnh để chạy lại (inference thuần, không train — GPU nhanh, CPU ~20 phút/cấu hình):
 
 ```bash
 python tools/visualize_paper_figures.py \
-  --checkpoint results/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
-  --output-dir results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures
+  --checkpoint backup/mf_sr_ocr/s1_mf_sr_ocr/mf_sr_ocr.pth \
+  --output-dir backup/mf_sr_ocr/s1_mf_sr_ocr/paper_figures
 
 python tools/visualize_paper_figures.py \
-  --checkpoint results/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
-  --output-dir results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures
+  --checkpoint backup/mf_sr_ocr/s2_mf_sr_ocr_lam05/s2_lam05_best.pth \
+  --output-dir backup/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures
 
 python tools/visualize_paper_figures.py \
-  --checkpoint results/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
-  --output-dir results/mf_sr_ocr/s3_l_perceptual/paper_figures
+  --checkpoint backup/mf_sr_ocr/s3_l_perceptual/s3_perceptual_best.pth \
+  --output-dir backup/mf_sr_ocr/s3_l_perceptual/paper_figures
 
 python tools/visualize_paper_figures.py --width-downsample 4 \
-  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
-  --output-dir results/mf_sr_ocr/s4_sr_scale1/paper_figures
+  --checkpoint backup/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --output-dir backup/mf_sr_ocr/s4_sr_scale1/paper_figures
 ```
 
 Mỗi lệnh xuất `figure4_qualitative_grid.png` (5 case đúng + 5 case sai) + ảnh từng
@@ -351,8 +351,8 @@ chứng gián tiếp rằng `T=32` (không phải bản thân việc SR phóng t
 tố chính đứng sau lợi ích đo được ở S1 — xem mục 5 và
 [s4_sr_scale1_mf_sr_ocr.md §3](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md#3-trả-lời-câu-hỏi-t-confound--kết-quả-chính-của-s4).
 Chi tiết + giới hạn cần nêu: [s1_proposed_mf_sr_ocr.md](../baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md),
-[s2_lam05_mf_sr_ocr.md](../baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md),
-[s3_perceptual_mf_sr_ocr.md](../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md),
+[s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md),
+[s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md),
 [s4_sr_scale1_mf_sr_ocr.md](../baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
 
 **Chi phí compute** (`tools/benchmark.py --all`, CPU). Hai bảng khác nhau vì
@@ -413,7 +413,7 @@ Nếu vẫn muốn chấm lại một checkpoint bất kỳ (kiến trúc suy ng
 
 ```bash
 python tools/eval_decode.py \
-  --checkpoint results/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
+  --checkpoint backup/mf_sr_ocr/s4_sr_scale1/s4_sr_scale1_best.pth \
   --width-downsample 4
 ```
 
@@ -444,7 +444,7 @@ python train.py \
 
 ## S2 — λ_SR = 0.5 (đầu kia khoảng review đề xuất) — ĐÃ CHẠY: 79.48% (794/999),
 ##      early-stopped epoch 56, đỉnh epoch 38 — chênh S1 chỉ 3 track (biên nhiễu),
-##      không cải thiện. Chi tiết: ../baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md
+##      không cải thiện. Chi tiết: ../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md
 ##      (run này không dùng `tee`, không có log_s2.txt)
 python train.py \
   --preset stable --experiment-name s2_lam05 \
@@ -457,7 +457,7 @@ python train.py \
 ## S3 — + L_Perceptual (số hạng α=0.1) — ĐÃ CHẠY: 80.58% (805/999), điểm cao
 ##      nhất đã đo, early-stopped epoch 43, đỉnh epoch 25 (sớm hơn S1/S2 rõ rệt).
 ##      +8 track so với S1 — vẫn trong biên nhiễu ±13, chưa kết luận chắc chắn.
-##      Chi tiết: ../baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md
+##      Chi tiết: ../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md
 ##      (run này không dùng `tee`, không có log_s3.txt)
 python train.py \
   --preset stable --experiment-name s3_perceptual \
@@ -512,7 +512,7 @@ Chưa có heatmap. Cần `pip install matplotlib`.
 > [model_comparison_summary.md §1b](../baseline1_crnn_stn/model_comparison_summary.md#1b-biểu-đồ-so-sánh-trực-quan).
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 ## Val Exact Match + Loss theo epoch — so S1 vs S3 vs S4
 python tools/plot_results.py curves \
@@ -570,7 +570,7 @@ python tools/visualize.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
 
 ### PSNR/SSIM của nhánh SR
 
-> Kết quả S1–S4 nằm ở `results/mf_sr_ocr/<cấu hình>/`. Ghi `--output-csv` vào **đúng
+> Kết quả S1–S4 nằm ở `backup/mf_sr_ocr/<cấu hình>/`. Ghi `--output-csv` vào **đúng
 > folder của cấu hình đó** để mọi thứ của một run nằm cùng chỗ.
 >
 > ⚠️ `results/` bị **gitignore** → toàn bộ dữ liệu này không được git theo dõi. Nhớ
@@ -578,7 +578,7 @@ python tools/visualize.py --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
 > đó mới được commit).
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 # S1 (sr_scale=2, width/8)
 python tools/eval_sr_quality.py \
@@ -621,7 +621,7 @@ Xuất ra: PSNR/SSIM của SR **và** của mốc `base` (không học), kèm ch
 ### Figure định tính 4 cột (I_LR → I_SR → Attention → Prediction)
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 python tools/visualize_paper_figures.py \
   --checkpoint $D/s4_sr_scale1/s4_sr_scale1_best.pth \

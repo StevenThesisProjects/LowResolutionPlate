@@ -14,12 +14,12 @@
 > Chi tiết: [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
 >
 > Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `results/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
+> Dữ liệu nguồn: `backup/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
 > `log_s1.txt`, `submission_s1_proposed.txt`, `sr_quality_s1.csv`, `mf_sr_ocr.pth`.
 > 3 ablation tách từ S1 đã chạy — xem
-> [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
+> [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
 > biên nhiễu, không cải thiện),
-> [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) (+L_Perceptual: **hơn
+> [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md) (+L_Perceptual: **hơn
 > S1 8 track, đồng hạng cao nhất đã đo**) và
 > [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) (SR scale=1, không phóng
 > to ảnh: **hoà tuyệt đối với S3**, bằng chứng nghiêng về `T=32` là yếu tố chính
@@ -183,8 +183,8 @@ Tương quan âm nghĩa là track model **đọc sai** lại có PSNR **cao hơn
 16.29 ở track đọc đúng) — nhất quán với 3 cấu hình còn lại. Chi tiết + giải thích:
 [../buoc2_metrics.md](../buoc2_metrics.md).
 
-Dữ liệu: `results/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv` (999 dòng).
-Hình định tính (5 đúng + 5 sai): `results/mf_sr_ocr/s1_mf_sr_ocr/paper_figures/`.
+Dữ liệu: `backup/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv` (999 dòng).
+Hình định tính (5 đúng + 5 sai): `backup/mf_sr_ocr/s1_mf_sr_ocr/paper_figures/`.
 
 ---
 
@@ -222,7 +222,7 @@ baseline gốc 77.00%), và phần lớn cải thiện đến từ kiến trúc/
 cũng cho bằng chứng học được thật (vượt bilinear, khoảng cách nới rộng theo
 thời gian) — khác hẳn kết luận "chưa chứng minh được giá trị" đã đặt ra cho J2.
 
-**Cập nhật — S2 (λ_SR=0.5) đã chạy** (xem [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md)):
+**Cập nhật — S2 (λ_SR=0.5) đã chạy** (xem [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md)):
 794/999 (79.48%), kém S1 đúng 3 track — nằm sâu trong biên nhiễu ±13, tức tăng
 `λ_SR` từ 0.1 lên 0.5 **không cải thiện**. Trả lời được câu hỏi để ngỏ ở trên:
 trong 2 điểm đã đo của khoảng đề xuất `λ_SR ∈ [0.1, 0.5]`, đầu thấp (0.1, cấu hình
@@ -231,7 +231,7 @@ S1) vẫn tốt hơn hoặc bằng đầu cao — không có lý do đổi sang 
 thay vì chỉ chọn 1 cấu hình theo điểm tổng.
 
 **Cập nhật — S3 (+L_Perceptual α=0.1) đã chạy** (xem
-[s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md)): 805/999 (80.58%),
+[s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md)): 805/999 (80.58%),
 **hơn S1 8 track** — điểm cao nhất trong toàn bộ lịch sử thử nghiệm, nhưng 8 track
 vẫn nằm trong biên nhiễu ±13 nên chưa đủ để khẳng định chắc chắn tốt hơn S1 (khác
 S2, vốn cho kết quả âm tính rõ ràng). Đây là tín hiệu tích cực đầu tiên kể từ S1

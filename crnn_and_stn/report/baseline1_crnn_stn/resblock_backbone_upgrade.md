@@ -89,4 +89,4 @@ Xem đầy đủ các lệnh CLI thực tế đã chạy (kèm kết quả) tạ
 
 ## 8. Kết luận
 
-Nâng cấp này giữ nguyên triết lý của CRNN + STN cho OCR, nhưng làm backbone tốt hơn theo hướng ResBlock/SR, đồng thời bổ sung các điều kiện train thực tế như warmup, accumulation và early stopping. Đây là bước cải thiện quan trọng nhất đã đo được cho tới nay trên bài toán biển số low-resolution nhiều frame (~76.68% exact match), và là baseline mới để so sánh các hướng Super Resolution — xem [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md).
+Nâng cấp này giữ nguyên triết lý của CRNN + STN cho OCR, nhưng làm backbone tốt hơn theo hướng ResBlock/SR, đồng thời bổ sung các điều kiện train thực tế như warmup, accumulation và early stopping. Đây là bước cải thiện quan trọng nhất đã đo được cho tới nay trên bài toán biển số low-resolution nhiều frame (~76.68% exact match), và là baseline mới để so sánh các hướng Super Resolution — xem [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md).

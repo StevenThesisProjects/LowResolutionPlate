@@ -507,7 +507,7 @@ Review không chỉ định các chỉ số này đo trên checkpoint multi-seed
 |---|---|---|---|
 | **CER / NED** | ✅ **Trong training loop, cả 9 run multi-seed** | `Trainer.validate()` → console mỗi epoch + 2 cột CSV | **Cả 3 lần chạy, có Mean ± Std** |
 | **CER / NED** (bổ sung) | Tính lại hậu kỳ từ `submission_*.txt` | không cần train lại | S1–S4 + J1/J2 lịch sử (1 seed) |
-| **PSNR / SSIM** | ⚠️ **Hậu kỳ, trên checkpoint 1-SEED** ở `results/mf_sr_ocr/` | `tools/eval_sr_quality.py` | **Chỉ S1–S4, KHÔNG có multi-seed, KHÔNG có J1** |
+| **PSNR / SSIM** | ⚠️ **Hậu kỳ, trên checkpoint 1-SEED** ở `backup/mf_sr_ocr/` | `tools/eval_sr_quality.py` | **Chỉ S1–S4, KHÔNG có multi-seed, KHÔNG có J1** |
 
 > 🚨 **Hai hệ quả phải nêu trong paper:**
 > 1. **PSNR/SSIM chưa có error bar** — đo trên checkpoint 1 seed, khác nguồn với bảng
@@ -548,7 +548,7 @@ hai đại lượng **không đi cùng chiều**. Đáng nêu trong paper.
 ### 2.2. PSNR và SSIM
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 python tools/eval_sr_quality.py --lr-domain-match \
   --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \
@@ -671,11 +671,11 @@ mtime thật trên đĩa:
 
 | Đã sinh hình cho | Nguồn checkpoint | Có multi-seed không |
 |---|---|---|
-| S1, S2, S3, S4 | `results/mf_sr_ocr/<cfg>/*.pth` — **1 seed** | ❌ |
+| S1, S2, S3, S4 | `backup/mf_sr_ocr/<cfg>/*.pth` — **1 seed** | ❌ |
 | **Lần 1 — J1** | **chưa sinh** | ❌ |
 
 ```bash
-D=results/mf_sr_ocr
+D=backup/mf_sr_ocr
 
 python tools/visualize_paper_figures.py \
   --checkpoint $D/s1_mf_sr_ocr/mf_sr_ocr.pth \

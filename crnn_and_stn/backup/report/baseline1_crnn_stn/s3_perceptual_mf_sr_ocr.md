@@ -2,13 +2,13 @@
 
 > ⚠️ **1 seed, `benchmark=True` — chưa xác nhận.** Phạm vi multi-seed đã chốt
 > (2026-08-03) là **3 model J1 + S1 + S4**, không có S3 — lý do chi phí ở
-> [../checklist_review.md](../checklist_review.md). 805/999 vẫn là điểm 1-seed
+> [../checklist_review.md](../../../report/checklist_review.md). 805/999 vẫn là điểm 1-seed
 > cao nhất từng đo, nhưng không có error bar; đừng báo cáo như số cuối cho paper.
 >
-> Kết quả của cấu hình S3 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+> Kết quả của cấu hình S3 trong [../training_runs/run_gpu.md](../../../report/training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s3_l_perceptual/history_s3_perceptual.csv`,
 > `submission_s3_perceptual.txt`. Không có `log_s3.txt` (không chạy `tee` khi train run này).
-> So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) — S3 chỉ khác S1
+> So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](../../../report/baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md) — S3 chỉ khác S1
 > đúng 1 tham số, giống cách S2 khác S1.
 
 ## 1. Cấu hình đã chạy
@@ -106,7 +106,7 @@ rằng chính `λ_SR` cao (không phải perceptual) là thứ kéo quỹ đạo
 train loss tiếp tục giảm, nhưng S3 chạm đáy **sớm nhất**. Perceptual loss có thể
 đã cung cấp gradient signal "đặc" hơn (VGG feature space) giúp model học nhanh hơn
 ở giai đoạn đầu, nhưng cũng khiến overfit bắt đầu sớm hơn tương ứng — nhất quán với
-nhận định đã lặp lại ở [groupnorm_sr_ablation_j1_j2.md §5](groupnorm_sr_ablation_j1_j2.md#5-overfit--cùng-pattern-ở-cả-2-run)
+nhận định đã lặp lại ở [groupnorm_sr_ablation_j1_j2.md §5](../../../report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md#5-overfit--cùng-pattern-ở-cả-2-run)
 rằng dataset ~19,000 track là dư cho 60-80 epoch, dư địa nên nhắm vào chống overfit.
 
 ## 4b. Metrics bổ sung theo review Bước 2
@@ -128,7 +128,7 @@ match (805/999) nhưng S3 có CER thấp hơn (0.0522 so với 0.0532), tức kh
 S3 gần như bằng S1 (+1.086 vs +1.072 dB). Lợi ích của nó (nếu có) nằm ở OCR chứ không ở
 chất lượng tái tạo.
 
-Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
+Chi tiết: [../buoc2_metrics.md](../../../report/buoc2_metrics.md).
 Dữ liệu: `results/mf_sr_ocr/s3_l_perceptual/sr_quality_s3.csv`.
 Hình định tính: `results/mf_sr_ocr/s3_l_perceptual/paper_figures/`.
 
@@ -159,5 +159,5 @@ và +11 so với S2 — nhưng khoảng cách với S1 vẫn nằm trong biên n
 lập luận "T=32 confound" (câu hỏi mà chính S4 đặt ra ở §3 file này thực ra thuộc
 về S4) bằng mốc nền J1 có error bar, thay vì multi-seed thêm một ablation loss
 (S3) vốn đã đồng hạng với S4. Lý do đầy đủ:
-[../checklist_review.md](../checklist_review.md). CER của S3 (0.0522, tốt nhất 4
+[../checklist_review.md](../../../report/checklist_review.md). CER của S3 (0.0522, tốt nhất 4
 cấu hình) vẫn là một tín hiệu đáng nêu trong paper, kèm nhãn "1 seed, chưa xác nhận".

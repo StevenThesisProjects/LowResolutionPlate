@@ -67,8 +67,8 @@ J2 > J1 (+0.30) và > ResBlock (+0.50), nhưng so với **baseline chuẩn chỉ
 ## 3b. ✅ Xác minh lại từ checkpoint + submission (2026-08-03)
 
 Cả 2 run vẫn còn đủ artefact trên đĩa, nên đã **chấm lại trực tiếp** thay vì tin số
-cũ. Dữ liệu: `results/crnn_resblock_groupnorm_nosr_j1/`,
-`results/crnn_resblock_sr_supervised_j2/`.
+cũ. Dữ liệu: `backup/crnn_resblock_groupnorm_nosr_j1/`,
+`backup/crnn_resblock_sr_supervised_j2/`.
 
 | Chỉ số | J1 | J2 | Ghi chú |
 |---|---:|---:|---|

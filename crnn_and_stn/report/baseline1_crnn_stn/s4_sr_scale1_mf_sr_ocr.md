@@ -15,10 +15,10 @@
 > [../checklist_review.md](../checklist_review.md).
 >
 > Kết quả của cấu hình S4 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `results/mf_sr_ocr/s4_sr_scale1/history_s4_sr_scale1.csv`,
+> Dữ liệu nguồn: `backup/mf_sr_ocr/s4_sr_scale1/history_s4_sr_scale1.csv`,
 > `log_s4.txt`, `submission_s4_sr_scale1.txt`.
 > So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) và
-> [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md).
+> [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md).
 
 ## 1. Cấu hình đã chạy
 
@@ -182,8 +182,8 @@ với `sr_scale=1` thì mốc `base` là ảnh **giữ nguyên** (không nội s
 là "SR hơn việc không làm gì".
 
 Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
-Dữ liệu: `results/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv`.
-Hình định tính: `results/mf_sr_ocr/s4_sr_scale1/paper_figures/`.
+Dữ liệu: `backup/mf_sr_ocr/s4_sr_scale1/sr_quality_s4.csv`.
+Hình định tính: `backup/mf_sr_ocr/s4_sr_scale1/paper_figures/`.
 
 ## 5c. Thời gian train — xác nhận S4 rẻ hơn thật
 
@@ -200,7 +200,7 @@ Hình định tính: `results/mf_sr_ocr/s4_sr_scale1/paper_figures/`.
 ⚠️ Đây là thời gian **train**, chưa phải latency **inference** — `tools/benchmark.py`
 chưa chạy cho `sr_scale=1` nên chưa có số cho bảng compute chính thức.
 
-Dữ liệu: `results/mf_sr_ocr/s4_sr_scale1/log_s4.txt`.
+Dữ liệu: `backup/mf_sr_ocr/s4_sr_scale1/log_s4.txt`.
 
 ## 5d. Multi-seed (review Bước 1) — số chính thức **79.48% ± 0.44**
 

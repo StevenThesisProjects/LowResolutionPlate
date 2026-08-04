@@ -41,10 +41,10 @@ Mọi cấu hình đã từng train trong project, không bỏ dòng nào. Cột
 
 | # | Cấu hình | Loại | Track đúng | Val Acc | Seeds | Tài liệu |
 |---|---|---|---:|---:|:---:|---|
-| 1 | **S3 — S1 + L_Perceptual (α=0.1)** | Đề xuất (S) | **805** | **80.58%** | 1 ⚠️ | [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) |
+| 1 | **S3 — S1 + L_Perceptual (α=0.1)** | Đề xuất (S) | **805** | **80.58%** | 1 ⚠️ | [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md) |
 | 2 | **S4 — SR scale=1, T=32 qua `width_downsample=4`** | Đề xuất (S) | **805** | **80.58%** | 1 ⚠️ | [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) |
 | 3 | **S1 — Joint MF-SR-OCR, λ_SR=0.1 (đề xuất chính)** | Đề xuất (S) | **797** | **79.78%** | 1 ⚠️ | [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) |
-| 4 | S2 — S1 + λ_SR=0.5 | Đề xuất (S) | 794 | 79.48% | 1 ⚠️ | [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) |
+| 4 | S2 — S1 + λ_SR=0.5 | Đề xuất (S) | 794 | 79.48% | 1 ⚠️ | [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md) |
 | — | 🥇 **J1 — 3 seed deterministic (KHÔNG SR)** | **CHÍNH THỨC** | 799/808/804 | **80.45% ± 0.45** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
 | — | 🥈 **S1 — 3 seed deterministic** | **CHÍNH THỨC** | 797/800/799 | **79.95% ± 0.15** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
 | — | 🥉 **S4 — 3 seed deterministic** | **CHÍNH THỨC** | 789/797/796 | **79.48% ± 0.44** | **3 ✅** | [multi_seed_results.md](multi_seed_results.md) |
@@ -54,16 +54,16 @@ Mọi cấu hình đã từng train trong project, không bỏ dòng nào. Cột
 | 8 | J1 — ResBlock + GroupNorm, không SR | Ablation (J) | 768 ✅ | 76.88% | 1 ⚠️ | [groupnorm_sr_ablation_j1_j2.md §3b](groupnorm_sr_ablation_j1_j2.md) |
 | 9 | ResBlock backbone (`norm=none`, PR #8) | Backbone | 766 | 76.68% | 1 ⚠️ | [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md) |
 | 10 | J3 — J2 + DCNv2 (kernel init ngẫu nhiên — bug) | Ablation (J) | 762 | 76.28% | 1 ⚠️ | [s1_proposed_mf_sr_ocr.md §2](s1_proposed_mf_sr_ocr.md#2-kết-quả-chính) |
-| 11 | D — AdamW: chỉ rút ngắn warmup (tốt nhất nhóm) | Optimizer† | — | 76.28% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
-| 12 | C — AdamW: chỉ tăng weight_decay | Optimizer† | — | 76.18% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
-| 13 | F — AdamW: wd + warmup mức vừa | Optimizer† | — | 76.08% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
-| 14 | A — AdamW: sửa bug param-grouping | Optimizer† | — | 75.98% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
+| 11 | D — AdamW: chỉ rút ngắn warmup (tốt nhất nhóm) | Optimizer† | — | 76.28% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
+| 12 | C — AdamW: chỉ tăng weight_decay | Optimizer† | — | 76.18% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
+| 13 | F — AdamW: wd + warmup mức vừa | Optimizer† | — | 76.08% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
+| 14 | A — AdamW: sửa bug param-grouping | Optimizer† | — | 75.98% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
 | 15 | CRNN + STN (đo lại trên dataset project) | Baseline | 757 | 75.78% | 1 ⚠️ | [baseline1_architecture.md](baseline1_architecture.md) |
-| 16 | B — AdamW: wd cao + warmup ngắn (2 biến cùng lúc) | Optimizer† | — | 75.58% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
-| 17 | E — AdamW: D + train dài hơn (60 epoch) | Optimizer† | — | 75.08% | 1 ⚠️ | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
+| 16 | B — AdamW: wd cao + warmup ngắn (2 biến cùng lúc) | Optimizer† | — | 75.58% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
+| 17 | E — AdamW: D + train dài hơn (60 epoch) | Optimizer† | — | 75.08% | 1 ⚠️ | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
 | 18 | aug light (augmentation nhẹ) | Baseline | 739 | 73.97% | 1 ⚠️ | chỉ có trong `run_gpu.md` |
-| 19 | SR-v2 — stacked-input SR, lr thấp + aug light | SR hỏng | 550 | 55.06% | 1 ⚠️ | [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md) |
-| 20 | SR-v1 — stacked-input SR (bản lỗi, gộp 5 frame→1) | SR hỏng | 492 | 49.25% | 1 ⚠️ | [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md) |
+| 19 | SR-v2 — stacked-input SR, lr thấp + aug light | SR hỏng | 550 | 55.06% | 1 ⚠️ | [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md) |
+| 20 | SR-v1 — stacked-input SR (bản lỗi, gộp 5 frame→1) | SR hỏng | 492 | 49.25% | 1 ⚠️ | [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md) |
 
 \* Kiến trúc khác hẳn (ResNet + Transformer), **không so trực tiếp được** với nhánh CRNN
 đang làm — để ở đây chỉ như mốc "cao nhất report gốc từng đạt".
@@ -211,17 +211,17 @@ Lệnh chạy: [run_gpu.md §0 B4](../training_runs/run_gpu.md#-b4--multi-seed-j
 | # | Cấu hình | Track đúng | Val Acc | Δ vs mốc trước | Trong biên nhiễu ±13? | Tài liệu |
 |---|---|---:|---:|---:|:---:|---|
 | 0 | CRNN + STN (report ICPR gốc) | — | 77.00% | — (mốc tham chiếu chuẩn) | — | [baseline1_architecture.md](baseline1_architecture.md) |
-| 1 | CRNN + STN (đo lại trên dataset project) | 757 | 75.78% | −1.22 vs #0 | có | [baseline1_architecture.md](baseline1_architecture.md), [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
+| 1 | CRNN + STN (đo lại trên dataset project) | 757 | 75.78% | −1.22 vs #0 | có | [baseline1_architecture.md](baseline1_architecture.md), [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
 | 2 | — aug light (augmentation nhẹ) | 739 | 73.97% | −18 track vs #1 | **không** (kém hơn rõ) | chỉ có trong `run_gpu.md` |
-| 3 | SR-v1 — stacked-input SR (bản lỗi, gộp 5 frame→1) | 492 | 49.25% | −265 track vs #1 | **không** (thất bại nặng) | [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md) |
-| 4 | SR-v2 — stacked-input SR, lr thấp + aug light | 550 | 55.06% | −207 track vs #1 | **không** (vẫn thất bại) | [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md) |
+| 3 | SR-v1 — stacked-input SR (bản lỗi, gộp 5 frame→1) | 492 | 49.25% | −265 track vs #1 | **không** (thất bại nặng) | [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md) |
+| 4 | SR-v2 — stacked-input SR, lr thấp + aug light | 550 | 55.06% | −207 track vs #1 | **không** (vẫn thất bại) | [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md) |
 | 5 | ResBlock backbone (`norm=none`, PR #8) | 766 | 76.68% | +9 track vs #1 | có | [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md) |
 | 6 | J1 — ResBlock + GroupNorm, không SR | 768 | 76.88% | +2 track vs #5 | có | [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md) |
 | 7 | J2 — + SR per-frame (single-frame) có giám sát | 771 | 77.18% | +3 track vs #6 | có | [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md) |
 | 8 | J3 — + DCNv2 (kernel init ngẫu nhiên, bug) | 762 | 76.28% | −9 track vs #7 | có | [s1_proposed_mf_sr_ocr.md §2](s1_proposed_mf_sr_ocr.md#2-kết-quả-chính) |
 | 9 | **S1 — Joint MF-SR-OCR, λ_SR=0.1 (đề xuất)** | **797** | **79.78%** | **+26 track vs #7 (J2)** | **KHÔNG — vượt rõ ràng** | [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) |
-| 10 | S2 — S1 + `λ_SR=0.5` thay vì 0.1 | 794 | 79.48% | −3 track vs #9 | có (không cải thiện) | [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) |
-| 11 | S3 — S1 + L_Perceptual (α=0.1) | 805 | 80.58% | +8 track vs #9 | có (chưa đủ bằng chứng, nhưng đồng hạng cao nhất) | [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) |
+| 10 | S2 — S1 + `λ_SR=0.5` thay vì 0.1 | 794 | 79.48% | −3 track vs #9 | có (không cải thiện) | [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md) |
+| 11 | S3 — S1 + L_Perceptual (α=0.1) | 805 | 80.58% | +8 track vs #9 | có (chưa đủ bằng chứng, nhưng đồng hạng cao nhất) | [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md) |
 | 12 | **S4 — SR scale=1 (T=32 qua `width_downsample=4`)** | **805** | **80.58%** | **+8 track vs #9, hoà #11** | có (nhưng 2 hướng độc lập cùng hội tụ) | [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) |
 
 **Đọc bảng này thế nào**: cột "Trong biên nhiễu ±13?" quan trọng hơn cột Val Acc.
@@ -305,7 +305,7 @@ Cả 4 dòng đều là **1 seed**.
 | **J1 (lịch sử, 1 seed)** | 76.88% | **0.0608** | **0** | ✅ chấm lại 2026-08-03 |
 
 > 🆕 **J1/J2 đã được chấm lại từ checkpoint + submission còn lưu trên đĩa**
-> (`results/crnn_resblock_groupnorm_nosr_j1/`, `results/crnn_resblock_sr_supervised_j2/`)
+> (`backup/crnn_resblock_groupnorm_nosr_j1/`, `backup/crnn_resblock_sr_supervised_j2/`)
 > — exact match khớp chính xác 76.88% / 77.18% đã báo cáo. **Phát hiện mới: J2 có
 > CER TỆ HƠN J1** (0.0645 vs 0.0608) và **18/999 track sai độ dài** (J1: 0) dù exact
 > match nhỉnh hơn 3 track. Tức "SR giúp ở J1→J2" còn mong manh hơn những gì biên
@@ -381,7 +381,7 @@ Chi tiết + 3 chỗ lệch so với review: [../buoc2_metrics.md](../buoc2_metr
 
 ### Hình định tính (Figure 4) — đã sinh cho cả 4 cấu hình
 
-`results/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
+`backup/mf_sr_ocr/<cấu hình>/paper_figures/` — mỗi cấu hình có
 `figure4_qualitative_grid.png` (grid 4 cột `I_LR → I_SR → Attention → Prediction`,
 5 case đúng + 5 case sai) và 10 ảnh từng track riêng.
 
@@ -452,7 +452,7 @@ thay bởi ResBlock ở §2 dòng #5):
 
 Toàn bộ A-F nằm trong biên nhiễu. Trần 76.28% thấp hơn ResBlock (76.68%) đạt
 được mà không cần tuning — kết luận: giới hạn nằm ở backbone, không phải
-optimizer. Chi tiết: [optimizer_adamw_verification.md](optimizer_adamw_verification.md).
+optimizer. Chi tiết: [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md).
 
 ## 6. Chi phí compute (kiến trúc hiện tại, STN pool `(4,8)`)
 
@@ -493,18 +493,18 @@ vẫn cần benchmark thật ([multi_seed_results.md §7](multi_seed_results.md#
 |---|---|
 | **Số chính thức Mean ± Std, so sánh S1 vs S4 có kiểm định** | **[multi_seed_results.md](multi_seed_results.md)** |
 | Kiến trúc gốc, đối chiếu với report ICPR | [baseline1_architecture.md](baseline1_architecture.md) |
-| SR thất bại lúc đầu vì sao (stacked-input bug) | [super_resolution_experiments.md](../summary_project/document/super_resolution_experiments.md) |
-| AdamW/weight-decay ablation (lịch sử, backbone cũ) | [optimizer_adamw_verification.md](optimizer_adamw_verification.md) |
+| SR thất bại lúc đầu vì sao (stacked-input bug) | [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md) |
+| AdamW/weight-decay ablation (lịch sử, backbone cũ) | [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md) |
 | ResBlock backbone thay BatchNorm bằng gì, vì sao | [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md) |
 | GroupNorm giúp gì, SR per-frame có giám sát lần đầu, **và vì sao J1 phải chạy lại** | [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md) |
 | Cấu hình đề xuất đầy đủ (MFSR+DCN+domain-match+decode+EMA) | [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) |
-| λ_SR=0.5 có tốt hơn 0.1 không | [s2_lam05_mf_sr_ocr.md](s2_lam05_mf_sr_ocr.md) |
-| L_Perceptual có giúp gì không | [s3_perceptual_mf_sr_ocr.md](s3_perceptual_mf_sr_ocr.md) |
+| λ_SR=0.5 có tốt hơn 0.1 không | [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md) |
+| L_Perceptual có giúp gì không | [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md) |
 | SR ×1 (không phóng to ảnh) có bằng SR ×2 không, "T confound" là gì, multi-seed đầu tiên | [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) |
 | CER/NED/PSNR/SSIM + bằng chứng PSNR nghịch OCR | [../buoc2_metrics.md](../buoc2_metrics.md) |
 | Tiến độ theo review, phạm vi multi-seed và lý do | [../checklist_review.md](../checklist_review.md) |
 | Lệnh chạy GPU đầy đủ + bảng compute + hướng dẫn vẽ chart | [../training_runs/run_gpu.md](../training_runs/run_gpu.md) |
-| Cấu trúc dataset, plate layout, corners annotation | [../summary_project/dataset/dataset_overview.md](../summary_project/dataset/dataset_overview.md) |
+| Cấu trúc dataset, plate layout, corners annotation | [dataset_overview.md](../../backup/report/summary_project/dataset/dataset_overview.md) |
 
 ## 8. Trạng thái & việc còn lại
 

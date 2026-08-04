@@ -1,13 +1,13 @@
 # S2 — MF-SR-OCR với λ_SR = 0.5 (ablation trọng số SR loss)
 
 > ⚠️ **1 seed, `benchmark=True` — chưa xác nhận, và SẼ KHÔNG được multi-seed**
-> (kết quả âm tính rõ, xem [../checklist_review.md](../checklist_review.md)). Mọi
+> (kết quả âm tính rõ, xem [../checklist_review.md](../../../report/checklist_review.md)). Mọi
 > con số trong file này là exploratory, không phải số cuối cho paper.
 >
-> Kết quả của cấu hình S2 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+> Kết quả của cấu hình S2 trong [../training_runs/run_gpu.md](../../../report/training_runs/run_gpu.md).
 > Dữ liệu nguồn: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/history_s2_lam05.csv`,
 > `submission_s2_lam05.txt`. Không có `log_s2.txt` (không chạy `tee` khi train run này).
-> So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md) — S2 chỉ khác S1
+> So sánh trực tiếp với [s1_proposed_mf_sr_ocr.md](../../../report/baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md) — S2 chỉ khác S1
 > đúng 1 tham số.
 
 ## 1. Cấu hình đã chạy
@@ -112,7 +112,7 @@ cấu hình khác — nhưng OCR lại **kém nhất nhóm S**.
 Tức là tối ưu theo PSNR **không** đồng nghĩa với dễ đọc hơn. Khi reviewer hỏi "sao
 không tối ưu theo PSNR", S2 chính là thí nghiệm đã trả lời: đã thử, và OCR tệ đi.
 
-Chi tiết + tương quan mức track: [../buoc2_metrics.md](../buoc2_metrics.md).
+Chi tiết + tương quan mức track: [../buoc2_metrics.md](../../../report/buoc2_metrics.md).
 Dữ liệu: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/sr_quality_s2.csv`.
 Hình định tính: `results/mf_sr_ocr/s2_mf_sr_ocr_lam05/paper_figures/`.
 
@@ -142,8 +142,8 @@ không tương đương ở mức lỗi từng track — đáng cân nhắc cho 
 chỉ chọn 1 trong 2 theo điểm tổng.
 
 **Cập nhật 2026-08-03**: phạm vi cuối cùng là **3 model J1 + S1 + S4**
-(xem [../checklist_review.md](../checklist_review.md)) — S2 **không** nằm trong đó.
+(xem [../checklist_review.md](../../../report/checklist_review.md)) — S2 **không** nằm trong đó.
 Bằng chứng độc lập khác (tương quan PSNR↔đọc-đúng âm, nhất quán trên n=999 ở cả 4
-cấu hình S1-S4, xem [../buoc2_metrics.md](../buoc2_metrics.md)) đã đủ để giữ kết
+cấu hình S1-S4, xem [../buoc2_metrics.md](../../../report/buoc2_metrics.md)) đã đủ để giữ kết
 luận "tăng λ_SR không giúp" mà không cần error bar riêng cho S2. Số liệu trong file
 này giữ nguyên làm tham khảo, gắn nhãn "1 seed, chưa xác nhận" ở mọi bảng so sánh.

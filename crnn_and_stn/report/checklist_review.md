@@ -5,9 +5,21 @@
 > File hiện tại là bản **theo dõi tiến độ**.
 >
 > Bám đúng cấu trúc review: 3 nhóm giải pháp + 4 bước.
-> Dữ liệu S1–S4: `results/mf_sr_ocr/<cấu hình>/` · Multi-seed:
-> `results/multi-seed/<cấu hình>/` · Lệnh chạy:
-> [training_runs/run_gpu.md §0](training_runs/run_gpu.md).
+> Lệnh chạy: [training_runs/run_gpu.md §0](training_runs/run_gpu.md).
+>
+> 🗂️ **Sắp xếp thư mục (2026-08-04)** — `report/` và `results/` **chỉ còn** baseline
+> CRNN+STN và J1/S1/S4; mọi thứ khác chuyển sang `backup/`:
+>
+> | Nội dung | Ở đâu |
+> |---|---|
+> | Multi-seed J1/S1/S4 (9 run) | `results/multi-seed/<cấu hình>/` |
+> | Tài liệu baseline + J1/S1/S4 | `report/` |
+> | Dữ liệu 1-seed S1–S4 | `backup/mf_sr_ocr/<cấu hình>/` |
+> | J1 lịch sử · J2 · J3 (DCNv2) | `backup/crnn_resblock_*` · `backup/DCNv2/` |
+> | Tài liệu S2, S3, AdamW ablation, `summary_project/` | `backup/report/` |
+>
+> Toàn bộ link nội bộ đã cập nhật và verify: **202/202 trong `report/`** và
+> **25/25 trong `backup/report/`** đều trỏ đúng file có thật.
 > Cập nhật: 2026-08-04 — ✅ **BƯỚC 1 HOÀN THÀNH**: đủ 3 model J1/S1/S4 có
 > Mean ± Std trên 3 seed deterministic. **Không còn run GPU nào** trong phạm vi.
 > 🎯 **ĐÃ CHỐT: S1 là phương pháp đề xuất chính của paper** — xem mục ngay dưới.
@@ -494,7 +506,7 @@ Yêu cầu cuối của Bước 1 trong review. Đã có gì:
       cùng chiều
 - [x] `tools/eval_sr_quality.py` — PSNR/SSIM bằng `skimage.metrics`
 - [x] PSNR/SSIM cho cả 4 cấu hình (999 track mỗi cấu hình), lưu tại
-      `results/mf_sr_ocr/<cấu hình>/sr_quality_*.csv`
+      `backup/mf_sr_ocr/<cấu hình>/sr_quality_*.csv`
 - [x] Tương quan PSNR ↔ đọc đúng ở mức từng track (n=999)
 - [x] Báo cáo: [buoc2_metrics.md](buoc2_metrics.md)
 
@@ -562,7 +574,7 @@ phản ánh OCR" mà là **"PSNR nghịch với OCR, có bằng chứng trên 99
       (có cột `I_SR`), không phải đổi layout như khi dùng J1
 
 ⚠️ **Lưu ý mới sau multi-seed**: hình hiện có sinh từ checkpoint **1-seed** của
-S1–S4 (`results/mf_sr_ocr/`), trong khi con số trong paper nay là multi-seed. Với
+S1–S4 (`backup/mf_sr_ocr/`), trong khi con số trong paper nay là multi-seed. Với
 S4 thì checkpoint 1-seed đạt 805/999 còn mức thật là ~794 — **hình và số sẽ đến từ
 2 model khác nhau**. Hai cách xử lý:
 
