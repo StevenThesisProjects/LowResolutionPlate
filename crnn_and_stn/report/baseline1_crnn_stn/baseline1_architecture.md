@@ -205,22 +205,21 @@ Không cần: `pandas`, `matplotlib`, `seaborn` (chỉ dùng cho analysis trong 
 > Giả thuyết *"`T=32` là yếu tố chính"* cũng **bị bác bỏ** — J1 chạy `T=16`.
 >
 > Chi tiết: [multi_seed_results.md](multi_seed_results.md) ·
-> [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+> [j1_groupnorm_nosr.md](j1_groupnorm_nosr.md).
 
 ⚠️ J1 multi-seed dùng **cờ nền của S1/S4** (STN pool `(4,8)`, domain-match,
 constrained, EMA — chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)`. Vì thế số
 **không** đặt chung cột với 76.88%.
 
-Mọi cấu hình khác (J2, J3, S2, S3, nhánh AdamW, SR-v1/v2) là **exploratory 1 seed** —
-giữ làm phụ lục, không vào bảng chính có error bar.
+Các ablation 1-seed đã chạy trước đây (không có error bar) nằm ở `backup/report/` —
+giữ làm phụ lục, không vào bảng chính.
 
 ### Lịch sử các hướng đã thử
 
 Baseline 1 (CRNN+STN, mốc 77.00% theo report / ~75.78% đo trên dataset thực tế của project — xem [training_runs/run_gpu.md](../training_runs/run_gpu.md)) là điểm khởi đầu:
 
 1. **Nâng cấp backbone CNN → ResBlock** (đã áp dụng, ~76.68%) — xem [resblock_backbone_upgrade.md](resblock_backbone_upgrade.md).
-2. **AdamW tuning trên backbone gốc** (đã kết thúc, mức trần 76.28%, bị ResBlock vượt qua) — xem [optimizer_adamw_verification.md](../../backup/report/baseline1_crnn_stn/optimizer_adamw_verification.md).
-3. **Super Resolution per-frame + GroupNorm** (J1 = 76.88%, J2 = 77.18% — cả hai trong biên nhiễu ±13 so với baseline) — xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md). Lịch sử các hướng SR đã thử trước đó (kể cả hướng thất bại) xem [super_resolution_experiments.md](../../backup/report/summary_project/document/super_resolution_experiments.md).
-4. **Cụm cờ nền** (STN pool `(4,8)` + `--lr-domain-match` + constrained decode + EMA) — ✅ **đây mới là hướng thắng thật**: áp lên đúng kiến trúc J1 (không SR) cho **80.45% ± 0.45**, hơn J1 lịch sử **+3.57 điểm** và vượt baseline gốc 77.00% hơn **3 điểm**. Xem [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
-5. **Joint End-to-End MF-SR-OCR** (S1 = 79.95% ± 0.15) — thêm multi-frame SR + DCNv2 lên trên cụm cờ nền. ⚠️ **Không cải thiện** so với J1 (−0.50, trong nhiễu) mà tốn 3.76× compute. Xem [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md).
-6. **Biến thể rẻ SR ×1** (S4 = 79.48% ± 0.44) — kém J1 có ý nghĩa thống kê. Giả thuyết `T=32` bị bác bỏ. Xem [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md).
+2. **GroupNorm** trên nền ResBlock (J1 lịch sử = 76.88%, trong biên nhiễu ±13 so với baseline) — sửa lỗi NaN khi bật SR, gần như miễn phí compute. Xem [j1_groupnorm_nosr.md](j1_groupnorm_nosr.md).
+3. **Cụm cờ nền** (STN pool `(4,8)` + `--lr-domain-match` + constrained decode + EMA) — ✅ **đây mới là hướng thắng thật**: áp lên đúng kiến trúc J1 (không SR) cho **80.45% ± 0.45**, hơn J1 lịch sử **+3.57 điểm** và vượt baseline gốc 77.00% hơn **3 điểm**. Xem [j1_groupnorm_nosr.md](j1_groupnorm_nosr.md).
+4. **Joint End-to-End MF-SR-OCR** (S1 = 79.95% ± 0.15) — 🎯 **phương pháp đề xuất**: thêm multi-frame SR + DCNv2 lên trên cụm cờ nền. ⚠️ **Không cải thiện** so với J1 (−0.50, trong nhiễu) mà tốn 3.76× compute — chọn vì **ổn định nhất** (std 0.15). Xem [s1_proposed_mf_sr_ocr.md](s1_proposed_mf_sr_ocr.md).
+5. **Biến thể rẻ SR ×1** (S4 = 79.48% ± 0.44) — kém J1 có ý nghĩa thống kê. Giả thuyết `T=32` bị bác bỏ. Xem [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md).

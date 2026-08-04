@@ -78,7 +78,7 @@ Nguồn: [`src/training/trainer.py:322-336`](../src/training/trainer.py) (hợp 
 | 1 | $\text{Warp}_\theta(I_{\text{SR}})$ | **Không warp** `I_SR` | `I_SR` đã nằm trong khung STN đã nắn → warp 2 lần là sai |
 | 2 | "Smooth L1" | `F.l1_loss` — **L1 thuần** | Chỉ sai tên; đã chốt **không đổi code** (đổi thì phải chạy lại toàn bộ) |
 | 3 | $\theta$ bình thường | $\text{sg}[\theta]$ — **`theta_sel.detach()`** | Gradient của $\mathcal{L}_{SR}$ **không** chảy về STN. Là chủ đích: SR chỉ được làm ảnh nét hơn, không được kéo STN về hình học "dễ tái tạo nhất" |
-| 4 | $\lambda_{\text{Perc}} \cdot \mathcal{L}_{\text{VGG}}$ **song song** | $\lambda_{\text{SR}} \cdot (\ldots + \alpha \mathcal{L}_{\text{VGG}})$ — **lồng trong** | Chỉ tương đương khi $\lambda_{\text{Perc}} = \lambda_{\text{SR}} \times \alpha$. Với S3: $0.1 \times 0.1 = 0.01$ ✅ khớp review |
+| 4 | $\lambda_{\text{Perc}} \cdot \mathcal{L}_{\text{VGG}}$ **song song** | $\lambda_{\text{SR}} \cdot (\ldots + \alpha \mathcal{L}_{\text{VGG}})$ — **lồng trong** | Chỉ tương đương khi $\lambda_{\text{Perc}} = \lambda_{\text{SR}} \times \alpha$. Ở ablation từng bật perceptual: $0.1 \times 0.1 = 0.01$ ✅ khớp review |
 
 ### 1.3. Giá trị siêu tham số THẬT của 3 lần chạy
 
@@ -90,7 +90,7 @@ Nguồn: [`src/training/trainer.py:322-336`](../src/training/trainer.py) (hợp 
 
 > 🚨 **Cả 3 lần chạy có error bar đều chạy `perceptual = 0.0`** — đã verify banner
 > 8/8 log. Số hạng $\lambda_{\text{Perceptual}} \mathcal{L}_{\text{VGG}}$ trong công
-> thức chỉ được bật ở **S3 (1 seed, không nằm trong bộ multi-seed)**. Paper phải ghi
+> thức chỉ được bật ở **một ablation 1 seed** (nay lưu ở `backup/report/`). Paper phải ghi
 > rõ số hạng này là **ablation 1 seed, chưa xác nhận**.
 
 ### ✅ Checklist Nhóm 1
@@ -308,7 +308,7 @@ done
 | `--use-ema` | EMA decay 0.999 — làm phẳng dao động cuối training |
 | `--no-cudnn-benchmark` | **Cốt lõi của Nhóm 2** — tắt chọn thuật toán conv ngẫu nhiên |
 | `--aug-level full` | Giữ đúng augment như S1/S4 để so công bằng |
-| `2>&1 \| tee` | S2/S3 **mất vĩnh viễn** số liệu thời gian chỉ vì quên `tee` |
+| `2>&1 \| tee` | Vài run cũ **mất vĩnh viễn** số liệu thời gian chỉ vì quên `tee` |
 
 > ⚠️ **Khác kế hoạch ban đầu**: kế hoạch cũ định chạy cờ **lịch sử** (`--stn-pool 1,1`)
 > để tái lập 76.88%. Run thật dùng **đúng bộ cờ nền của S1/S4, chỉ bỏ SR + DCN**.
@@ -349,7 +349,7 @@ done
 | Cờ | Vì sao dùng |
 |---|---|
 | `--use-sr --sr-scale 2` | Nhánh MFSR phóng to ×2 → ảnh 64×256, đồng thời **`T` nhảy 16 → 32** |
-| `--use-dcn` | DCNv2 align 5 frame trước khi hợp nhất; kernel **identity-init** (J3 lịch sử init ngẫu nhiên → hỏng) |
+| `--use-dcn` | DCNv2 align 5 frame trước khi hợp nhất; kernel **identity-init** (một run cũ init ngẫu nhiên → hỏng) |
 | `--lambda-sr 0.1` | Đúng $\lambda_{SR}$ review chỉ định |
 | _(KHÔNG có `--width-downsample`)_ | Dùng mặc định **8** — đây là 1 trong 2 chỗ khác S4 |
 
@@ -506,7 +506,7 @@ Review không chỉ định các chỉ số này đo trên checkpoint multi-seed
 | Chỉ số | Chạy ở đâu | Cách chạy | Phủ được lần chạy nào |
 |---|---|---|---|
 | **CER / NED** | ✅ **Trong training loop, cả 9 run multi-seed** | `Trainer.validate()` → console mỗi epoch + 2 cột CSV | **Cả 3 lần chạy, có Mean ± Std** |
-| **CER / NED** (bổ sung) | Tính lại hậu kỳ từ `submission_*.txt` | không cần train lại | S1–S4 + J1/J2 lịch sử (1 seed) |
+| **CER / NED** (bổ sung) | Tính lại hậu kỳ từ `submission_*.txt` | không cần train lại | các run 1-seed cũ |
 | **PSNR / SSIM** | ⚠️ **Hậu kỳ, trên checkpoint 1-SEED** ở `backup/mf_sr_ocr/` | `tools/eval_sr_quality.py` | **Chỉ S1–S4, KHÔNG có multi-seed, KHÔNG có J1** |
 
 > 🚨 **Hai hệ quả phải nêu trong paper:**
@@ -574,12 +574,10 @@ tuyệt đối:
 | Cấu hình | PSNR (SR) | PSNR (base) | **Chênh** | SSIM (SR) | SSIM (base) | **Chênh** |
 |---|---:|---:|---:|---:|---:|---:|
 | **Lần 2 — S1** (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
-| S2 (×2, λ=0.5) | 18.5228 | 16.2349 | **+2.2879 dB** | 0.5461 | 0.3780 | **+0.1681** |
-| S3 (×2, perceptual) | 16.9582 | 15.8727 | +1.0855 dB | 0.4234 | 0.3569 | +0.0664 |
 | **Lần 3 — S4** (×1) | 17.5249 | 16.5011 | +1.0238 dB | 0.5027 | 0.4408 | +0.0618 |
 | **Lần 1 — J1** | — | — | — | — | — | — |
 
-> ⚠️ **Không đặt PSNR tuyệt đối của S4 chung cột với S1–S3**: S1–S3 xuất ảnh 64×256,
+> ⚠️ **Không đặt PSNR tuyệt đối của S4 chung cột với S1**: S1 xuất ảnh 64×256,
 > S4 xuất 32×128 — **hai thang khác nhau**. Chỉ so được cột "Chênh".
 >
 > ⚠️ Số dao động **~±0.05 dB** giữa các lần chạy (pipeline degradation ngẫu nhiên,
@@ -591,14 +589,12 @@ tuyệt đối:
 | Mức | Bằng chứng | Chiều |
 |---|---|---|
 | **Track** (n=999) | Track đọc **sai** có PSNR **cao hơn ~2 dB**; $r \approx -0.35 \ldots -0.41$, nhất quán cả 4 cấu hình | **nghịch** |
-| **Cấu hình** | S2 có PSNR tốt nhất (+2.29 dB, gấp đôi) nhưng OCR **kém nhất** (794/999) | **nghịch** |
+| **Cấu hình** | Ablation có PSNR cao nhất toàn dự án (+2.29 dB) lại có OCR **kém nhất** | **nghịch** |
 | **Kiến trúc** | **Lần 1 (J1) bỏ hẳn SR → không có PSNR nào → OCR không hề thua** (điểm TB cao nhất) | **nghịch** |
 
 | Cấu hình | PSNR track **đọc đúng** | PSNR track **đọc sai** | Chênh | $r$(PSNR, đúng) |
 |---|---:|---:|---:|---:|
 | S1 | 16.288 | 18.240 | **−1.952 dB** | **−0.362** |
-| S2 | 18.102 | 20.154 | −2.052 dB | −0.346 |
-| S3 | 16.492 | 18.894 | −2.402 dB | −0.412 |
 | S4 | 17.080 | 19.371 | −2.291 dB | −0.400 |
 
 → Khi reviewer hỏi _"sao không tối ưu theo PSNR"_, câu trả lời không còn là "PSNR không
@@ -620,7 +616,7 @@ cần _"ảnh này chứa bao nhiêu chi tiết đọc được"_.
 ### ✅ Checklist Bước 2
 
 - [x] CER + NED trong `validate()` → console mỗi epoch + 2 cột CSV (9/9 run)
-- [x] CER/NED cho S1–S4 + J1/J2 lịch sử (tính lại từ submission, không train lại)
+- [x] CER/NED cho các run 1-seed cũ (tính lại từ submission, không train lại)
 - [x] **CER Mean ± Std cho cả 3 lần chạy**
 - [x] `tools/eval_sr_quality.py` — PSNR/SSIM bằng `skimage.metrics`
 - [x] PSNR/SSIM cho 4 cấu hình S1–S4 (999 track mỗi cấu hình)
@@ -645,13 +641,11 @@ cần _"ảnh này chứa bao nhiêu chi tiết đọc được"_.
 |---|:---:|:---:|
 | **Lần 2 — S1** | ✅ | ✅ |
 | **Lần 3 — S4** | ✅ | ✅ |
-| S2 | ✅ | ❌ (đã bỏ, ~33h) |
-| S3 | ✅ | ❌ (đã bỏ, ~36–45h) |
 | **Lần 1 — J1** | ❌ **không thể có** | ✅ |
 
-- **S2/S3 có hình mà không có multi-seed**: lúc sinh hình thì cả 4 checkpoint S-series
+- **Vài ablation 1-seed cũng có hình**: lúc sinh hình thì cả 4 checkpoint S-series
   đã nằm sẵn trên đĩa, sinh thêm 2 bộ rất rẻ (~20 phút CPU, 0 GPU) và có ích để so
-  **cùng một track qua nhiều cấu hình**. Quyết định cắt S2/S3 khỏi multi-seed đến **sau đó**.
+  **cùng một track qua nhiều cấu hình**. Quyết định cắt chúng khỏi multi-seed đến **sau đó**.
 - **Lần 1 (J1) không có hình và không thể có**: grid 4 cột cần cột $I_{SR}$, mà J1
   không có nhánh SR nên $I_{SR}$ **không tồn tại** — cùng lý do với PSNR ở Bước 2.
 
@@ -671,7 +665,7 @@ mtime thật trên đĩa:
 
 | Đã sinh hình cho | Nguồn checkpoint | Có multi-seed không |
 |---|---|---|
-| S1, S2, S3, S4 | `backup/mf_sr_ocr/<cfg>/*.pth` — **1 seed** | ❌ |
+| S1, S4 (+ 2 ablation 1-seed) | `backup/mf_sr_ocr/<cfg>/*.pth` — **1 seed** | ❌ |
 | **Lần 1 — J1** | **chưa sinh** | ❌ |
 
 ```bash
@@ -703,8 +697,8 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
 | Track | Xuất hiện | Dùng để minh hoạ |
 |---|---|---|
 | `track_22161` | **SAI ở cả 4** | **giới hạn thật của dữ liệu**, không phải điểm yếu của một model |
-| `track_19095` | SAI ở S1, S3, S4 | case khó nhất quán |
-| `track_21455` | ĐÚNG ở S1, S2, S3 | case dễ, đọc chắc chắn |
+| `track_19095` | SAI ở S1 và S4 | case khó nhất quán |
+| `track_21455` | ĐÚNG ở S1 | case dễ, đọc chắc chắn |
 
 ### ⚠️ 2 caveat khi chốt hình
 
@@ -786,7 +780,7 @@ Mỗi lệnh xuất `figure4_qualitative_grid.png` + 10 ảnh track riêng (5 đ
    decode vs EMA) — câu hỏi mở quan trọng nhất còn lại.
 3. **Ablation là tích luỹ**, không tách 1 biến; `T` cũng nhảy 16→32 giữa Lần 1 và Lần 2.
 4. **3 ablation chỉ 1 seed** (phụ lục, nhãn _chưa xác nhận_): multi-frame vs
-   single-frame (J2 77.18%), perceptual (S3 80.58%), $\lambda_{SR}=0.5$ (S2 79.48%).
+   single-frame, perceptual loss, $\lambda_{SR}=0.5$ — dữ liệu ở `backup/`.
 5. **Không đo được PSNR/SSIM cho Lần 1** — bảng PSNR không phủ được cấu hình có điểm
    TB cao nhất (không có $I_{SR}$ để đo).
 6. **PSNR/SSIM và hình định tính đo trên checkpoint 1 seed**, khác nguồn với bảng

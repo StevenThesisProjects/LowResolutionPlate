@@ -3,7 +3,7 @@
 > ⚠️ **J1/J2 dưới đây là bản lịch sử** (`STN_POOL=(1,1)`, không domain-match/
 > constrained-decode/EMA — kiến trúc cũ trước S1). Chúng **không so 1-biến được**
 > với S1/S4 vì lệch nhau 5-6 tham số cùng lúc, xem ma trận đầy đủ ở
-> [model_comparison_summary.md §4](model_comparison_summary.md#4-ma-trận-cấu-hình--cái-gì-bật-ở-model-nào).
+> [model_comparison_summary.md §4](../../../report/baseline1_crnn_stn/model_comparison_summary.md#4-ma-trận-cấu-hình--cái-gì-bật-ở-model-nào).
 > 🔴 **CHỈ J1 ĐƯỢC MULTI-SEED** (phạm vi cuối cùng: **3 model J1 + S1 + S4**),
 > chạy **đúng bộ cờ J1 ở [mục 2](#2-cấu-hình)** + ép `--stn-pool 1,1` (mặc định nay
 > là `(4,8)`). ✅ **J1 tái lập được ~76.88%** vì không dùng SR, mà mọi thay đổi code
@@ -12,10 +12,10 @@
 > ⏭️ **J2 ra ngoài phạm vi** — con số **77.18% giữ nguyên là 1 seed**, dùng cho phụ
 > lục + Limitations (ablation multi-frame vs single-frame không có error bar).
 > Lý do và lệnh chạy:
-> [../checklist_review.md](../checklist_review.md),
-> [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+> [../checklist_review.md](../../../report/checklist_review.md),
+> [../training_runs/run_gpu.md](../../../report/training_runs/run_gpu.md).
 >
-> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
+> Gộp từ 2 thí nghiệm liên tiếp trong nhánh fix issue #9. Checklist đầy đủ + lệnh chạy: [../training_runs/run_gpu.md](../../../report/training_runs/run_gpu.md).
 
 **Baseline chuẩn theo report ICPR của tác giả gốc là CRNN + STN (77.00%)** — không phải ResBlock backbone (76.68%, cải tiến làm sau ở PR #8). Mọi so sánh dưới đây tách rõ 2 mốc để không nhầm "vượt ResBlock" thành "vượt baseline gốc".
 
@@ -110,7 +110,7 @@ tại là `SR_EDGE_WEIGHT = 0.0` (`configs/config.py:90`), và S1/S4 đều ch�
 — đã kiểm tra banner.
 
 **Hệ quả**: J2 khác S1 ở **7 biến**, không phải 6 như
-[s1_proposed_mf_sr_ocr.md §1](s1_proposed_mf_sr_ocr.md#1-cấu-hình-đã-chạy) liệt kê —
+[s1_proposed_mf_sr_ocr.md §1](../../../report/baseline1_crnn_stn/s1_proposed_mf_sr_ocr.md#1-cấu-hình-đã-chạy) liệt kê —
 thiếu đúng dòng `edge loss`. Nghĩa là ladder J1→S1→S4 là **ablation tích luỹ**
 (mỗi bậc đổi nhiều thứ), **không phải tách 1 biến** — phải ghi rõ cách đọc này trong
 paper. (Chi tiết `edge=0.5` này chỉ còn quan trọng nếu sau này chạy lại J2.)
@@ -194,7 +194,7 @@ Kiểm chứng ở mức track: J1-mới hơn J1-lịch-sử **+31 / +40 / +36 t
 
 **2. "`T=32` là yếu tố chính" — cũng KHÔNG đứng vững.**
 J1 chạy **`T=16`** mà vẫn ngang/hơn S1 và S4 (đều `T=32`). Giả thuyết nêu ở
-[s4_sr_scale1_mf_sr_ocr.md §3](s4_sr_scale1_mf_sr_ocr.md) — rằng lợi ích của "SR"
+[s4_sr_scale1_mf_sr_ocr.md §3](../../../report/baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md) — rằng lợi ích của "SR"
 thực ra đến từ việc `T` tăng gấp đôi — **không còn cơ sở**: khi cụm cờ nền đã bật,
 `T=16` không hề kém `T=32`.
 
@@ -260,9 +260,9 @@ ngoài biên nhiễu). Phạm vi multi-seed chốt cuối là **J1 + S1 + S4**:
 
 ⚠️ **Lưu ý cho paper**: J1→S1 **không** tách được `T` khỏi SR — bật
 `--use-sr --sr-scale 2` tự động nâng `T` từ 16 lên 32
-([`train.py:285`](../../train.py)), nên J1→S1 đổi **cả `T` lẫn SR cùng lúc**. Cấu
+([`train.py:285`](../../../train.py)), nên J1→S1 đổi **cả `T` lẫn SR cùng lúc**. Cấu
 hình duy nhất tách được là `--width-downsample 4` **không** `--use-sr` — ngoài phạm
 vi, ghi Limitations.
-Xem [model_comparison_summary.md §1c](model_comparison_summary.md#1c-kết-quả-multi-seed--số-chính-thức-cho-paper)
-cho ma trận đầy đủ và [s4_sr_scale1_mf_sr_ocr.md §3](s4_sr_scale1_mf_sr_ocr.md#3-trả-lời-câu-hỏi-t-confound--kết-quả-chính-của-s4)
+Xem [model_comparison_summary.md §1c](../../../report/baseline1_crnn_stn/model_comparison_summary.md#1c-kết-quả-multi-seed--số-chính-thức-cho-paper)
+cho ma trận đầy đủ và [s4_sr_scale1_mf_sr_ocr.md §3](../../../report/baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md#3-trả-lời-câu-hỏi-t-confound--kết-quả-chính-của-s4)
 cho câu hỏi gốc.

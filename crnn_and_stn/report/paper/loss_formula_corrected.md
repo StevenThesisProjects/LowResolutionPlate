@@ -58,7 +58,7 @@ L_SR    = (1/N) Σᵢ ‖ I_SR⁽ⁱ⁾ − Warp_sg[θᵢ](I_HR⁽ⁱ⁾) ‖₁
 | **S1** (đề xuất, có error bar) | 0.1 | **0** | **0** |
 | **S4** (ablation, có error bar) | 0.1 | **0** | **0** |
 | **J1** (ablation, có error bar) | — | — | — (không có nhánh SR) |
-| S3 (1 seed, phụ lục) | 0.1 | 0.1 | 0.01 |
+| _(ablation 1-seed, ở `backup/report/`)_ | 0.1 | 0.1 | 0.01 |
 
 > 🚨 **Cả 3 cấu hình có error bar đều chạy $\alpha = 0$.** Nếu paper in công thức có
 > số hạng $\mathcal{L}_{\text{VGG}}$ mà không chú thích, reviewer sẽ hiểu nhầm là con
@@ -110,7 +110,7 @@ L_SR    = (1/N) Σᵢ ‖ I_SR⁽ⁱ⁾ − Warp_sg[θᵢ](I_HR⁽ⁱ⁾) ‖₁
 |---|---|
 | **Paper cũ (sai)** | $\mathcal{L}_{\text{Total}} = \mathcal{L}_{\text{CTC}} + \lambda_{\text{SR}}\mathcal{L}_{\text{SR}} + \lambda_{\text{Perc}}\mathcal{L}_{\text{VGG}}$ — 3 số hạng **song song** |
 | **Đã sửa** | $\mathcal{L}_{\text{Total}} = \mathcal{L}_{\text{CTC}} + \lambda_{\text{SR}}(\mathcal{L}_1 + \alpha\mathcal{L}_{\text{VGG}})$ — perceptual **lồng trong** $\mathcal{L}_{\text{SR}}$ |
-| **Vì sao** | Code nhân $\lambda_{\text{SR}}$ cho **cả cụm**. Hai cách viết chỉ tương đương khi $\lambda_{\text{Perc}} = \lambda_{\text{SR}} \times \alpha$. Với S3: $0.1 \times 0.1 = 0.01$ ✅ đúng bằng con số review nêu — **nhưng chỉ đúng tình cờ ở giá trị đó**. Nếu sau này đổi $\lambda_{\text{SR}}$ mà quên đổi $\lambda_{\text{Perc}}$, hai công thức lệch nhau. |
+| **Vì sao** | Code nhân $\lambda_{\text{SR}}$ cho **cả cụm**. Hai cách viết chỉ tương đương khi $\lambda_{\text{Perc}} = \lambda_{\text{SR}} \times \alpha$. Ở ablation từng bật perceptual: $0.1 \times 0.1 = 0.01$ ✅ đúng bằng con số review nêu — **nhưng chỉ đúng tình cờ ở giá trị đó**. Nếu sau này đổi $\lambda_{\text{SR}}$ mà quên đổi $\lambda_{\text{Perc}}$, hai công thức lệch nhau. |
 | **Nguồn** | [`src/training/trainer.py:336`](../../src/training/trainer.py) + [`losses.py:87-88`](../../src/training/losses.py) |
 
 ---
@@ -122,14 +122,13 @@ Không có 3 câu này thì công thức đúng vẫn gây hiểu nhầm:
 1. **Về perceptual loss:**
    > *Số hạng $\alpha\mathcal{L}_{\text{VGG}}$ được đặt $\alpha = 0$ ở toàn bộ các cấu
    > hình có error bar (J1, S1, S4). Đóng góp của nó chỉ được khảo sát ở một ablation
-   > 1 seed (S3) và **chưa được xác nhận** bằng multi-seed.*
+   > 1 seed và **chưa được xác nhận** bằng multi-seed.*
 
 2. **Về stop-gradient:** dùng nguyên đoạn ở Lỗi 3.
 
 3. **Về $\mathcal{L}_{\text{Edge}}$** (số hạng có trong code nhưng chưa từng nêu trong paper):
    > *Cài đặt còn hỗ trợ một số hạng edge loss (Sobel) với trọng số $\beta$, đặt
-   > $\beta = 0$ ở mọi cấu hình báo cáo trong bài. Cấu hình lịch sử J2 từng chạy
-   > $\beta = 0.5$; kết quả đó nằm ngoài phạm vi so sánh chính.*
+   > $\beta = 0$ ở mọi cấu hình báo cáo trong bài.*
 
    Nếu **không** muốn nhắc $\mathcal{L}_{\text{Edge}}$ trong paper thì bỏ luôn — vì
    $\beta = 0$ ở mọi cấu hình báo cáo nên nó không ảnh hưởng con số nào. Nhưng phải

@@ -106,7 +106,7 @@ rằng chính `λ_SR` cao (không phải perceptual) là thứ kéo quỹ đạo
 train loss tiếp tục giảm, nhưng S3 chạm đáy **sớm nhất**. Perceptual loss có thể
 đã cung cấp gradient signal "đặc" hơn (VGG feature space) giúp model học nhanh hơn
 ở giai đoạn đầu, nhưng cũng khiến overfit bắt đầu sớm hơn tương ứng — nhất quán với
-nhận định đã lặp lại ở [groupnorm_sr_ablation_j1_j2.md §5](../../../report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md#5-overfit--cùng-pattern-ở-cả-2-run)
+nhận định đã lặp lại ở [groupnorm_sr_ablation_j1_j2.md §5](groupnorm_sr_ablation_j1_j2.md#5-overfit--cùng-pattern-ở-cả-2-run)
 rằng dataset ~19,000 track là dư cho 60-80 epoch, dư địa nên nhắm vào chống overfit.
 
 ## 4b. Metrics bổ sung theo review Bước 2

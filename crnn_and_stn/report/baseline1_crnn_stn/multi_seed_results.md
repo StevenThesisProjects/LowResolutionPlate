@@ -81,7 +81,7 @@ experiment. `nan_batches = 0` ở mọi epoch của cả 6 run.
 ⚠️ J1 dùng **`T=16`** (không SR nên width không nhân đôi) và params 29,442,700 —
 khác J1 **lịch sử** (76.88%, STN pool `(1,1)`, params 29,313,452). Hai số này
 **không đặt chung cột**. Chi tiết:
-[groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+[j1_groupnorm_nosr.md](j1_groupnorm_nosr.md).
 
 ### S1 (SR ×2, multi-frame + DCN)
 
@@ -230,7 +230,7 @@ xác nhận đây là đặc điểm ổn định của 2 kiến trúc khác nha
 nhiên của 1 lần chạy. Ở cả 3 seed, số track "S1 đúng/S4 sai" nhỉnh hơn "S4 đúng/S1
 sai" (49>41, 44>41, 43>40) — cùng chiều với S1 có mean acc cao hơn S4, nhưng chênh
 lệch nhỏ và nằm trong biên nhiễu đã nêu ở mục 3. Gợi ý cho hướng ensemble S1+S4 vẫn
-còn giá trị (như đã nêu ở phân tích S1 vs S2 trước đây), vì ~18% track "đổi chỗ"
+còn giá trị, vì ~18% track "đổi chỗ"
 là nguồn bổ sung thông tin thật, không phải trùng lặp.
 
 ## 8. Compute — J1 rẻ nhất mà điểm cao nhất
@@ -274,7 +274,9 @@ Chế độ deterministic chỉ làm chậm **2–4%** so với `benchmark=True`
 
 ### ⚠️ Việc paper phải xử lý (không thuộc phạm vi tài liệu này)
 
-- Kết luận đảo chiều so với bản thảo hiện tại (vốn coi S1 là phương pháp thắng).
+- **Nhánh SR chưa chứng minh được đóng góp** — phải nêu ở Limitations kèm con số
+  chi phí 3.76×, dù S1 vẫn là phương pháp đề xuất.
 - Chưa tách được **từng thành phần trong cụm cờ nền** — cần ablation riêng.
-- 3 ablation vẫn 1 seed: multi-frame vs single-frame (J2), perceptual (S3), λ=0.5 (S2).
+- Chưa khảo sát có error bar các biến thể của nhánh SR (trọng số λ_SR, perceptual
+  loss, single-frame vs multi-frame) — chỉ có dữ liệu 1 seed, lưu ở `backup/report/`.
 - Chỉ đo validation Scenario-B; **chưa chạy test lần nào**.

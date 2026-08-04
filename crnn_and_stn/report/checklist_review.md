@@ -15,8 +15,8 @@
 > | Multi-seed J1/S1/S4 (9 run) | `results/multi-seed/<cấu hình>/` |
 > | Tài liệu baseline + J1/S1/S4 | `report/` |
 > | Dữ liệu 1-seed S1–S4 | `backup/mf_sr_ocr/<cấu hình>/` |
-> | J1 lịch sử · J2 · J3 (DCNv2) | `backup/crnn_resblock_*` · `backup/DCNv2/` |
-> | Tài liệu S2, S3, AdamW ablation, `summary_project/` | `backup/report/` |
+> | Artefact các run 1-seed cũ | `backup/crnn_resblock_*` · `backup/DCNv2/` |
+> | Tài liệu các ablation 1-seed | `backup/report/` |
 >
 > Toàn bộ link nội bộ đã cập nhật và verify: **202/202 trong `report/`** và
 > **25/25 trong `backup/report/`** đều trỏ đúng file có thật.
@@ -72,7 +72,7 @@ Reviewer sẽ tự tính ra từ bảng Mean ± Std, nên phải chủ động n
 > constrained, EMA — chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)`. Đây là
 > ablation 1-cụm-biến sạch so với S1 nên tốt hơn về khoa học, nhưng **không đặt
 > chung cột với 76.88%**. Chi tiết:
-> [baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md §3c](baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md).
+> [j1_groupnorm_nosr.md](baseline1_crnn_stn/j1_groupnorm_nosr.md).
 >
 > 📄 Phân tích đầy đủ 9 run: [baseline1_crnn_stn/multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
 
@@ -85,7 +85,7 @@ Reviewer sẽ tự tính ra từ bảng Mean ± Std, nên phải chủ động n
 | Nhóm 3 — chống overfitting       | ⏭️ **ĐÃ CHỐT KHÔNG ÁP DỤNG** — code sẵn (opt-in, mặc định tắt), đưa vào Future work |
 | **Bước 1** — multi-seed          | ✅ **XONG** — J1 ✅ · S1 ✅ · S4 ✅ (3 seed mỗi model)                  |
 | **Bước 2** — CER/NED/PSNR/SSIM   | ✅ **XONG** (2 chỗ cố ý lệch review, có lý do)                        |
-| **Bước 3** — hình định tính      | 🟡 script + 4 bộ hình (**S1/S2/S3/S4**, không phải 3 model multi-seed — xem [§Bước 3](#-bước-3--hình-định-tính)), **còn chọn hình cuối cho Figure 4** |
+| **Bước 3** — hình định tính      | 🟡 script xong; hình cũ sinh từ checkpoint 1-seed — **còn chọn/sinh lại hình cho Figure 4** |
 | Bước 4 — PARSeq/SVTR             | ❌ chưa bắt đầu, để cuối cùng                                         |
 
 **Không còn việc cần GPU** trong phạm vi đã chốt.
@@ -111,93 +111,33 @@ Không chỉ đọc lại tài liệu — đã kiểm tra trực tiếp:
 | MotionBlur/GaussNoise trong train transform | `src/data/transforms.py` | ❌ chỉ có trong degradation ảnh **synthetic**, không có trong train transform |
 | `weight_decay` hiện tại | banner 6 log | ❌ vẫn `0.0001` (review yêu cầu `1e-3`) |
 | `patience` hiện tại | `configs/config.py:122` | ❌ vẫn `18` (review yêu cầu `12`) |
-| **J1/J2 lịch sử — chấm lại từ artefact còn lưu** | `submission_*.txt` vs nhãn gốc | ✅ **768/999 (76.88%)** và **771/999 (77.18%)** — khớp chính xác số đã báo cáo |
-| **J1/J2 — kiến trúc thật từ `state_dict`** | đọc `.pth` | ✅ J1: 29,313,452 params, **không SR/DCN**, STN fc in=64 → pool **`(1,1)`** · J2: 29,426,895 |
-| **J2 có bật edge loss không** | banner `log_j2.txt` | 🆕 ⚠️ **`edge=0.5` (BẬT)** — thiếu trong mọi tài liệu trước, S1/S4 đều `edge=0.0` |
-| **CER của J1/J2** | tính lại từ submission | 🆕 ⚠️ **J2 (0.0645) TỆ hơn J1 (0.0608)** + 18/999 track sai độ dài (J1: 0) |
+| **J1 lịch sử — kiến trúc thật từ `state_dict`** | đọc `.pth` | ✅ 29,313,452 params, **không SR/DCN**, STN fc in=64 → pool **`(1,1)`** — khác J1 multi-seed |
 
 ---
 
-## 💰 Tối ưu chi phí multi-seed — cắt được cái nào?
+## 📦 Phạm vi đã chốt — chỉ 3 model có error bar
 
-Review yêu cầu multi-seed toàn bộ ablation từng chạy (J1/J2/S1/S2/S3/S4) —
-tốn hơn ~140h GPU nếu làm hết. Không phải cấu hình nào cũng đáng tiền như nhau.
+Review yêu cầu multi-seed toàn bộ ablation từng chạy (>140h GPU nếu làm hết).
+Phạm vi cuối cùng chốt ở **3 model: J1 + S1 + S4** — đủ trả lời 2 câu hỏi cốt lõi:
 
-**Dữ liệu 1-seed đã có đủ cho cả 4 cấu hình S1-S4** (không thiếu gì để phân tích):
-
-|     | history | submission | .pth | CER/NED | PSNR/SSIM | hình | log |
-| --- | :-----: | :--------: | :--: | :-----: | :-------: | :--: | :-: |
-| S1  |   ✅    |     ✅     |  ✅  |   ✅    |    ✅     |  ✅  | ✅  |
-| S2  |   ✅    |     ✅     |  ✅  |   ✅    |    ✅     |  ✅  | ❌  |
-| S3  |   ✅    |     ✅     |  ✅  |   ✅    |    ✅     |  ✅  | ❌  |
-| S4  |   ✅    |     ✅     |  ✅  |   ✅    |    ✅     |  ✅  | ✅  |
-
-### ✅ ĐÃ CHỐT (2026-08-03): multi-seed **J1 + S1 + S4** — bỏ J2, S2, S3
-
-|        | Multi-seed? | Chi phí | Trạng thái / Lý do                                                                                                                                                                                                                  |
-| ------ | :---------: | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **S1** |     ✅      |   ~22h  | **XONG — 79.95% ± 0.15.** Phương pháp đề xuất, con số headline của paper                                                                                                                                                             |
-| **S4** |     ✅      |   ~12h  | **XONG — 79.48% ± 0.44.** Claim _"bằng S1 nhưng rẻ hơn 2.3×"_ nay đã xác nhận                                                                                                                                                        |
-| **J1** |     ✅      |   ~10h  | **XONG — 80.45% ± 0.45.** Mốc nền: GroupNorm, **không SR**, T=16. Đã chạy bằng **cờ nền S1/S4** (không phải cờ lịch sử `1,1`) → ablation 1-cụm-biến sạch. Kết quả: claim *"S1 vượt cấu hình không SR"* **không đứng vững** — hai bên hoà                |
-| **J2** |  ⏭️ **bỏ**  |   ~27h  | SR single-frame ×2. Đắt nhất trong nhóm còn lại. Đánh đổi: mất ablation "multi-frame vs single-frame" → xử lý bằng số 1-seed + Limitations (xem dưới)                                                                                 |
-| **S2** |  ⏭️ **bỏ**  |    ~33h | Kết quả **âm tính** (794, kém nhất nhóm S). Kết luận "tăng λ_SR không giúp" đã có bằng chứng độc lập mạnh hơn: tương quan PSNR↔đọc-đúng âm (r ≈ −0.35 đến −0.41, **n=999, nhất quán 4 cấu hình**) — không phụ thuộc thứ hạng của S2 |
-| **S3** |  ⏭️ **bỏ**  |~36–45h  | Đồng hạng tuyệt đối với S4 (805/999) ở 1 seed — tốn gần gấp đôi S4 chỉ để xác nhận một ablation loss                                                                                                                                 |
-
-#### 💰 Đánh đổi khi bỏ J2 — phải ghi vào Limitations
-
-**Mất**: ablation _"multi-frame SR có hơn single-frame SR không"_ — đáng lưu ý vì
-**"Multi-Frame" nằm ngay trong tên phương pháp (MF-SR-OCR)**.
-
-**Cách trả lời khi reviewer hỏi** (0 GPU):
-
-1. Số 1-seed có sẵn: **J2 (single-frame) 77.18% vs S1 (multi-frame) 79.78%** — chênh
-   **26 track = gấp đôi biên nhiễu ±13**. Đủ mạnh để nêu, kèm nhãn *"1 seed; J2 lịch
-   sử khác S1 ở 7 tham số"*.
-2. Ghi thẳng **Limitations**: *"ablation multi-frame vs single-frame chỉ có 1 seed;
-   phần có error bar giới hạn ở J1/S1/S4."*
-
-#### ⚠️ Lưu ý: J1 KHÔNG giải được "T confound"
-
-`T = IMG_WIDTH × (SR_SCALE nếu USE_SR) ÷ WIDTH_DOWNSAMPLE`
-([`train.py:285`](../train.py)) → J1 có **T=16**, S1/S4 có **T=32**. Đi từ J1 sang S1
-đổi **cả `T` lẫn SR cùng lúc**. Cấu hình duy nhất tách được là `--width-downsample 4`
-**không** `--use-sr` (T=32, không SR) — ngoài phạm vi 3 model này → ghi Limitations.
-
-#### Bộ 3 model trả lời được gì
-
-| So sánh | Câu hỏi trả lời | Trạng thái |
+| So sánh | Câu hỏi trả lời | Kết quả |
 |---|---|---|
-| **S1 vs J1** | _Pipeline SR đề xuất có hơn backbone không SR không?_ | ✅ **đã trả lời**: **không** — hoà (+0.50, trong nhiễu), J1 rẻ hơn 3.76× → ghi Limitations |
-| **S4 vs S1** | _Có cần phóng to ảnh không, hay chỉ cần `T=32`?_ | ✅ **đã trả lời**: không cần |
-| ~~S1 vs J2~~ | _Multi-frame có hơn single-frame?_ | 1 seed + Limitations |
-| ~~S3/S2 vs S1~~ | _Perceptual / λ=0.5 có giúp không?_ | giữ 1 seed, phụ lục |
+| **S1 vs J1** | _Pipeline SR đề xuất có hơn backbone không SR không?_ | ✅ **không** — hoà (+0.50, trong nhiễu), J1 rẻ hơn 3.76× → ghi Limitations |
+| **S1 vs S4** | _Có cần phóng to ảnh không, hay chỉ cần `T=32`?_ | ✅ **không cần** — hoà (+0.47, trong nhiễu) |
 
-⚠️ **Ladder J1→S1→S4 là ablation TÍCH LUỸ**, không phải tách 1 biến — J1 khác S1 ở
-nhiều tham số cùng lúc (SR, DCN, MFSR, STN pool, domain-match, decode, EMA). Cách đọc
-đúng: *"gộp tất cả thay đổi được +X track"*, **không** phải *"SR đóng góp +X track"*.
+Các ablation 1-seed khác (trọng số λ_SR, perceptual loss, single-frame SR, AdamW
+tuning, các hướng SR thất bại ban đầu) **ra ngoài phạm vi** — dữ liệu và tài liệu
+lưu ở `backup/`, dùng cho phụ lục nếu cần, **không** vào bảng chính vì không có
+error bar.
 
-### Hệ quả với paper
+⚠️ **Ladder J1→S1 là ablation 1-CỤM-biến**, không phải tách 1 biến: S1 thêm cùng lúc
+SR + DCN + MFSR (và `T` nhảy 16→32). Cách đọc đúng: *"gộp cả cụm đó lại không cải
+thiện"*, **không** phải *"riêng SR không đóng góp"*.
 
-✅ **Công thức có perceptual vẫn giữ nguyên** như review viết:
+### Hệ quả với công thức trong paper
 
-```
-L_Total = L_CTC + λ_SR·L_SR + λ_Perceptual·L_VGG      (λ_Perceptual = 0.01)
-```
-
-⚠️ Nhưng **S3 (cấu hình bật perceptual) không còn trong bộ multi-seed** — công thức
-trong paper phải ghi rõ số hạng `λ_Perceptual` là **ablation 1-seed, chưa xác nhận**,
-không phải một phần của con số headline (S1) hay của bộ so sánh có error bar
-(J1/J2/S1/S4).
-
-⚠️ **S2 và S3** phải được ghi rõ **"1 seed, chưa xác nhận"** ở mọi bảng.
-
-⚠️ **J2 (77.18%) giữ nhãn "1 seed, exploratory"** — dùng trong phụ lục/Limitations,
-không vào bảng chính.
-
-### Thứ tự chạy
-
-**S1 ✅ → S4 ✅ → J1 ✅** — đã chạy xong cả 3. Lệnh đã dùng:
-[training_runs/run_gpu.md §0 B4](training_runs/run_gpu.md).
+⚠️ Số hạng `λ_Perceptual · L_VGG` phải ghi rõ là **ablation 1 seed, chưa xác nhận** —
+cả 3 cấu hình có error bar đều chạy `α = 0` (đã verify banner 8/8 log).
 
 ---
 
@@ -218,12 +158,11 @@ L_Total = L_CTC + λ_SR·(L1 + α·L_VGG)          # perceptual nằm TRONG L_SR
 L_SR    = (1/N) Σ ‖I_SR − Warp_sg[θ](I_HR)‖₁   # chỉ warp HR; θ bị detach
 ```
 
-- [x] Xác nhận `λ_Perceptual = λ_SR × α` → S3 (`--sr-perceptual-weight 0.1`) = 0.01
-- [x] **Chốt phạm vi multi-seed = J1+S1+S4 (2026-08-03)** → S3 **không** còn
-      trong bộ multi-seed, nên số hạng `λ_Perceptual` trong công thức phải ghi rõ
-      là **ablation 1-seed, chưa xác nhận**, không phải một phần của con số
-      headline đã có error bar. ⚠️ Cả S1 lẫn S4 (2 cấu hình có error bar) đều chạy
-      `perceptual=0.0` — đã verify trong banner 6/6 log
+- [x] Xác nhận quy đổi `λ_Perceptual = λ_SR × α` (ablation từng bật: 0.1 × 0.1 = 0.01)
+- [x] **Chốt phạm vi multi-seed = J1 + S1 + S4** → số hạng `λ_Perceptual` trong công
+      thức phải ghi rõ là **ablation 1-seed, chưa xác nhận**, không phải một phần của
+      con số headline. ⚠️ Cả 3 cấu hình có error bar đều chạy `perceptual = 0.0` —
+      đã verify trong banner 8/8 log
 - [ ] **Lỗi 1 — bỏ `Warp_θ` khỏi `I_SR`.** Code chỉ warp HR
       (`trainer.py:263-272`), vì `I_SR` đã nằm trong khung STN đã nắn — warp hai
       lần là sai
@@ -397,8 +336,7 @@ python train.py --preset stable --experiment-name s1_reg_seed42 --seed 42 \
 
 ## 🔴 Bước 1 — Multi-Seed Runs (đường găng)
 
-Đã chốt phạm vi **J1 + S1 + S4**, bỏ S2, S3 và J2 — xem
-[lý do](#-tối-ưu-chi-phí-multi-seed--cắt-được-cái-nào).
+Phạm vi: **J1 + S1 + S4** — xem [lý do](#-phạm-vi-đã-chốt--chỉ-3-model-có-error-bar).
 
 - [x] `mkdir -p results` trên server (thiếu thì `tee` fail, mất log)
 - [x] **S4 × 3 seed** ✅ **XONG** → `79.48% ± 0.44` (42: 78.98 · 100: 79.78 · 2026: 79.68)
@@ -409,12 +347,9 @@ python train.py --preset stable --experiment-name s1_reg_seed42 --seed 42 \
       ⚠️ Chạy bằng **cờ nền S1/S4** (STN pool `(4,8)` + domain-match + constrained +
       EMA, chỉ bỏ SR/DCN), **không** phải cờ lịch sử `(1,1)` — nên là ablation
       1-cụm-biến sạch so với S1, và số **không** so được với 76.88% lịch sử
-- [ ] ~~J2 × 3 seed~~ — **đã bỏ**, tiết kiệm 27h; giữ số 1-seed 77.18% cho phụ lục
-- [ ] ~~S2 × 3 seed~~ — **đã quyết định bỏ**, giữ kết quả 1 seed kèm nhãn "chưa xác nhận"
-- [ ] ~~S3 × 3 seed~~ — **đã quyết định bỏ**, giữ kết quả 1 seed kèm nhãn "chưa xác nhận"
 - [x] `aggregate_seeds.py` → bảng Mean ± Std đủ **3** model ✅
 - [x] 🆕 `aggregate_seeds.py --output-csv` — xuất bảng ra file CSV ✅
-- [x] Cập nhật `model_comparison_summary.md` + `multi_seed_results.md` + `groupnorm_sr_ablation_j1_j2.md §3c` ✅
+- [x] Cập nhật `model_comparison_summary.md` + `multi_seed_results.md` + `j1_groupnorm_nosr.md` ✅
 
 ### ✅ Kết quả S1 multi-seed — con số headline TRỤ VỮNG
 
@@ -458,14 +393,11 @@ là **có cơ sở thật**.
 Chi tiết: [s4_sr_scale1_mf_sr_ocr.md §5d](baseline1_crnn_stn/s4_sr_scale1_mf_sr_ocr.md).
 
 **Hệ quả — đã cập nhật sau khi có S1 multi-seed (2026-08-03):**
-1. ~~Số 1-seed của J1/J2/S1/S2/S3 nhiều khả năng cũng bị thổi phồng~~ →
+1. ~~Mọi số 1-seed nhiều khả năng cũng bị thổi phồng~~ →
    ⚠️ **ĐÃ BỊ BÁC BỎ với S1**: seed 42 của S1 cho **đúng cùng con số** ở cả 2 chế
    độ cudnn (797/999). Hiệu ứng `benchmark=True` **phụ thuộc cấu hình**, không phải
-   quy luật chung. J1/J2/S2/S3 vẫn chưa biết
-2. Thế hoà **S3 ↔ S4 ở 805/999 có thể không tồn tại** — vì S3 đã bị loại khỏi phạm
-   vi multi-seed, việc này sẽ **không** được xác nhận trực tiếp; ghi rõ trong paper
-   là giới hạn đã biết, không phải việc bỏ sót
-3. ~~Chưa so được S4 với S1~~ → ✅ **ĐÃ SO ĐƯỢC**: S1 = 79.95% ± 0.15 vs
+   quy luật chung — nên không khái quát hoá được theo chiều nào
+2. ~~Chưa so được S4 với S1~~ → ✅ **ĐÃ SO ĐƯỢC**: S1 = 79.95% ± 0.15 vs
    S4 = 79.48% ± 0.44 → không khác biệt có ý nghĩa. J1 = 80.45% ± 0.45 (cao nhất)
 4. Paper phải chuyển hẳn sang báo cáo **Mean ± Std**, bỏ lối best-of-run
 
@@ -490,7 +422,6 @@ Yêu cầu cuối của Bước 1 trong review. Đã có gì:
       ✅ Verify với số thật: S1 `79.9466 ± 0.1529`, J1 `80.4471 ± 0.4514`,
       S4 `79.4795 ± 0.4363`, delta `-0.5005 ± 0.2751` → `within_noise` — khớp chính xác
       bảng trong [multi_seed_results.md](baseline1_crnn_stn/multi_seed_results.md).
-      Lệnh: [training_runs/run_gpu_remaining.md §5b](training_runs/run_gpu_remaining.md)
       ⚠️ `results/` bị gitignore → muốn commit thì ghi thẳng vào `report/`:
       `--output-csv report/baseline1_crnn_stn/multi_seed_summary.csv`
 
@@ -514,13 +445,13 @@ Yêu cầu cuối của Bước 1 trong review. Đã có gì:
 
 | Cấu hình | PSNR track đọc **đúng** | PSNR track đọc **sai** | r(PSNR, đúng) |
 | -------- | ----------------------: | ---------------------: | ------------: |
-| S1       |                  16.288 |                 18.240 |        −0.362 |
-| S2       |                  18.102 |                 20.154 |        −0.346 |
-| S3       |                  16.492 |                 18.894 |        −0.412 |
-| S4       |                  17.080 |                 19.371 |        −0.400 |
+| **S1**   |                  16.288 |                 18.240 |        −0.362 |
+| **S4**   |                  17.080 |                 19.371 |        −0.400 |
+| **J1**   |         không có nhánh SR |     không có nhánh SR |             — |
 
-Track đọc **sai** lại có PSNR **cao hơn ~2 dB**, nhất quán ở cả 4 cấu hình. Cùng chiều
-với mức cấu hình: S2 tối ưu PSNR mạnh nhất (+2.29 dB) nhưng OCR kém nhất (794/999).
+Track đọc **sai** lại có PSNR **cao hơn ~2 dB**, nhất quán ở cả 2 cấu hình có SR
+(mỗi cấu hình n=999). Cùng chiều với mức kiến trúc: **J1 bỏ hẳn việc tái tạo ảnh lại
+đọc tốt nhất** (80.45%).
 
 → Khi reviewer hỏi _"sao không tối ưu theo PSNR"_, câu trả lời không còn là "PSNR không
 phản ánh OCR" mà là **"PSNR nghịch với OCR, có bằng chứng trên 999 track ở 4 cấu hình
@@ -541,25 +472,12 @@ phản ánh OCR" mà là **"PSNR nghịch với OCR, có bằng chứng trên 99
 
 - [x] `tools/visualize_paper_figures.py` — grid 4 cột, 5 đúng + 5 sai
 - [x] Verify chạy được (bản 2 track, tự tái lập đúng 805/999)
-- [x] Chạy full 10 track cho **cả 4 cấu hình** (S1/S2/S3/S4) → mỗi cấu hình có
-      `paper_figures/figure4_qualitative_grid.png` + 10 ảnh track riêng
+- [x] Chạy full 10 track trên checkpoint 1-seed → `figure4_qualitative_grid.png`
+      + 10 ảnh track riêng cho mỗi cấu hình
 
-> ⚠️ **"4 bộ hình" ≠ "4 model multi-seed"** — đây là hai tập hợp khác nhau:
->
-> | | Có hình (Bước 3) | Có multi-seed (Bước 1) |
-> |---|:---:|:---:|
-> | **S1** | ✅ | ✅ |
-> | **S4** | ✅ | ✅ |
-> | S2 | ✅ | ❌ (đã bỏ, ~33h) |
-> | S3 | ✅ | ❌ (đã bỏ, ~36–45h) |
-> | **J1** | ❌ **không thể có** | ✅ |
->
-> - **S2/S3 có hình mà không có multi-seed**: lúc sinh hình thì cả 4 checkpoint
->   S-series đã có sẵn, sinh thêm 2 bộ rất rẻ (~20 phút CPU, 0 GPU) và có ích để so
->   **cùng một track qua các cấu hình**. Quyết định cắt S2/S3 khỏi multi-seed đến **sau đó**.
-> - **J1 không có hình và không thể có**: grid 4 cột cần cột `I_SR`, mà J1 không có
->   nhánh SR nên `I_SR` **không tồn tại** (cùng lý do với PSNR ở Bước 2). Muốn có hình
->   J1 thì phải đổi sang grid **3 cột**.
+> 🚨 **J1 không có hình và không thể có**: grid 4 cột cần cột `I_SR`, mà J1 không có
+> nhánh SR nên `I_SR` **không tồn tại** (cùng lý do với PSNR ở Bước 2). Muốn có hình
+> J1 cho phụ lục thì phải đổi sang grid **3 cột**.
 >
 > ⏱️ **Thứ tự thời gian — hình chạy TRƯỚC multi-seed, không phải sau** (mtime thật):
 >
@@ -586,10 +504,6 @@ S4 thì checkpoint 1-seed đạt 805/999 còn mức thật là ~794 — **hình 
 📌 Với S1 thì mức chênh 1-seed ↔ multi-seed là **nhỏ nhất trong 3 model** (seed 42
 cho đúng 797/999 ở cả hai chế độ cudnn), nên cách B ít rủi ro hơn hẳn so với S4 —
 nhưng cách A vẫn sạch hơn nếu còn thời gian.
-
-Chạy cả 4 (không chỉ 3 cấu hình vào paper) vì rẻ, và có đủ thì so được **cùng một
-track qua các cấu hình** — hữu ích khi muốn minh hoạ vì sao S2 tái tạo ảnh đẹp hơn
-nhưng lại đọc sai.
 
 ## 🟠 Bước 4 — PARSeq / SVTR — **LÀM RIÊNG, CUỐI CÙNG**
 

@@ -1,6 +1,6 @@
 # AdamW cho Baseline 1 (STN + CRNN) — Xác nhận & Ablation (lịch sử)
 
-> **Trạng thái: đã kết thúc, chỉ còn giá trị tham khảo.** Toàn bộ ablation dưới đây chạy trên **backbone CNN + BatchNorm gốc** (trước khi có ResBlock backbone ở PR #8). Backbone đó không còn tồn tại trong code hiện tại — kết quả tốt nhất tìm được ở đây (76.28%) đã bị ResBlock backbone (76.68%) vượt qua mà không cần tuning này. Xem [resblock_backbone_upgrade.md](../../../report/baseline1_crnn_stn/resblock_backbone_upgrade.md) và [groupnorm_sr_ablation_j1_j2.md](../../../report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md) cho hướng đang active.
+> **Trạng thái: đã kết thúc, chỉ còn giá trị tham khảo.** Toàn bộ ablation dưới đây chạy trên **backbone CNN + BatchNorm gốc** (trước khi có ResBlock backbone ở PR #8). Backbone đó không còn tồn tại trong code hiện tại — kết quả tốt nhất tìm được ở đây (76.28%) đã bị ResBlock backbone (76.68%) vượt qua mà không cần tuning này. Xem [resblock_backbone_upgrade.md](../../../report/baseline1_crnn_stn/resblock_backbone_upgrade.md) và [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md) cho hướng đang active.
 
 ## 1. Xác nhận kiến trúc & optimizer
 
@@ -54,6 +54,6 @@ Nguyên tắc: mỗi lần chỉ đổi **một** biến so với baseline, cô 
 
 ## 5. Vì sao dừng ở đây
 
-Mức trần đạt được bằng optimizer tuning trên backbone CRNN gốc là 76.28% — không tiệm cận 80% (mục tiêu ban đầu), và **thấp hơn ResBlock backbone (76.68%)** vốn không cần tuning này. Kết luận: giới hạn nằm ở kiến trúc backbone, không phải optimizer — hướng đi tiếp theo là nâng backbone (đã làm, xem [resblock_backbone_upgrade.md](../../../report/baseline1_crnn_stn/resblock_backbone_upgrade.md)) rồi SR có giám sát (đang làm, xem [groupnorm_sr_ablation_j1_j2.md](../../../report/baseline1_crnn_stn/groupnorm_sr_ablation_j1_j2.md)), không phải tiếp tục tinh chỉnh optimizer trên backbone cũ.
+Mức trần đạt được bằng optimizer tuning trên backbone CRNN gốc là 76.28% — không tiệm cận 80% (mục tiêu ban đầu), và **thấp hơn ResBlock backbone (76.68%)** vốn không cần tuning này. Kết luận: giới hạn nằm ở kiến trúc backbone, không phải optimizer — hướng đi tiếp theo là nâng backbone (đã làm, xem [resblock_backbone_upgrade.md](../../../report/baseline1_crnn_stn/resblock_backbone_upgrade.md)) rồi SR có giám sát (đang làm, xem [groupnorm_sr_ablation_j1_j2.md](groupnorm_sr_ablation_j1_j2.md)), không phải tiếp tục tinh chỉnh optimizer trên backbone cũ.
 
 Cấu hình D (`--onecycle-pct-start 0.15`, còn lại mặc định) là lựa chọn cuối cho backbone gốc nếu cần tái lập, nhưng **không dùng cho công việc hiện tại** (đã chuyển sang ResBlock + `WarmupCosineScheduler`, flag `--onecycle-pct-start` không tồn tại trong `train.py` hiện tại).

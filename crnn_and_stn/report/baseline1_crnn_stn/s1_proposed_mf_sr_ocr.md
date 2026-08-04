@@ -1,329 +1,154 @@
-# S1 — Joint End-to-End MF-SR-OCR (Proposed Method)
+# S1 — Joint End-to-End MF-SR-OCR (🎯 phương pháp đề xuất)
 
-> ✅ **MULTI-SEED ĐÃ XONG** — số chính thức là **79.95% ± 0.15** (3 seed
-> deterministic), xem [§8](#8-multi-seed-review-bước-1--xác-nhận-7978) và
-> [multi_seed_results.md](multi_seed_results.md). Con số 79.78% trong tài liệu này
-> là 1 seed, và **trùng khớp chính xác với seed 42 của multi-seed** — khác S4, số
-> 1-seed của S1 không hề bị thổi phồng.
+> **Con số chính thức: 79.95% ± 0.15** trên 3 seed deterministic (42/100/2026).
 >
-> 🚨 **NHƯNG: nhánh SR KHÔNG chứng minh được đóng góp.** J1 — **cùng bộ cờ nền,
-> chỉ bỏ SR/DCN/MFSR** — đạt **80.45% ± 0.45**, tức **hoà S1** (+0.50, trong nhiễu)
-> trong khi rẻ hơn **3.76×** compute. Toàn bộ phần "S1 vượt J2 26 track" ở §2 dưới
-> đây so với **J2 lịch sử** (kiến trúc cũ), **không** phải với J1 cùng nền.
-> **Kết luận chính của tài liệu này cần đọc lại theo §8.**
-> Chi tiết: [groupnorm_sr_ablation_j1_j2.md §3c](groupnorm_sr_ablation_j1_j2.md).
+> **Đã chốt S1 là phương pháp đề xuất chính của paper** — không phải vì điểm cao nhất
+> (J1 nhỉnh hơn 0.50, nhưng nằm trong biên nhiễu → **hoà**), mà vì **ổn định nhất**:
+> std `0.15`, nhỏ hơn **3×** so với J1 và S4.
 >
-> Kết quả của cấu hình S1 trong [../training_runs/run_gpu.md](../training_runs/run_gpu.md).
-> Dữ liệu nguồn: `backup/mf_sr_ocr/s1_mf_sr_ocr/` — `history_s1_proposed.csv`,
-> `log_s1.txt`, `submission_s1_proposed.txt`, `sr_quality_s1.csv`, `mf_sr_ocr.pth`.
-> 3 ablation tách từ S1 đã chạy — xem
-> [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md) (λ_SR=0.5: kém S1 3 track, trong
-> biên nhiễu, không cải thiện),
-> [s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md) (+L_Perceptual: **hơn
-> S1 8 track, đồng hạng cao nhất đã đo**) và
-> [s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) (SR scale=1, không phóng
-> to ảnh: **hoà tuyệt đối với S3**, bằng chứng nghiêng về `T=32` là yếu tố chính
-> chứ không phải bản thân việc phóng to ảnh). Cả S3 lẫn S4 vẫn trong biên nhiễu so
-> với S1 nên chưa kết luận chắc chắn tốt hơn. Bảng so sánh đầy đủ:
-> [model_comparison_summary.md](model_comparison_summary.md).
+> 🚨 **Kết quả âm tính bắt buộc công bố kèm**: J1 — **cùng bộ cờ nền, chỉ bỏ
+> SR/DCN/MFSR** — hoà điểm với S1 trong khi rẻ hơn **3.76× compute**. Nghĩa là
+> **nhánh SR chưa chứng minh được đóng góp đo được**.
+> Chi tiết: [j1_groupnorm_nosr.md](j1_groupnorm_nosr.md).
 
-## 1. Cấu hình đã chạy
+## 1. Kiến trúc — 5 bước của pipeline đề xuất
 
 ```
-python train.py --preset stable --experiment-name s1_proposed \
-  --epochs 60 --batch-size 32 --grad-accum-steps 2 \
-  --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
-  --backbone-norm group --lr-domain-match \
-  --decode constrained --use-ema \
-  --num-workers 8 --aug-level full
+5 LR frames
+  → [1] STN per-frame (affine 6 tham số, pool (4,8))
+  → [2] DCNv2 align (kernel identity-init)
+  → [3] Multi-frame SR ×2  (+ L_SR)
+  → [4] backbone ResBlock + Attention Fusion
+  → [5] BiLSTM + CTC  (constrained decode)
 ```
 
-Đọc từ header của `log_s1.txt` — đây là toàn bộ khác biệt so với J2:
+$$\mathcal{L}_{\text{Total}} = \mathcal{L}_{\text{CTC}} + \lambda_{\text{SR}} \cdot \mathcal{L}_{\text{SR}}, \qquad \lambda_{\text{SR}} = 0.1$$
 
-| Thành phần | J2 | S1 |
-|---|---|---|
-| SR | per-frame (single-frame), scale 2 | **multi-frame** (`multi_frame=True`), scale 2 |
-| DCNv2 | không có | **có**, kernel identity-init |
-| STN pool | `(1,1)` global-average | **`(4,8)`** |
-| Domain match (Nguyên nhân #4) | không | **có** (`--lr-domain-match`) |
-| Decode | greedy | **constrained** (layout `LLLNLNN,LLLNNNN`, beam 16) |
-| EMA | không | **có** (decay 0.999) |
-| SR target alignment | lệch geometry (bug) | **đã sửa** — augment 1 lần ở cỡ target, warp target theo `theta` của STN |
-| **Sobel edge loss** | **`edge=0.5` (BẬT)** | **`edge=0.0` (TẮT)** |
-| T (timestep CTC) | 32 (do SR tăng width) | 32 |
-| Params | 29,426,895 | **29,577,214** |
+$$\mathcal{L}_{\text{SR}} = \frac{1}{N}\sum \left\| I_{\text{SR}} - \mathrm{Warp}_{\mathrm{sg}[\theta]}(I_{\text{HR}}) \right\|_1$$
 
-> ⚠️ **Dòng `edge loss` bổ sung 2026-08-03** sau khi đọc lại banner `log_j2.txt`:
-> J2 chạy kèm Sobel edge loss trọng số 0.5, còn S1 tắt hẳn. Nghĩa là S1 khác J2 ở
-> **7 biến chứ không phải 6** — càng khẳng định J2 lịch sử **không** dùng làm mốc
-> so 1-biến cho S1 được. Chi tiết:
-> [groupnorm_sr_ablation_j1_j2.md §3b](groupnorm_sr_ablation_j1_j2.md).
+Công thức đầy đủ + 4 chỗ paper đang ghi sai:
+[../paper/loss_formula_corrected.md](../paper/loss_formula_corrected.md).
 
-Toàn bộ 5 bước của pipeline đề xuất đều bật: STN per-frame → DCNv2 align → MFSR ×2
-(+`L_SR` = L1, không Sobel/Perceptual) → backbone + Attention Fusion → BiLSTM + CTC,
-`λ_SR = 0.1`. 19.001 track train (38.002 sample train+synthetic), 999 track val
-(Scenario-B), không NaN batch nào trong suốt 55 epoch đã chạy.
+> 📌 `α` (perceptual) và `β` (Sobel edge) đều đặt **0** ở S1 — đã verify trên banner
+> cả 3 log. Params: **29,577,214** · `T = (128 × 2) / 8 = 32`.
 
----
+## 2. Cấu hình đã chạy
 
-## 2. Kết quả chính
+```bash
+for SEED in 42 100 2026; do
+  python train.py --preset stable --experiment-name s1_seed${SEED} --seed ${SEED} \
+    --epochs 60 --batch-size 32 --grad-accum-steps 2 \
+    --use-sr --sr-scale 2 --use-dcn --lambda-sr 0.1 \
+    --backbone-norm group --lr-domain-match \
+    --decode constrained --use-ema \
+    --no-cudnn-benchmark --num-workers 8 --aug-level full \
+    2>&1 | tee results/log_s1_seed${SEED}.txt
+done
+```
 
-| Chỉ số | Giá trị | Epoch |
-|---|---:|---:|
-| **Best Val Acc (constrained decode)** | **79.78%** (797/999 track) | 37 |
-| Best Val Acc (greedy decode, cùng epoch) | 79.58% (795/999 track) | 37 |
-| Val Acc epoch cuối (55, early-stopped) | 78.88% (789/999 track) | 55 |
-| Val Loss thấp nhất | 0.1910 | 21 |
-| Train Loss epoch cuối | 0.0306 | 55 |
-| `nan_batches` | 0 mọi epoch | — |
+> ⚠️ **S1 KHÔNG có `--width-downsample`** (dùng mặc định 8) và **có `--sr-scale 2`** —
+> đây là 2 chỗ khác S4. Gõ nhầm là dựng sai kiến trúc, chạy 22 giờ ra kết quả vô nghĩa.
+>
+> Dữ liệu: `results/multi-seed/s1_mf_sr_ocr/` · 19.001 track train, 999 track val
+> (Scenario-B) · `nan_batches = 0` mọi epoch.
 
-Training dừng ở epoch 55 vì early stopping (`patience=18`) — đúng 18 epoch liên
-tiếp không cải thiện kể từ đỉnh ở epoch 37, khớp chính xác với cấu hình
-`EARLY_STOPPING_PATIENCE=18` trong `configs/config.py`. Không phải log bị cắt.
-
-### So sánh với các cấu hình đã chạy trước
-
-| Run | Cấu hình | Track đúng | Val Acc | So với S1 |
-|---|---|---:|---:|---:|
-| — | CRNN + STN (report ICPR gốc) | — | 77.00% | **+27 track / +2.78 điểm** |
-| — | CRNN + STN (đo lại) | 757 | 75.78% | +40 track |
-| SR-v1 | stacked-input SR (bản lỗi) | 492 | 49.25% | +305 track |
-| SR-v2 | stacked-input SR, lr thấp + aug light | 550 | 55.06% | +247 track |
-| — | ResBlock backbone `norm=none` | 766 | 76.68% | +31 track |
-| J1 | + GroupNorm, không SR | 768 | 76.88% | +29 track |
-| J2 | + SR per-frame (single-frame) có giám sát | 771 | 77.18% | **+26 track / +2.60 điểm** |
-| J3 | + DCNv2 (kernel init ngẫu nhiên — bug cũ) | 762 | 76.28% | +35 track |
-| **S1** | **Joint MF-SR-OCR (đề xuất)** | **797** | **79.78%** | — |
-
-Biên nhiễu của val 999 track là **±13 track (±1.3 điểm)** — đã dùng để đánh giá
-J1/J2/J3 trước đây (chênh nhau 3-9 track, tức nằm trong nhiễu, không kết luận
-được gì). **S1 hơn J2 tới 26 track — gấp đôi biên nhiễu.** Đây là lần đầu tiên
-một cấu hình vượt qua ngưỡng ±13 track kể từ baseline gốc 77.00%. Vẫn cần xác
-nhận bằng multi-seed (ngoài phạm vi hiện tại) trước khi khẳng định chắc chắn,
-nhưng khoảng cách này không còn mong manh như J1→J2→J3.
-
----
-
-## 3. Phân rã: cải thiện đến từ đâu
-
-Đây là 1 run duy nhất gộp 6 thay đổi cùng lúc (MFSR, DCN, STN pool, domain-match,
-decode, EMA) nên **không tách được đóng góp riêng của từng cái** — ablation cho
-việc đó nằm ngoài phạm vi hiện tại. Nhưng CSV cho phép tách được **2 nhóm lớn**:
-
-**Nhóm 1 — kiến trúc/training (MFSR + DCN + GroupNorm + domain-match + STN pool + EMA), đo bằng greedy decode để loại yếu tố decode:**
-795/999 (79.58%) so với J2 771/999 (77.18%, cũng đo bằng greedy vì code cũ chỉ
-có greedy) → **+24 track / +2.40 điểm**, đã tự nó vượt biên nhiễu ±13.
-
-**Nhóm 2 — constrained decode**, đo bằng chênh lệch `val_acc − val_acc_greedy`
-ngay trong S1: sau giai đoạn khởi động (epoch 1-2, model còn xuất chuỗi rác nên
-chênh tới +7.5 điểm), khoảng cách ổn định quanh **+0.10 → +0.30 điểm** (~1-3
-track) suốt phần còn lại của training, và đúng **+2 track (+0.20 điểm)** tại
-epoch tốt nhất (797 so với 795). Nhất quán với dự đoán ban đầu: ràng buộc layout
-sửa được lỗi sai độ dài / sai lớp ký tự ở vị trí đã biết, nhưng model đã train
-tốt thì tự nó ít mắc lỗi dạng này — phần lớn giá trị nằm ở nhóm 1, không phải decode.
-
----
-
-## 4. SR có thật sự học được gì, hay chỉ tái tạo bilinear?
-
-Đây là câu hỏi trọng tâm đặt ra từ đầu — SR trước đây (J2) chỉ +0.30 track so với
-J1 và không rõ có học được gì hay không. Với bản sửa (target căn chỉnh đúng theo
-`theta`, augment hình học một lần dùng chung cho input/target), CSV cho câu trả
-lời rõ ràng:
-
-| | Epoch 1 | Epoch 55 | Đổi |
-|---|---:|---:|---:|
-| `sr_loss` (SR học được) | 0.2497 | 0.2168 | **−13.2%** |
-| `sr_loss_bilinear` (mốc: bilinear thuần, không học) | 0.2569 | 0.2568 | ~không đổi |
-| Khoảng cách (bilinear − SR) | 0.0070 | 0.0396 | **rộng gấp 5.7 lần** |
-
-`sr_loss < sr_loss_bilinear` ở **toàn bộ 55/55 epoch**, và khoảng cách **nới rộng
-dần theo thời gian** thay vì co lại hay dao động ngẫu nhiên quanh 0. Đây là bằng
-chứng SR học được chi tiết thật vượt quá phép nội suy bilinear — khác hẳn giả
-thuyết "SR chỉ tái tạo lại bilinear" đặt ra khi thiết kế thí nghiệm S4. Không có
-nghĩa là giới hạn 55% pixel nội suy (do HR gốc chỉ ~115×42px, target ×2 là
-256×64px) đã được giải quyết — S4 (`--sr-scale 1`) vẫn cần chạy để đo SR ở đúng
-thang thông tin thật của dataset — nhưng bản sửa target-alignment đã cho SR một
-tín hiệu học được thay vì học ra bộ lọc nhiễu như PR #7.
-
----
-
-## 5. Chất lượng dự đoán trên tập validation (`submission_s1_proposed.txt`)
-
-999 dòng, đúng bằng số track validation — đây là bản ghi dự đoán ở epoch tốt
-nhất (37), dùng constrained decode.
-
-- **Confidence**: trung bình 0.969, trung vị 0.9996 — phần lớn dự đoán rất chắc
-  chắn. Chỉ 7/999 track (0.7%) có confidence dưới 0.55: `track_19095` (0.494 —
-  thấp nhất), `track_15594` (0.505), `track_22161` (0.508), `track_19725`
-  (0.513), `track_12513` (0.516), `track_12247` (0.513), `track_12478` (0.522).
-  Đây là các ứng viên tốt cho phần "ảnh minh hoạ lỗi" (`tools/visualize.py
-  --only-errors`) trong báo cáo.
-- **Độ dài dự đoán**: 997/999 track đúng 7 ký tự như ràng buộc layout. **2/999
-  track (0.2%) có độ dài 6** (`track_14442` → `MKL712`, `track_17959` →
-  `BBB581`) — đây là trường hợp beam search không tìm được chuỗi 7 ký tự hợp lệ
-  nào trong khung `T=32`, nên `constrained_beam_decode` rơi vào nhánh fallback về
-  greedy (xem docstring hàm trong `postprocess.py`). Ràng buộc layout **không
-  tuyệt đối 100%** trong thực tế — cần biết để không báo cáo "100% đúng độ dài".
-
----
-
-## 5b. Metrics bổ sung theo review Bước 2
-
-| Chỉ số | S1 | Ghi chú |
-|---|---:|---|
-| Exact Match | 79.78% (797/999) | |
-| CER ↓ | 0.0562 | mức corpus |
-| NED ↓ / 1−NED ↑ | 0.0562 / 0.9438 | |
-| PSNR: SR vs base | 16.6827 vs 15.6110 | **+1.0717 dB** |
-| SSIM: SR vs base | 0.4179 vs 0.3481 | **+0.0698** |
-| r(PSNR, đọc đúng) | **−0.362** | tương quan **âm** |
-
-Tương quan âm nghĩa là track model **đọc sai** lại có PSNR **cao hơn** (18.24 so với
-16.29 ở track đọc đúng) — nhất quán với 3 cấu hình còn lại. Chi tiết + giải thích:
-[../buoc2_metrics.md](../buoc2_metrics.md).
-
-Dữ liệu: `backup/mf_sr_ocr/s1_mf_sr_ocr/sr_quality_s1.csv` (999 dòng).
-Hình định tính (5 đúng + 5 sai): `backup/mf_sr_ocr/s1_mf_sr_ocr/paper_figures/`.
-
----
-
-## 6. Giới hạn cần nêu khi báo cáo
-
-1. ~~**1 run, không multi-seed**~~ — ✅ **đã giải quyết**: 3 seed deterministic cho
-   **79.95% ± 0.15**, xem [§8](#8-multi-seed-review-bước-1--xác-nhận-7978). Kết
-   luận "+26 track so với J2" **vẫn chỉ dựa trên J2 1-seed** — J2 multi-seed đã bị
-   bỏ để tiết kiệm GPU, nên khoảng cách này sẽ không được xác nhận bằng error bar.
-   Ghi vào Limitations.
-2. **Gộp 6 thay đổi trong 1 run** — không tách được đóng góp riêng của MFSR vs
-   DCN vs domain-match vs STN pool vs EMA. Mục 3 chỉ tách được decode vs phần còn
-   lại, không tách sâu hơn.
-3. **best-of-55-epoch** — chọn model theo đúng epoch có val acc cao nhất trên
-   cùng 999 track dùng để báo cáo, nên 79.78% có thể lạc quan hơn thực tế một
-   chút. Tham khảo thêm epoch cuối (78.88%) như một mốc bảo thủ hơn.
-4. **Compute chưa đo lại** — bảng chi phí compute ở `run_gpu.md` đo trên kiến
-   trúc J2/J3 cũ (chưa có MFSR + STN pool 4x8). Params đã tăng nhẹ (29.58M so
-   với 29.43M của J2) nhưng FLOPs/latency thật của S1 chưa được benchmark.
-5. **Val acc dùng trọng số EMA**, không phải trọng số gốc — `Trainer.validate()`
-   và `save_model()` đều dùng `self._eval_model()` trả về `ema.module` khi
-   `use_ema=True`. Số liệu trong báo cáo là của model đã làm mượt qua EMA.
-6. **Constrained decode có nhánh fallback** (mục 5) — không đảm bảo 100% output
-   đúng layout trong mọi trường hợp.
-
----
-
-## 7. Kết luận
-
-Với đúng phạm vi J1→J2→J3→S1: J1/J2/J3 chênh nhau trong biên nhiễu ±13 track,
-không đủ để kết luận GroupNorm/SR/DCN có tác dụng thật. **S1 là cấu hình đầu
-tiên vượt biên nhiễu đó một cách rõ ràng** (+26 track so với J2, +27 so với
-baseline gốc 77.00%), và phần lớn cải thiện đến từ kiến trúc/training (đo được
-+24 track ngay cả khi so sánh thuần greedy), không phải từ decode. SR trong S1
-cũng cho bằng chứng học được thật (vượt bilinear, khoảng cách nới rộng theo
-thời gian) — khác hẳn kết luận "chưa chứng minh được giá trị" đã đặt ra cho J2.
-
-**Cập nhật — S2 (λ_SR=0.5) đã chạy** (xem [s2_lam05_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s2_lam05_mf_sr_ocr.md)):
-794/999 (79.48%), kém S1 đúng 3 track — nằm sâu trong biên nhiễu ±13, tức tăng
-`λ_SR` từ 0.1 lên 0.5 **không cải thiện**. Trả lời được câu hỏi để ngỏ ở trên:
-trong 2 điểm đã đo của khoảng đề xuất `λ_SR ∈ [0.1, 0.5]`, đầu thấp (0.1, cấu hình
-S1) vẫn tốt hơn hoặc bằng đầu cao — không có lý do đổi sang 0.5. Phát hiện phụ:
-196/999 track đổi dự đoán giữa S1/S2 dù điểm tổng gần hoà, gợi ý hướng ensemble
-thay vì chỉ chọn 1 cấu hình theo điểm tổng.
-
-**Cập nhật — S3 (+L_Perceptual α=0.1) đã chạy** (xem
-[s3_perceptual_mf_sr_ocr.md](../../backup/report/baseline1_crnn_stn/s3_perceptual_mf_sr_ocr.md)): 805/999 (80.58%),
-**hơn S1 8 track** — điểm cao nhất trong toàn bộ lịch sử thử nghiệm, nhưng 8 track
-vẫn nằm trong biên nhiễu ±13 nên chưa đủ để khẳng định chắc chắn tốt hơn S1 (khác
-S2, vốn cho kết quả âm tính rõ ràng). Đây là tín hiệu tích cực đầu tiên kể từ S1
-đáng chạy multi-seed cùng S1 thay vì chỉ multi-seed riêng S1.
-
-**Cập nhật — S4 (sr-scale 1 + width_downsample 4) đã chạy** (xem
-[s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md)): 805/999 (80.58%) —
-**hoà tuyệt đối với S3**, đạt bằng một cơ chế hoàn toàn khác (không phóng to ảnh,
-giữ `T=32` qua thay đổi backbone thay vì qua SR). Đây là bằng chứng gián tiếp
-quan trọng: `T=32` (nhiều bước CTC hơn), không phải bản thân việc SR phóng to
-ảnh, mới có thể là yếu tố chính đứng sau lợi ích đo được của S1 so với J2/J3
-(vốn chạy ở `T=16`). Cần thêm 1 ablation "`width_downsample=4` không SR" để tách
-dứt điểm — chưa nằm trong phạm vi S1-S4 đã hoàn thành.
-
-Cả 4 cấu hình S1-S4 theo kế hoạch trong `run_gpu.md` đã chạy xong 1 seed.
-Bảng so sánh đầy đủ: [model_comparison_summary.md](model_comparison_summary.md).
-
----
-
-## 8. Multi-seed (review Bước 1) — xác nhận 79.78%
-
-Chạy lại 3 seed ở chế độ **deterministic** (`--no-cudnn-benchmark`), mọi cờ khác giữ
-nguyên. Dữ liệu: `results/multi-seed/s1_mf_sr_ocr/`.
+## 3. Kết quả 3 seed
 
 | Seed | Track đúng | Val Acc | Best epoch | Số epoch | Val Loss | CER ↓ | Conf. TB | conf<0.55 | sai độ dài |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 42 | 797/999 | 79.78% | 28 | 46 | 0.2094 | 0.0541 | 0.9655 | 6 | 0 |
 | 100 | 800/999 | 80.08% | 32 | 50 | 0.2141 | 0.0525 | 0.9692 | 4 | 0 |
 | 2026 | 799/999 | 79.98% | 24 | 42 | 0.1988 | 0.0556 | 0.9585 | 12 | 1 |
-| **Mean ± Std** | | **79.95% ± 0.15** | | | | **0.0541 ± 0.0016** | 0.9644 ± 0.0054 | | |
+| **Mean ± Std** | | **79.95% ± 0.15** | | | | 0.0541 ± 0.0016 | 0.9644 ± 0.0054 | | |
 
-### ✅ Số 1-seed của S1 KHÔNG bị thổi phồng — khác hẳn S4
+**Std 0.15 — nhỏ nhất trong 3 model** (J1: 0.45 · S4: 0.44). Đây là cấu hình duy nhất
+mà cả 3 seed rơi trong khoảng **0.3 điểm**.
 
-| Cùng seed 42, chỉ đổi chế độ cudnn | Track đúng | Val Acc | Best epoch |
-|---|---:|---:|---:|
-| `benchmark=True` (lần chạy gốc, mục 2) | 797/999 | 79.78% | 37 |
-| `deterministic=True` (multi-seed) | 797/999 | 79.78% | 28 |
-| **Chênh** | **0 track** | **0.00 điểm** | (khác epoch đạt đỉnh) |
+## 4. 🎯 Vì sao chọn S1 làm phương pháp đề xuất
 
-Đây là điều **không xảy ra với S4** (lệch 16 track, −1.60 điểm — xem
-[s4_sr_scale1_mf_sr_ocr.md §5d](s4_sr_scale1_mf_sr_ocr.md)). Cùng seed, hai chế độ
-cudnn khác nhau, S1 ra **đúng cùng một con số**. Hai hệ quả:
+1. **J1 không hơn S1 có ý nghĩa** (+0.50, sai số hiệu ±0.28) → thống kê là **hoà**.
+   Chọn giữa hai cấu hình hoà nhau thì quyết định bằng **độ ổn định**.
+2. **Ổn định nhất qua seed** — std 0.15, nhỏ hơn 3× hai cấu hình còn lại.
+3. **Bất biến với `cudnn.benchmark`** — cùng seed 42, chạy `benchmark=True` và
+   `deterministic=True` cho **đúng cùng con số** (797/999, lệch **0 track**), trong khi
+   S4 lệch **16 track**. Con số của S1 **tái lập được nhất** trong cả project.
+4. Là **kiến trúc hoàn chỉnh** mà toàn bộ câu chuyện của bài xây quanh nó; J1 và S4
+   đóng đúng vai **ablation** của chính S1.
 
-1. **Con số headline của paper (79.78 → 79.95%) là con số ổn định nhất đã đo** —
-   không phụ thuộc chế độ cudnn, và std giữa các seed cũng nhỏ nhất (0.15, so với
-   0.44 của S4).
-2. **Không được khái quát hoá "1-seed + `benchmark=True` luôn thổi phồng"** thành
-   quy luật chung. Mức nhạy cảm phụ thuộc cấu hình cụ thể — quan sát thực nghiệm,
-   chưa có lời giải thích chắc chắn, nên nêu đúng như vậy trong paper.
+| Cặp | Chênh | Sai số hiệu | Kết luận |
+|---|---:|---:|---|
+| J1 vs S1 | +0.50 | ±0.28 | ⚠️ trong nhiễu → **hoà** |
+| S1 vs S4 | +0.47 | ±0.27 | ⚠️ trong nhiễu → **hoà** |
 
-### So với S4 — không khác biệt có ý nghĩa thống kê
-
-```
-Chênh lệch   : +0.47 điểm (S1 79.95% so với S4 79.48%)
-Sai số hiệu  : ±0.27
-⚠️ Chênh lệch NẰM TRONG biên độ nhiễu → chưa đủ bằng chứng kết luận.
-```
-
-Claim *"S4 bằng S1 nhưng rẻ hơn 2.3×"* nay được xác nhận đúng cách (trước đây so 1
-bên multi-seed với 1 bên 1-seed). Thời gian train của S1 dưới chế độ deterministic:
-**9.39 phút/epoch** (so với 9.21 ở lần chạy gốc — chỉ chậm hơn 2.0%).
-
-Nghịch lý đáng nêu: **S1 ổn định hơn S4 về exact match** (std 0.15 vs 0.44, nhỏ hơn
-3 lần) nhưng **kém ổn định hơn về CER** (std 0.0016 vs 0.0001, lớn hơn 16 lần) — hai
-đại lượng không đi cùng chiều, quan sát chỉ multi-seed mới thấy được.
-
-Ổn định dự đoán: **778/999 track (77.9%) được cả 3 seed dự đoán giống hệt nhau** —
-tức 22.1% số track đổi kết quả tuỳ seed (S4: 23.1%).
-
-### 🚨 So với J1 (cùng nền, không SR) — SR không mang lại lợi ích
-
-| Model | SR/DCN/MFSR | `T` | GFLOPs | Mean ± Std |
-|---|:---:|---:|---:|---:|
-| **J1** | ❌ | 16 | **26.14** | **80.45% ± 0.45** 🥇 |
-| **S1** | ✅ | 32 | 109.08 (**3.76×**) | 79.95% ± 0.15 |
-
-```
-Chênh lệch   : +0.50 điểm (J1 so với S1)
-Sai số hiệu  : ±0.28
-⚠️ NẰM TRONG biên nhiễu → không phân biệt được.
-```
+## 5. 🚨 Giới hạn phải công bố — nhánh SR chưa chứng minh được đóng góp
 
 J1 dùng **chung toàn bộ cụm cờ nền** với S1 (GroupNorm, STN pool `(4,8)`,
-`--lr-domain-match`, constrained decode, EMA) và chỉ **bỏ SR + DCN + MFSR**. Thêm
-cụm đó vào **không cải thiện** mà tốn 3.76× compute. Ở mức track, J1 hơn S1
-**+2 / +8 / +5** qua 3 seed — cùng chiều ở cả 3.
+`--lr-domain-match`, constrained decode, EMA); S1 chỉ thêm **SR + DCN + MFSR**.
+Thêm cụm đó vào **không cải thiện** mà tốn **3.76× compute**.
 
-→ Phần +26 track "S1 vượt J2" ở [§2](#2-kết-quả-chính) là so với **J2 lịch sử**
-(STN pool `(1,1)`, không domain-match/EMA/constrained). Khi so với cấu hình **cùng
-nền**, lợi thế đó **biến mất**. Cải thiện thật đến từ cụm cờ nền, không phải SR.
+| | GFLOPs/track | Phút/epoch | Val Acc (3 seed) |
+|---|---:|---:|---:|
+| J1 (không SR) | **26.14** | **2.60** | 80.45% ± 0.45 |
+| **S1** | 109.08 (**3.76×**) | 9.67 | **79.95% ± 0.15** |
 
-Phân tích đầy đủ 9 run: **[multi_seed_results.md](multi_seed_results.md)**.
+**Cách viết trung thực**: _"SR không cho thấy lợi ích đo được trên tập val này"_ —
+**không** phải _"SR có ích"_, cũng **không** phải _"bỏ SR thì tốt hơn"_ (chênh trong
+nhiễu, không kết luận được chiều nào).
 
-✅ **Bước 1 của review đã hoàn thành** — đủ 3 model J1/S1/S4 có Mean ± Std.
-Không còn run GPU nào trong phạm vi đã chốt.
+📌 **Một điểm ủng hộ việc giữ nhánh SR**: J1 overfit **sớm và sâu hơn** (val loss chạm
+đáy ep 11–16 so với 15–22 của S1; train loss xuống 0.0074 so với ~0.03). Nhánh SR có
+vẻ hoạt động như **regularizer đa nhiệm** — không cải thiện exact match nhưng có ghìm
+được mức overfit. Đây là quan sát, chưa phải ablation riêng.
+
+## 6. Constrained decode đóng góp bao nhiêu
+
+20.000 nhãn đều dài 7 ký tự và chỉ có **2 layout** (`LLLNLNN` 13k · `LLLNNNN` 7k) →
+khoá cứng 6/7 vị trí lớp chữ/số, beam 16.
+
+| Seed | Constrained | Greedy | Chênh |
+|---|---:|---:|---:|
+| 42 | 79.78% | 79.78% | 0 |
+| 100 | 80.08% | 79.88% | **+2 track** |
+| 2026 | 79.98% | 79.98% | 0 |
+
+Đóng góp nhỏ (**0–2 track**) nhưng miễn phí về compute — chạy ở khâu decode.
+
+## 7. Chất lượng ảnh SR
+
+| | PSNR (SR) | PSNR (base) | Chênh | SSIM (SR) | SSIM (base) | Chênh |
+|---|---:|---:|---:|---:|---:|---:|
+| S1 (×2) | 16.6827 | 15.6110 | +1.0717 dB | 0.4179 | 0.3481 | +0.0698 |
+
+> ⚠️ Đo trên checkpoint **1 seed**, khác nguồn với bảng accuracy multi-seed.
+> 🔬 Track model đọc **sai** lại có PSNR **cao hơn ~2 dB** (r = −0.362, n=999) — PSNR
+> **nghịch** với khả năng đọc. Chi tiết: [../buoc2_metrics.md](../buoc2_metrics.md).
+
+## 8. Overfit
+
+| Seed | Val loss chạm đáy | Val acc đỉnh | Val loss cuối | Train loss cuối |
+|---|---:|---:|---:|---:|
+| 42 | ep 20 (0.1875) | ep 28 | 0.2849 | 0.0344 |
+| 100 | ep 16 (0.1852) | ep 32 | 0.2701 | 0.0312 |
+| 2026 | ep 19 (0.1888) | ep 24 | 0.2556 | 0.0411 |
+
+Val loss chạm đáy sớm (ep 16–20) rồi tăng 36–52%, trong khi train loss tụt về ~0.03.
+Val acc vẫn nhích lên tới ep 24–32 **dù val loss đã tăng** → early stopping theo
+**Val Exact Match Accuracy** (không theo val loss) là lựa chọn đúng.
+
+Các biện pháp chống overfit đã cài sẵn nhưng **chưa khảo sát** — xem Future work ở
+[../checklist_review.md](../checklist_review.md).
+
+## 9. Kết luận
+
+1. **S1 = 79.95% ± 0.15** — con số headline của paper, ổn định và tái lập được nhất.
+2. **Nhánh SR chưa chứng minh được đóng góp đo được** — Limitation bắt buộc, kèm con
+   số chi phí **3.76×**.
+3. **Phần cải thiện thật đến từ cụm cờ nền** (STN pool `(4,8)` + domain-match +
+   constrained decode + EMA), không phải SR.
+4. **Chưa tách được từng thành phần trong cụm cờ nền** — câu hỏi mở lớn nhất còn lại.
+5. Chỉ đo trên **validation Scenario-B**; **chưa chạy test lần nào**.
+
+📄 [multi_seed_results.md](multi_seed_results.md) ·
+[j1_groupnorm_nosr.md](j1_groupnorm_nosr.md) ·
+[s4_sr_scale1_mf_sr_ocr.md](s4_sr_scale1_mf_sr_ocr.md) ·
+[model_comparison_summary.md](model_comparison_summary.md)
