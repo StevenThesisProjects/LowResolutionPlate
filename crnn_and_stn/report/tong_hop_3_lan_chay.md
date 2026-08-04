@@ -831,7 +831,16 @@ python train.py \
 > ⚠️ Model ra từ lệnh này **khác** 3 checkpoint `s1_seed*_best.pth` đã có — train mới
 > trên 20.000 track (thêm 5%, gồm cả val), không phải checkpoint cũ được inference lại.
 >
-> **Phương án an toàn hơn**: dùng lại checkpoint đã được validate, chỉ chạy inference
-> trên test — số val và số test đến từ **cùng một model**. Hiện chưa có tool
-> (`tools/eval_decode.py` chỉ chạy `mode="val"`), cần viết thêm ~1 giờ.
+> **Phương án an toàn hơn (khuyến nghị)**: dùng lại checkpoint đã được validate, chỉ
+> chạy inference trên test — số val và số test đến từ **cùng một model**.
+> ✅ **Đã có tool** `tools/predict_test.py` (verify ra đúng 1.000 dòng trên test public):
+>
+> ```bash
+> python tools/predict_test.py \
+>   --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+>   --output results/submission_s1_seed42_public.txt
+> ```
+>
+> ⚠️ `tools/eval_decode.py` **KHÔNG** dùng được cho test (thiếu `is_test=True` →
+> `Tổng samples: 0`). 🎯 Nên chạy **cả 2 phương án** rồi so trên public test.
 > Phân tích đánh đổi: [paper/paper_revision_plan.md §3](paper/paper_revision_plan.md).

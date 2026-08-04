@@ -530,11 +530,21 @@ minh hoạ *"giới hạn của dữ liệu"* trong paper, vì không cấu hìn
 - [x] Chốt cấu hình cuối theo Mean ± Std, **trước khi** nhìn bất kỳ số test nào →
       ✅ **S1** (2026-08-04), chọn vì std nhỏ nhất (0.15) và bất biến với
       `cudnn.benchmark`. Quyết định này được chốt khi **chưa** có bất kỳ số test nào
-- [ ] Inference test public — ⚠️ `--submission-mode` **train lại từ đầu và tắt early
-      stopping**, không phải chỉ inference; lệnh sẵn dùng (`--epochs 28`, trung bình
-      best epoch 3 seed S1) + phân tích 2 phương án A/B ở
-      [paper/paper_revision_plan.md §3](paper/paper_revision_plan.md)
-- [ ] Test blind cuối cùng
+- [x] 🆕 **`tools/predict_test.py`** (2026-08-05) — inference test trên checkpoint có
+      sẵn, **không train lại**. ⚠️ `eval_decode.py` không dùng được cho test (thiếu
+      `is_test=True` → `Tổng samples: 0`)
+- [x] 🆕 **Phương án A đã chạy xong** — sinh `submission_s1_seed42_public.txt` (1.000
+      dòng) và `submission_s1_seed42_blind.txt` (3.000 track) từ `s1_seed42_best.pth`,
+      model **đã biết chắc 79.78% trên val**
+- [ ] 🔄 **Phương án B đang chạy** — `train.py --submission-mode --epochs 28`, train lại
+      trên 20.000 track (~4.6h). Model này **không kiểm chứng được** vì không có val
+- [ ] ⬜ **Nộp public bằng A** → có mốc leaderboard an toàn ← **bước tiếp theo**
+- [ ] ⬜ B xong → nộp public bằng B → so 2 số
+- [ ] ⬜ **Nộp blind bằng bản thắng** — làm **cuối cùng**, test blind thường chỉ cho
+      nộp 1 lần
+
+> 📋 Lệnh đầy đủ + **kiểm tra file submission trước khi nộp** (số dòng, định dạng, độ
+> dài biển số, track ID trùng): [paper/paper_revision_plan.md §3](paper/paper_revision_plan.md)
 
 ---
 

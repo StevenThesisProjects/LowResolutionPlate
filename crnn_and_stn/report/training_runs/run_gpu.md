@@ -342,8 +342,28 @@ python train.py \
 > trên 20.000 track (thêm 5%, gồm cả val), không phải checkpoint cũ được inference lại.
 
 **Phương án an toàn hơn (khuyến nghị)**: dùng lại checkpoint đã được validate, chỉ chạy
-inference trên test — số val và số test đến từ **cùng một model**. Hiện chưa có tool
-(`tools/eval_decode.py` chỉ chạy `mode="val"`), cần viết thêm ~1 giờ.
+inference trên test — số val và số test đến từ **cùng một model**.
+✅ **Đã có tool**: `tools/predict_test.py` (verify ra đúng 1.000 dòng trên test public).
+
+```bash
+# Test public (1.000 track) — ~1 phút GPU, KHÔNG train lại
+python tools/predict_test.py \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --output results/submission_s1_seed42_public.txt
+
+# Test blind (3.000 track)
+python tools/predict_test.py \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --data-root dataset/TKzFBtn7-test-blind/TKzFBtn7-test-blind \
+  --output results/submission_s1_seed42_blind.txt
+```
+
+> ⚠️ **`tools/eval_decode.py` KHÔNG dùng được cho test** — nó dựng dataset với
+> `val_split_file` và thiếu `is_test=True`, trỏ vào thư mục test sẽ ra
+> `Tổng samples: 0 → ❌ Validation set rỗng`. Phải dùng `predict_test.py`.
+>
+> 🎯 **Nên chạy cả 2 phương án** rồi so trên public test — bản A đến từ model **đã biết
+> chắc 79.78% trên val**, bản B thêm 5% dữ liệu nhưng **không kiểm chứng được**.
 Phân tích đánh đổi: [../paper/paper_revision_plan.md §3](../paper/paper_revision_plan.md).
 
 Test public 1.000 track, test blind 3.000 track — file ra là

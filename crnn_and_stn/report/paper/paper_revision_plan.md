@@ -70,14 +70,18 @@ Hệ quả trong `Trainer.fit()`: khi `val_loader is None` thì **early stopping
 → Nếu dùng, **bắt buộc đặt `--epochs` bằng epoch tốt nhất học được từ validation**
 (S1: trung bình 28 qua 3 seed), không để 60.
 
-**(2) Chưa có công cụ chạy test trên checkpoint có sẵn.** `tools/eval_decode.py` chạy
-`mode="val"`, không nhận test set.
+**(2) ✅ ĐÃ CÓ công cụ chạy test trên checkpoint có sẵn** — `tools/predict_test.py`
+(thêm 2026-08-05, đã verify ra đúng 1.000 dòng trên test public).
+
+⚠️ **`tools/eval_decode.py` KHÔNG dùng được cho test** — nó dựng dataset với
+`val_split_file` và thiếu `is_test=True`, nên trỏ vào thư mục test sẽ ra:
+`Split không hợp lệ → Val: 99 tracks → Tổng samples: 0 → ❌ Validation set rỗng`.
 
 ### Hai phương án
 
 | | **A — dùng lại checkpoint đã có** | **B — `--submission-mode`** |
 |---|---|---|
-| Cách làm | Viết script inference nhỏ (~1 h người), nạp `*_best.pth`, chạy trên test | Train lại toàn bộ 20k track rồi predict test |
+| Cách làm | ✅ `tools/predict_test.py` — nạp `*_best.pth`, inference thuần trên test | Train lại toàn bộ 20k track rồi predict test |
 | Chi phí GPU | ~0 (chỉ inference) | **thêm 6–7 h** |
 | Dữ liệu train | 19.001 track | 20.000 track (**+5%**) |
 | Rủi ro | Không có — model đúng bằng model đã báo cáo val | **Cao**: không có val để kiểm chứng, không early stopping, dễ ship model overfit |
@@ -108,21 +112,70 @@ python train.py \
 > 1 lần train mới trên 20.000 track (thêm 5% dữ liệu, gồm cả 999 track val), dùng seed
 > mặc định của `--preset stable`. Số val đã có (79.78–80.08%) **không phải** số của
 > chính model này.
+
+**Lệnh phương án A (khuyến nghị)** — ✅ **ĐÃ CHẠY XONG (2026-08-05)**, ~1 phút GPU:
+
+```bash
+# Test public (1.000 track)
+python tools/predict_test.py \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --output results/submission_s1_seed42_public.txt
+
+# Test blind (3.000 track)
+python tools/predict_test.py \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --data-root dataset/TKzFBtn7-test-blind/TKzFBtn7-test-blind \
+  --output results/submission_s1_seed42_blind.txt
+```
+
+> ✅ Đã verify: ra đúng **1.000 dòng** trên test public. Thư mục blind có **3.000 track**.
+> Kiến trúc suy ngược từ `state_dict` nên không cần nhớ flag lúc train — trừ
+> `--width-downsample 4` nếu chấm checkpoint **S4**.
+
+### ✅ Kiểm tra file submission TRƯỚC KHI NỘP (~30 giây)
+
+Bắt lỗi định dạng sớm còn hơn nộp hỏng:
+
+```bash
+# 1) Đúng số dòng chưa — kỳ vọng 1000 và 3000
+wc -l results/submission_s1_seed42_public.txt results/submission_s1_seed42_blind.txt
+
+# 2) Định dạng: track_id,TEXT;conf
+head -3 results/submission_s1_seed42_public.txt
+
+# 3) Độ dài biển số — gần như toàn bộ phải là 7 ký tự
+awk -F'[,;]' '{print length($2)}' results/submission_s1_seed42_public.txt | sort | uniq -c
+
+# 4) Track ID không được trùng — phải = 1000
+cut -d, -f1 results/submission_s1_seed42_public.txt | sort -u | wc -l
+```
+
+### Thứ tự đúng — trạng thái hiện tại
+
+```
+multi-seed (val) ✅  →  chốt cấu hình = S1 ✅  →  sinh file test (A) ✅
+   →  nộp public bằng A  ⬜         ← BƯỚC TIẾP THEO
+   →  B train xong → nộp public bằng B → so 2 số  ⬜
+   →  nộp blind bằng BẢN THẮNG  ⬜   ← làm CUỐI CÙNG
+```
+
+> 🚨 **Tuyệt đối không** dùng test public để chọn *cấu hình* — sẽ biến nó thành tập
+> validation thứ hai và làm số blind test mất giá trị. Việc chọn cấu hình (**S1**) đã
+> **xong trước** khi nhìn bất kỳ con số test nào. Dùng public để chọn giữa A và B
+> (cùng cấu hình S1, chỉ khác cách train) thì **không vi phạm** nguyên tắc này.
 >
-> Phương án A (khuyến nghị, dùng `s1_seed42_best.pth` có sẵn + inference thuần trên
-> test) **chưa có lệnh sẵn** — cần viết thêm tool trước (~1 giờ, xem bảng trên).
-
-### Thứ tự đúng
-
-```
-multi-seed (val) ✅  →  chốt cấu hình = S1 ✅  →  inference test public
-                                              →  (nếu có leaderboard) đối chiếu
-                                              →  test blind cuối cùng
-```
-
-> 🚨 **Tuyệt đối không** dùng test public để chọn cấu hình — sẽ biến nó thành tập
-> validation thứ hai và làm số blind test mất giá trị. Việc chọn cấu hình đã **xong
-> trước** khi nhìn bất kỳ con số test nào.
+> ⚠️ **Chưa nộp blind vội** — test blind thường chỉ cho nộp **một lần**. File blind của
+> A đã sinh sẵn, nhưng nếu B thắng trên public thì phải sinh lại từ checkpoint của B:
+>
+> ```bash
+> python tools/predict_test.py \
+>   --checkpoint results/submission_s1_final_best.pth \
+>   --data-root dataset/TKzFBtn7-test-blind/TKzFBtn7-test-blind \
+>   --output results/submission_B_blind.txt
+> ```
+>
+> 📌 Nếu ban tổ chức **cho nộp blind nhiều lần** thì toàn bộ lưu ý trên không còn quan
+> trọng — nên **kiểm tra luật challenge trước**, vì nó quyết định cả chiến lược.
 
 ## 4. Limitations phải ghi vào paper
 
