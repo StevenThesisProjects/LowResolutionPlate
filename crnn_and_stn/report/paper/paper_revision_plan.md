@@ -150,7 +150,34 @@ awk -F'[,;]' '{print length($2)}' results/submission_s1_seed42_public.txt | sort
 cut -d, -f1 results/submission_s1_seed42_public.txt | sort -u | wc -l
 ```
 
-### Thứ tự đúng — trạng thái hiện tại
+### 📋 Trình tự nên làm — checklist theo thứ tự
+
+- [x] **Bước 1 — Sinh file test của A** (public + blind) ✅ xong 2026-08-05
+      → `submission_s1_seed42_public.txt` (1.000 dòng) ·
+      `submission_s1_seed42_blind.txt` (3.000 track)
+      *Chạy file là vô hại, chỉ tốn ~1 phút. Cẩn trọng nằm ở khâu **nộp**, không phải khâu chạy.*
+
+- [ ] **Bước 2 — Nộp public bằng A** ← **VIỆC TIẾP THEO**
+      → có **mốc an toàn** trên leaderboard từ model đã biết chắc 79.78% trên val.
+      Nhớ chạy 4 lệnh kiểm tra file ở mục trên trước khi nộp.
+
+- [ ] **Bước 3 — Đợi B train xong (~3h) → nộp public bằng B → so 2 số**
+      → file của B: `results/submission_submission_s1_final_final.txt`
+      (do `predict_test()` tự sinh cuối run `--submission-mode`)
+
+- [ ] **Bước 4 — Nộp blind bằng BẢN THẮNG** — làm **cuối cùng**
+
+  - Nếu **A thắng**: dùng luôn `submission_s1_seed42_blind.txt` (đã có sẵn)
+  - Nếu **B thắng**: phải **sinh lại** file blind từ checkpoint của B —
+
+    ```bash
+    python tools/predict_test.py \
+      --checkpoint results/submission_s1_final_best.pth \
+      --data-root dataset/TKzFBtn7-test-blind/TKzFBtn7-test-blind \
+      --output results/submission_B_blind.txt
+    ```
+
+**Sơ đồ tổng:**
 
 ```
 multi-seed (val) ✅  →  chốt cấu hình = S1 ✅  →  sinh file test (A) ✅
@@ -164,18 +191,13 @@ multi-seed (val) ✅  →  chốt cấu hình = S1 ✅  →  sinh file test (A) 
 > **xong trước** khi nhìn bất kỳ con số test nào. Dùng public để chọn giữa A và B
 > (cùng cấu hình S1, chỉ khác cách train) thì **không vi phạm** nguyên tắc này.
 >
-> ⚠️ **Chưa nộp blind vội** — test blind thường chỉ cho nộp **một lần**. File blind của
-> A đã sinh sẵn, nhưng nếu B thắng trên public thì phải sinh lại từ checkpoint của B:
+> ⚠️ **Vì sao phải để blind cuối cùng**: test blind thường chỉ cho nộp **một lần**.
+> Nộp blind bằng A ngay bây giờ, mà 3 giờ nữa B thắng trên public, là **tiêu mất lượt
+> nộp cho model kém hơn**.
 >
-> ```bash
-> python tools/predict_test.py \
->   --checkpoint results/submission_s1_final_best.pth \
->   --data-root dataset/TKzFBtn7-test-blind/TKzFBtn7-test-blind \
->   --output results/submission_B_blind.txt
-> ```
->
-> 📌 Nếu ban tổ chức **cho nộp blind nhiều lần** thì toàn bộ lưu ý trên không còn quan
-> trọng — nên **kiểm tra luật challenge trước**, vì nó quyết định cả chiến lược.
+> 📌 **Kiểm tra luật challenge trước** — nếu ban tổ chức **cho nộp blind nhiều lần**
+> thì toàn bộ lưu ý trên không còn quan trọng, cứ nộp thoải mái. Luật này quyết định
+> cả chiến lược.
 
 ## 4. Limitations phải ghi vào paper
 
