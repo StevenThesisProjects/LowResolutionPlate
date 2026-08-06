@@ -70,8 +70,6 @@ The remainder of this paper is organized as follows: Section~2 details the data,
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-
 \section{Methodology}
 
 This section describes the proposed MF-SR-OCR framework, beginning with the task and the corpus it is trained on and ending with the protocol behind every number we report. Each component is described together with the reason for its design, since several of the choices below follow from failure modes observed during development rather than from convention.
@@ -176,7 +174,7 @@ Because the differences separating LRLPR variants are small, single-run comparis
 
 Beyond exact-match accuracy we report character error rate and normalized edit distance, which separate configurations whose exact-match scores are close, and---for configurations containing the restoration branch---PSNR and SSIM of the super-resolved frames against the high-resolution ground truth. The latter two are always given alongside the bilinear upscale of the same input, since only the difference between the two is interpretable \cite{nascimento2025toward}.
 
-Two caveats follow from this protocol. Early stopping selects the reported checkpoint on the same validation split the results are then measured on, so the absolute numbers are mildly optimistic; the comparisons between configurations remain sound, because every configuration is selected and measured in the same way on the same tracks. And every number in this paper is a validation number: the benchmark's held-out test sets are unlabelled and we did not submit to them, so no test-set result is claimed anywhere.
+Two caveats follow from this protocol. Early stopping selects the reported checkpoint on the same validation split the results are then measured on, so the absolute numbers are mildly optimistic; the comparisons between configurations remain sound, because every configuration is selected and measured in the same way on the same tracks. And every number in this paper is a validation number. The benchmark distributes its public and blind test sets without labels, so no test accuracy can be computed locally: we produced predictions for all $1{,}000$ public and $3{,}000$ blind tracks from a single checkpoint---the seed-$42$ run of the full model, selected because its score is invariant to cuDNN autotuning---but did not submit them, and no test-set result is claimed anywhere in this paper. That checkpoint is also the weakest of the three seeds on validation, so the choice cannot be read as picking the most favourable run.
 
 The nine runs behind Section~3---three configurations at three seeds---cost $39.1$ GPU-hours in total on a single GPU, distributed as $5.6$~h for \emph{w/o~SR}, $22.2$~h for the full model and $11.3$~h for \emph{SR$\times 1$}. The restoration path accounts for most of this difference: it makes the proposed model roughly four times more expensive to train, and $3.76\times$ more expensive to run, than the variant without it.
 
