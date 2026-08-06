@@ -104,11 +104,11 @@ Each training track yields two samples. The first uses the real low-resolution f
 
 The network maps a tensor of shape $[B, 5, 3, 32, 128]$ to per-timestep class log-probabilities through the six stages numbered in Fig.~\ref{fig1}. All frames share weights throughout, so the parameter count is independent of the number of frames.
 
-\textbf{Stage 1 --- Per-frame geometric rectification.} A Spatial Transformer Network \cite{jaderberg2015stn} predicts six affine parameters $\theta_i$ per frame and resamples it. The localization network uses stride-1 convolutions with max-pooling and retains a $4 \times 8$ spatial grid before its fully connected head, rather than pooling to $1 \times 1$. This matters because rotation and translation are spatial quantities: a globally averaged descriptor cannot express \emph{``the plate leans five degrees and sits left of centre''}, and a head fed such a descriptor can fit little beyond zoom. The final layer is initialized so that $\theta_i$ is the identity, making the module a no-op at the start of training.
+\textbf{Stage 1 --- Per-frame geometric rectification.} A Spatial Transformer Network \cite{jaderberg2015stn} predicts six affine parameters $\theta_i$ per frame and resamples it. The localization network uses stride-1 convolutions with max-pooling and retains a $4 \times 8$ spatial grid before its fully connected head, rather than pooling to $1 \times 1$. This matters because rotation and translation are spatial quantities: a globally averaged descriptor retains little with which to express \emph{``the plate leans five degrees and sits left of centre''}, and a head fed such a descriptor appears able to fit little beyond zoom. The final layer is initialized so that $\theta_i$ is the identity, making the module a no-op at the start of training.
 
 \textbf{Stage 2 --- Cross-frame deformable alignment.} A single affine warp per frame cannot express residual local misalignment caused by motion blur, rolling shutter, or plate bending. We therefore align each frame toward the middle frame of the track with a modulated deformable convolution \cite{zhu2019dcnv2}, following the principle established for video restoration \cite{wang2019edvr}. Offsets and modulation masks are predicted from the concatenated (frame, reference) pair. Both heads are zero-initialized, and---importantly---the deformable kernel itself is initialized to the identity; zeroing only the offsets is insufficient, since a randomly initialized $3\times3$ kernel would replace each RGB frame with a random mixture on the very first forward pass.
 
-\textbf{Stage 3 --- Multi-frame super-resolution.} The restoration branch upscales the aligned frames by $\times 2$. Shallow features are extracted per frame, averaged across the five frames to form a temporal context, and concatenated back onto each frame before a body of four residual blocks; upsampling uses sub-pixel convolution \cite{nascimento2023attention}, and the learned output is added to a bilinear upscale so that the module starts near identity. The temporal context is what makes the branch multi-frame rather than single-image: at five to seven pixels of width per character, any additional signal must come from the sub-pixel jitter between frames.
+\textbf{Stage 3 --- Multi-frame super-resolution.} The restoration branch upscales the aligned frames by $\times 2$. Shallow features are extracted per frame, averaged across the five frames to form a temporal context, and concatenated back onto each frame before a body of four residual blocks; upsampling uses sub-pixel convolution \cite{nascimento2023attention}, and the learned output is added to a bilinear upscale so that the module starts near identity. The temporal context is what makes the branch multi-frame rather than single-image: at five to seven pixels of width per character, the only additional signal plausibly available to it is the sub-pixel jitter between frames.
 
 \textbf{Stage 4 --- Shared residual encoder.} A stem convolution is followed by five residual stages with channel widths $(64, 128, 256, 256, 512)$ and two blocks each, using PReLU activations, squeeze-and-excitation channel re-weighting, and a residual scale of $0.1$ for stability over long schedules. Following the practice of super-resolution networks we omit BatchNorm inside residual blocks, but removing normalization entirely proved untenable once the SR head doubles the spatial size: feature scale drifts and gradients diverge to NaN. We therefore use GroupNorm \cite{wu2018groupnorm}, which normalizes per sample and so avoids the small-batch behaviour of BatchNorm while restoring the stability its removal cost. The stride schedule reduces height to a single row while preserving width as the CTC time axis, yielding $T = 32$ steps: the $128$-pixel input width is doubled by the $\times 2$ branch and then divided by eight. During training, whole frame feature maps are replaced by the track mean with probability $0.05$, discouraging the model from relying on one clear frame.
 
@@ -181,37 +181,93 @@ The nine runs behind Section~3---three configurations at three seeds---cost $39.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-\section{Numerical Results and Discussion}
+\section{Results and Discussion}
 
+This section first places the three configurations against the baselines published with the benchmark, then examines whether the restoration branch justifies its cost. That examination returns a negative answer, and the two subsections after it trace the reason: first through the image-quality metrics that motivated the branch, then through the errors the model actually makes.
 
-To ensure experimental consistency and reproducibility, a unified hyperparameter configuration was enforced across all candidate architectures. The models were implemented within the TensorFlow deep learning framework. Network weights were optimized using the Adam algorithm with a static learning rate of $\alpha = 5 \times 10^{-4}$. This specific learning rate was empirically selected to balance convergence speed with stability, effectively mitigating the gradient volatility often observed in the recurrent units of the CLDNN and the multi-head attention blocks of the TNN. The loss calculation utilized Sparse Categorical Cross-Entropy, minimizing the divergence between the predicted probability distribution and the ground-truth modulation labels. Further, the performance analysis assesses classification accuracy across a wide dynamic range of signal-to-noise ratios (SNRs), i.e., from $-20$ dB to $+20$ dB. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=1\textwidth,  height = 0.4\textheight, keepaspectratio]{Result/Ensemble.png}
-    \caption{Accuracy vs. SNR of different techniques.}
-    \label{fig2}
-\end{figure}
+\subsection{Main Comparison}
 
-Fig. \ref{fig2} delineates the definitive performance benchmark, wherein the heterogeneous fusion of the Shallow ResNet and TNN (solid red trajectory) establishes a dominant operational envelope across the full dynamic range, peaking at an asymptotic accuracy of $\approx 94\%$ in the high-SNR regime ($> 10\,\text{dB}$) while demonstrating superior gradient stability in the critical transition zone ($0\text{--}4\,\text{dB}$). This empirical success validates the hypothesis of feature orthogonality: the architecture effectively synergizes the high-precision spatial filtering of the ResNet—essential for resolving dense, static constellations (e.g., 64-QAM)—with the global, noise-resilient context of the TNN, thereby rectifying errors in noise-dominated samples where local convolutional filters lose discriminative power and yielding a calibrated, robust classification output. In stark contrast, the CLDNN-TNN configuration yields suboptimal inference results (saturating at $90\%\text{--}91\%$) due to feature redundancy and overlapping inductive biases; since both constituent architectures (via recurrent units and self-attention, respectively) are predisposed toward extracting temporal dependencies, they exhibit correlated error manifolds—particularly in differentiating high-order memoryless modulations like 64-QAM vs. 8-PSK—resulting in a compounded "temporal bias" that fails to provide the requisite diversity needed for effective ensembling.
+Table~\ref{tab:main} reports the three configurations of Table~\ref{tab:configs} over the three seeds. The full model reaches $79.95\% \pm 0.15$, about three points above the multi-frame CRNN+STN baseline it extends and above the stronger ResNet+Transformer+STN baseline as well. Its three seeds span $0.30$ points, against $0.90$ for the variant without restoration and $0.80$ for the one without upscaling, so it is also the most stable configuration we trained.
+
+\begin{table}[!h]
+\centering
+\caption{Recognition on the $999$ held-out Scenario-B tracks. Baseline rows are single numbers published with the benchmark; our rows are mean $\pm$ standard deviation over seeds $42$, $100$ and $2026$.}
+\label{tab:main}
+\begin{tabular}{lccr}
+\hline
+ & Exact match (\%) & CER & GFLOPs \\
+\hline
+CRNN \cite{shi2017crnn} & 74.45 & --- & --- \\
+CRNN+STN \cite{jaderberg2015stn} & 77.00 & --- & --- \\
+ResNet+Transformer & 75.80 & --- & --- \\
+ResNet+Transformer+STN & 78.70 & --- & --- \\
+\hline
+\textbf{Full} (proposed) & \textbf{79.95 $\pm$ 0.15} & 0.0541 $\pm$ 0.0016 & 109.08 \\
+w/o~SR & 80.45 $\pm$ 0.45 & \textbf{0.0525 $\pm$ 0.0007} & \textbf{26.14} \\
+SR$\times 1$ & 79.48 $\pm$ 0.44 & 0.0543 $\pm$ 0.0001 & --- \\
+\hline
+\end{tabular}
+\end{table}
+
+The baseline rows carry a caveat. They are the numbers published with the benchmark, measured on the organizers' split rather than on ours, so the comparison is indicative rather than exact. Our own reproduction of CRNN+STN on the split used here scored about $75.8\%$, which would place the improvement closer to four points than to three.
+
+Among our three configurations the comparison is more restrained. Under the criterion of Section~2.6---a gap counts only when it exceeds twice the standard error of the difference---one of the three pairwise comparisons survives. The variant without upscaling is worse than the variant without restoration by $0.97$ points against a standard error of $0.36$. The two comparisons involving the full model, $+0.50 \pm 0.28$ against \emph{w/o~SR} and $+0.47 \pm 0.27$ against \emph{SR$\times 1$}, both fall inside the noise. On this data the full model and the variant that drops restoration entirely are statistically indistinguishable.
+
+Layout-constrained decoding adds little on top of this. Disabling it changes $0$, $2$ and $0$ tracks across the three seeds. It costs nothing at inference and did not degrade a prediction in any of our runs, so we retain it, but it does not appear to be the source of the accuracy.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Does the Restoration Branch Justify Its Cost?}
+
+The branch does learn something. Fig.~\ref{fig:srloss} tracks its reconstruction loss against a bilinear upscale of the same input. The learned path stays below interpolation at every one of the $46$ epochs, and the margin widens from $2.5\%$ at the first epoch to $13.8\%$ at convergence, so the branch is not simply reproducing what interpolation already supplies.
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth, height = 0.4\textheight, keepaspectratio]{Result/CM Resnet TNN.png}
-    \caption{Confusion Matrix of Ensembling Shallow Resnet and TNN.}
-    \label{fig3}
+    \includegraphics[width=\textwidth]{Result/SRLossVsBilinear.png}
+    \caption{Reconstruction loss of the learned branch against a bilinear upscale of the same input: (a) both losses per epoch, (b) their relative gap.}
+    \label{fig:srloss}
 \end{figure}
+
+That improvement does not appear to reach recognition. Removing the branch, its deformable alignment and the temporal averaging inside it---while holding the backbone, the schedule and the baseline cluster fixed---moves accuracy from $79.95\%$ to $80.45\%$, a change inside the noise floor, and reduces computation from $109.08$ to $26.14$ GFLOPs per track. At track level the reduced variant is ahead at every seed, by $2$, $8$ and $5$ tracks; the direction is consistent but the magnitude is not distinguishable from chance. Training cost follows the same ratio, $22.2$ GPU-hours for the full model against $5.6$ for the variant without it.
+
+Two readings of this result remain open. The first is that restoration does not help this task; the second is that our particular branch is too weak and a stronger one would. Our data does not separate them---it establishes only that this branch, at this cost, buys nothing measurable. What it does not support is the explanation we assumed at the outset, namely that the improvement of the full pipeline came from super-resolution. Since the configuration without any restoration matches it, the improvement over the baseline appears to rest on the four settings shared by all three configurations: the $4 \times 8$ localization grid, domain-matched degradation, constrained decoding and weight averaging. Decomposing that cluster is the natural next experiment and is left for future work.
+
+The upscaling factor gives a clearer result. \emph{SR$\times 1$} retains the branch but removes the $\times 2$ upscale, recovering the same $32$ CTC timesteps through a denser width schedule instead, and falls $0.97$ points behind \emph{w/o~SR}---the one difference in Table~\ref{tab:main} that clears the significance threshold. Doubling the input width thus appears not to be a costless way of obtaining sequence length.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Reconstruction Fidelity Is Not Recognition Performance}
+
+Measured in the conventional way, the branch succeeds. Against the high-resolution targets it gains $+0.72$~dB PSNR and $+0.043$ SSIM over the bilinear baseline, and \emph{SR$\times 1$} gains more still, $+1.04$~dB and $+0.076$. \emph{SR$\times 1$} is nonetheless the weakest recognizer of the three.
+
+Fig.~\ref{fig:psnr} makes the inversion explicit at track level. Panel~(a) separates the $999$ validation tracks by whether the model read them correctly: the misread tracks average $18.42$~dB against $16.12$~dB for the correct ones, so the failures score $2.30$~dB \emph{higher}, and the point-biserial correlation between PSNR and correctness is $r = -0.41$. Panel~(b) groups the same tracks into PSNR quintiles, where exact-match accuracy falls monotonically from $93.5\%$ in the lowest quintile to $51.0\%$ in the highest. Repeating the measurement on \emph{SR$\times 1$}---a different checkpoint, and one whose output resolution differs---gives $r = -0.40$ with a gap of $2.22$~dB, which is consistent with the effect belonging to the data rather than to a single run.
 
 \begin{figure}[!h]
     \centering
-    \includegraphics[width=1\textwidth, height = 0.4\textheight, keepaspectratio]{Result/CM CLDNN TNN.png}
-    \caption{Confusion Matrix of Ensembling CLDNN and TNN.}
-    \label{fig4}
+    \includegraphics[width=\textwidth]{Result/PsnrVsCorrect.png}
+    \caption{PSNR against readability on the $999$ validation tracks: (a) the two distributions, (b) exact-match accuracy per PSNR quintile.}
+    \label{fig:psnr}
 \end{figure}
 
-The confusion matrix presented in Fig. \ref{fig3} delineates the system's performance within the critical "Transition Regime" ($\text{SNR} \approx 0\,\text{dB}$), where the ensemble demonstrates a strategic fusion of spatial rigidity and contextual resilience. Notably, the architecture achieves exceptional fidelity in analog domains—recording $93\%$ accuracy for Wideband Frequency Modulation (WBFM) and exceeding $73\%$ for Amplitude Modulation schemes—a result we attribute to the Transformer's global attention mechanism acting as a "spectral validator" that filters spurious local correlations and eliminates the false-positive mode collapse frequently observed in standalone convolutional baselines. While discrimination in dense digital constellations (e.g., QAM, PSK) is naturally bounded between $48\%$ and $60\%$ by the noise-obscured Euclidean distances, the ensemble maintains strict Manifold Preservation: errors are not stochastic but are statistically clustered among spectrally adjacent sub-classes (e.g., misclassifying 64-QAM as 16-QAM). This structured error distribution confirms that the heterogeneous fusion preserves the topological integrity of the modulation space, preventing catastrophic classification bias even when the noise floor challenges definitive symbol discrimination.
+A plausible explanation is that PSNR here is dominated by image content rather than by restoration quality. A blurred, low-contrast plate has little high-frequency detail to lose, so any reconstruction of it scores well while remaining unreadable; a sharp plate carries exactly the fine detail that is hard to reconstruct and easy to read. On this reading PSNR would be tracking how easily an image can be rebuilt, which on this data appears close to the opposite of how much readable evidence it contains. The practical implication is that image-quality metrics may be not merely uninformative here but misleading: a model selected or supervised by PSNR would risk being pushed away from legibility. This is a concrete argument for the coupling in Eq.~\eqref{eq:total}, where the reconstruction term is subordinate to a recognition loss rather than standing alone as a pixel criterion.
 
-To isolate the specific contribution of deep residual spatial filtering, we evaluate the CLDNN-Transformer ensemble, where the performance dynamics reveal a stark divergence contingent on modulation topology. While the classification of continuous analog waveforms remains robust—virtually invariant to the backbone choice due to the Transformer's dominance in resolving global temporal envelopes (matching the 93\% WBFM benchmark of the ResNet-based system)—the digital domain suffers a precipitous degradation in fidelity. Specifically, 16-QAM detection collapses to 39\% (a 9\% deficit relative to the ResNet-TNN benchmark), with concomitant losses across phase-dependent schemes like 8PSK and QPSK. We attribute this sub-optimal performance to feature redundancy and a compound spatial deficit: the CLDNN’s reliance on recurrent aggregation functionally overlaps with the Transformer’s self-attention mechanism, resulting in an ensemble with correlated temporal inductive biases but insufficient spatial resolution. Lacking the deep residual regularization provided by the ResNet to disentangle dense Euclidean clusters, the framework fails to enforce the precise decision boundaries required for high-order memoryless modulations, confirming that rigorous spatial feature extraction is a non-negotiable prerequisite for robust digital signal separation.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Error Analysis}
+
+Of the $202$ tracks the full model gets wrong at seed $42$, $114$---$56.4\%$---differ from the ground truth in exactly one character, and a further $18.3\%$ in two. This accounts for the distance between the two metrics in Table~\ref{tab:main}: a character error rate of $0.054$ and an exact-match rate of $79.95\%$ describe the same predictions, one counting characters and the other refusing partial credit. It also indicates where the remaining headroom lies, since most failures are single confusions rather than collapses, typically between glyph pairs that survive downsampling poorly.
+
+Confidence does not identify those failures. Of the $202$, $103$ carry a decoder confidence above $0.9$, and the mean confidence over all failures is $0.868$. A confidence threshold intended to catch errors would therefore miss slightly more than half of them, which is a caution for any deployment that plans to gate on the model's own certainty.
+
+About a fifth of the validation set is seed-dependent. Comparing the three seeds of each configuration track by track, the predictions agree on $789$ of $999$ tracks for \emph{w/o~SR}, $778$ for the full model and $768$ for \emph{SR$\times 1$}. Each configuration therefore changes $21$--$23\%$ of its answers between otherwise identical runs, which is the strongest support we can offer for the multi-seed protocol of Section~2.6.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Limitations}
+
+Four limits bound what we can claim. All results are validation results on $999$ Scenario-B tracks; we produced predictions for the official test splits but never scored them, so nothing reported here can be compared against the competition leaderboard. The baseline cluster was never decomposed, so we can state that the improvement over the baseline does not come from super-resolution, but not yet which of the four remaining settings it does come from. The backbone is identical in all three configurations, so this paper offers no evidence about it in either direction. And we compare against the baselines shipped with the benchmark rather than against a modern scene-text recognizer such as PARSeq or SVTR; that comparison is the most useful single addition we can identify to this work.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion}
