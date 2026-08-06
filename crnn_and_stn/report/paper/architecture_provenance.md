@@ -153,3 +153,86 @@ Vẽ hoặc in chúng mà không chú thích → reviewer hiểu nhầm **79.95%
 - [ ] Kiểm `SE`, `sr_scale`, `width_downsample`, `T` — 4 chỗ dễ chép nhầm nhất
 - [ ] Xác nhận `edge=0.0, perceptual=0.0` trước khi in công thức loss
 - [ ] Nếu sửa hình: sửa `make_system_overview.py` rồi chạy lại, **không** sửa file ảnh
+
+---
+
+## 5. PSNR/SSIM đến từ đâu — truy vết đầy đủ
+
+> Đây là phần dễ bị chất vấn nhất của bài, vì kết luận "PSNR nghịch với khả năng
+> đọc" phụ thuộc hoàn toàn vào việc PSNR được đo **đúng cách**. Toàn bộ pipeline
+> nằm ở [`tools/eval_sr_quality.py`](../../tools/eval_sr_quality.py), chạy **hậu kỳ**
+> trên checkpoint, không nằm trong vòng lặp huấn luyện.
+
+### 5.1. Ba ảnh được đem so
+
+Một lần `forward` với `return_sr=True` trả về **ba thứ** (`eval_sr_quality.py:210`):
+
+| Ký hiệu trong code | Là gì | Sinh ra ở đâu |
+|---|---|---|
+| `sr_output` → `selected` | ảnh **SR do model tạo** | `components.py:395` — `tail(feat) + base` |
+| `sr_base` → `base_sel` | ảnh **nội suy bilinear** của cùng đầu vào | `components.py:376-379` — `F.interpolate(..., mode="bilinear")` |
+| `hr_targets` → `hr_flat` | ảnh **HR gốc** làm chuẩn | dataset, 5 file `hr-00*.jpg` của track |
+
+`base` là mốc bắt buộc: chỉ nhìn PSNR của ảnh SR thì không biết nhánh học được
+có hơn nội suy hay không. Đây cũng chính là cột `sr_loss_bilinear` trong
+`history_*.csv` mà Fig. 3 dùng.
+
+### 5.2. HR target được warp trước khi so — **quan trọng**
+
+`eval_sr_quality.py:80-87` (`warp_like_loss`) sao chép **đúng logic** của
+`Trainer._sr_loss` (`trainer.py:269-272`): ảnh HR được nắn theo cùng `theta` của
+STN trước khi so sánh.
+
+Lý do giống hệt lý do trong công thức loss (§2): ảnh SR **đã nằm trong khung đã
+nắn**, còn HR thì chưa. Không warp thì đang so hai hệ toạ độ khác nhau và PSNR
+sẽ thấp giả tạo. Khác biệt duy nhất so với lúc train: ở đây **không có
+stop-gradient** vì đang chạy trong `torch.no_grad()` (`:203`) — không có gradient
+nào để chặn.
+
+### 5.3. Công thức
+
+`eval_sr_quality.py:53-61`:
+
+```python
+def to_unit_range(t):            # ảnh chuẩn hoá [-1,1] → [0,1]
+    return ((t + 1.0) / 2.0).clamp(0.0, 1.0)
+
+mse  = torch.mean((pred - target) ** 2, dim=[1,2,3])   # từng ảnh
+psnr = 10.0 * torch.log10(1.0 / mse.clamp(min=1e-12))  # data_range = 1.0
+```
+
+$$\mathrm{PSNR} = 10\log_{10}\frac{1}{\mathrm{MSE}}, \qquad \text{ảnh ở thang } [0,1]$$
+
+SSIM dùng `skimage.metrics.structural_similarity` với `channel_axis=2`,
+`data_range=1.0` (`:64-77`) — cài đặt tham chiếu hay được trích dẫn, không tự viết.
+
+### 5.4. Từ ảnh lên track
+
+PSNR tính cho **từng ảnh**, rồi lấy **trung bình 5 frame** của track
+(`:242-243`) trước khi ghi CSV. Nên mỗi dòng trong
+`sr_quality_s1_seed42.csv` là **một track**, không phải một ảnh:
+
+```
+track_id,psnr_sr,psnr_base,ssim_sr,ssim_base
+track_10007,16.9667,16.5422,0.3493,0.3261
+```
+
+999 dòng = 999 track validation. Đây chính là file Fig. 4 đọc vào.
+
+### 5.5. Ba cảnh báo bắt buộc nhớ
+
+1. **Không so PSNR tuyệt đối giữa các `sr_scale` khác nhau** (`:19-20`): S1 xuất
+   ảnh 64×256, S4 xuất 32×128 — hai thang khác nhau. Chỉ so được **cột chênh
+   lệch** (SR so với base của chính nó).
+2. **`sr_scale=1` thì `base` là ảnh gốc giữ nguyên**, không phải ảnh nội suy
+   (`:155-156`) — nên mốc của S4 khác bản chất mốc của S1.
+3. **Chạy với `--num-workers 0`** để tái lập tuyệt đối: pipeline degradation
+   ngẫu nhiên ở mỗi worker gây dao động ~±0.05 dB (xem [buoc2_metrics.md §2](../buoc2_metrics.md)).
+
+### 5.6. Lệnh tái tạo file CSV
+
+```bash
+python tools/eval_sr_quality.py --lr-domain-match --num-workers 0 \
+  --checkpoint results/multi-seed/s1_mf_sr_ocr/s1_seed42_best.pth \
+  --output-csv results/multi-seed/s1_mf_sr_ocr/sr_quality_s1_seed42.csv
+```
