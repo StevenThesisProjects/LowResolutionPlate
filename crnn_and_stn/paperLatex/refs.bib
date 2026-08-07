@@ -1,31 +1,22 @@
+```bibtex
 % =====================================================================
-%  refs.bib — MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution
-%             and Recognition for Low-Resolution License Plates
-%
-%  17 tai lieu, moi entry deu duoc trich dan trong bai.
-%  Cac entry AMC cua file template goc: refs_amc_template.bib.bak
-%
-%  To chuc:
-%    (A) Bai toan LRLPR, benchmark va dataset        — 3 entry
-%    (B) Super-resolution cho bien so                — 5 entry
-%    (C) Nhan dang chuoi ky tu (OCR)                 — 2 entry
-%    (D) Can chinh khong gian & hop nhat da khung    — 3 entry
-%    (E) On dinh huan luyen                          — 2 entry
-%    (F) Nhan dang scene-text hien dai                — 2 entry
+% refs.bib — MF-SR-OCR
+% End-to-End Joint Multi-Frame Super-Resolution and Recognition
+% for Low-Resolution License Plates
 % =====================================================================
 
-
 % ---------------------------------------------------------------------
-% (A) Bai toan LRLPR, benchmark va dataset
+% (A) LRLPR problem, benchmark, and dataset
 % ---------------------------------------------------------------------
 
-@inproceedings{laroca2026icpr,
-  author  = {Laroca, Rayson and Nascimento, Valfride and Kim, Donggun and Chung, Sanghyeok and Bae, Subin and Seo, Uihwan and Oh, Seungsang and Phung, Chi M. and Vo, Minh G. and Ye, Xingsong and Du, Yongkun and Su, Yuchen and Chen, Zhineng and Heo, Sunhee and Lee, Hyangwoo and Na, Kihyun and Nguyen, Khanh V. Vu and Pham, Sang T. and Phung, Duc N. N. and Le, Trong P. and Tran, Vy N. Vo and Menotti, David},
-  title     = {{ICPR} 2026 Competition on Low-Resolution License Plate Recognition},
-  booktitle = {International Conference on Pattern Recognition (ICPR)},
-  pages     = {1--20},
-  year      = {2026},
-  note      = {arXiv:2604.22506}
+@misc{laroca2026icpr,
+  author        = {Laroca, Rayson and Nascimento, Valfride and Kim, Donggun and Chung, Sanghyeok and Bae, Subin and Seo, Uihwan and Oh, Seungsang and Phung, Chi M. and Vo, Minh G. and Ye, Xingsong and Du, Yongkun and Su, Yuchen and Chen, Zhineng and Heo, Sunhee and Lee, Hyangwoo and Na, Kihyun and Nguyen, Khanh V. Vu and Pham, Sang T. and Phung, Duc N. N. and Le, Trong P. and Tran, Vy N. Vo and Menotti, David},
+  title         = {{ICPR} 2026 Competition on Low-Resolution License Plate Recognition},
+  year          = {2026},
+  eprint        = {2604.22506},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  note          = {To appear in International Conference on Pattern Recognition (ICPR)}
 }
 
 @article{nascimento2025toward,
@@ -39,23 +30,24 @@
   doi     = {10.5753/jbcs.2025.5159}
 }
 
-@inproceedings{laroca2022cross,
-  author    = {Laroca, Rayson and Cardoso, Everton V. and Lucio, Diego R. and Estevam, Valter and Menotti, David},
-  title     = {On the Cross-dataset Generalization in License Plate Recognition},
-  booktitle = {International Conference on Computer Vision Theory and Applications (VISAPP)},
-  pages     = {166--178},
-  year      = {2022},
-  doi       = {10.5220/0010846800003124}
+@article{ke2023ultrafast,
+  author  = {Ke, Xiao and Zeng, Guanhong and Guo, Wenzhong},
+  title   = {An Ultra-Fast Automatic License Plate Recognition Approach for Unconstrained Scenarios},
+  journal = {IEEE Transactions on Intelligent Transportation Systems},
+  volume  = {24},
+  number  = {5},
+  pages   = {5172--5185},
+  year    = {2023},
+  doi     = {10.1109/TITS.2023.3237581}
 }
 
-
 % ---------------------------------------------------------------------
-% (B) Super-resolution cho bien so
+% (B) License plate super-resolution
 % ---------------------------------------------------------------------
 
 @article{na2025mflpr2,
   author  = {Na, Kihyun and Oh, Junseok and Cho, Youngkwan and Kim, Bumjin and Cho, Sungmin and Choi, Jinyoung and Kim, Injung},
-  title   = {{MF-LPR}$^2$: Multi-frame License Plate Image Restoration and Recognition using Optical Flow},
+  title   = {{MF-LPR}$^2$: Multi-Frame License Plate Image Restoration and Recognition using Optical Flow},
   journal = {Computer Vision and Image Understanding},
   volume  = {256},
   pages   = {104361},
@@ -87,7 +79,7 @@
 @inproceedings{nascimento2024lcdnet,
   author    = {Nascimento, Valfride and Laroca, Rayson and Ribeiro, Rafael O. and Schwartz, William Robson and Menotti, David},
   title     = {Enhancing License Plate Super-Resolution: A Layout-Aware and Character-Driven Approach},
-  booktitle = {Conference on Graphics, Patterns and Images (SIBGRAPI)},
+  booktitle = {2024 37th SIBGRAPI Conference on Graphics, Patterns and Images (SIBGRAPI)},
   pages     = {1--6},
   year      = {2024},
   doi       = {10.1109/SIBGRAPI62404.2024.10716303}
@@ -103,9 +95,8 @@
   doi     = {10.1016/j.cag.2023.05.005}
 }
 
-
 % ---------------------------------------------------------------------
-% (C) Nhan dang chuoi ky tu (OCR)
+% (C) OCR / sequence recognition
 % ---------------------------------------------------------------------
 
 @article{shi2017crnn,
@@ -122,15 +113,14 @@
 @inproceedings{graves2006ctc,
   author    = {Graves, Alex and Fern{\'a}ndez, Santiago and Gomez, Faustino and Schmidhuber, J{\"u}rgen},
   title     = {Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks},
-  booktitle = {International Conference on Machine Learning (ICML)},
+  booktitle = {Proceedings of the 23rd International Conference on Machine Learning (ICML)},
   pages     = {369--376},
   year      = {2006},
   doi       = {10.1145/1143844.1143891}
 }
 
-
 % ---------------------------------------------------------------------
-% (D) Can chinh khong gian & hop nhat da khung hinh
+% (D) Spatial alignment and multi-frame fusion
 % ---------------------------------------------------------------------
 
 @inproceedings{jaderberg2015stn,
@@ -143,8 +133,8 @@
 
 @inproceedings{zhu2019dcnv2,
   author    = {Zhu, Xizhou and Hu, Han and Lin, Stephen and Dai, Jifeng},
-  title     = {Deformable {ConvNets} v2: More Deformable, Better Results},
-  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  title     = {Deformable ConvNets V2: More Deformable, Better Results},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
   pages     = {9300--9308},
   year      = {2019},
   doi       = {10.1109/CVPR.2019.00953}
@@ -159,9 +149,8 @@
   doi       = {10.1109/CVPRW.2019.00247}
 }
 
-
 % ---------------------------------------------------------------------
-% (E) On dinh huan luyen
+% (E) Training stability
 % ---------------------------------------------------------------------
 
 @inproceedings{wu2018groupnorm,
@@ -184,25 +173,15 @@
 }
 
 % ---------------------------------------------------------------------
-% (F) Bo nhan dang scene-text hien dai — nhac o Limitations va Conclusion
+% (F) Modern scene-text recognition
 % ---------------------------------------------------------------------
 
-@inproceedings{bautista2022parseq,
-  author    = {Bautista, Darwin and Atienza, Rowel},
-  title     = {Scene Text Recognition with Permuted Autoregressive Sequence Models},
-  booktitle = {European Conference on Computer Vision (ECCV)},
-  series    = {Lecture Notes in Computer Science},
-  pages     = {178--196},
-  year      = {2022},
-  publisher = {Springer},
-  doi       = {10.1007/978-3-031-19815-1_11}
+@inproceedings{du2025svtrv2,
+  author    = {Du, Yongkun and Chen, Zhineng and Xie, Hongtao and Jia, Caiyan and Jiang, Yu-Gang},
+  title     = {{SVTRv2}: {CTC} Beats Encoder-Decoder Models in Scene Text Recognition},
+  booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+  doi       = {10.1109/ICCV51701.2025.01874},
+  pages     = {20147--20156},
+  year      = {2025}
 }
-
-@inproceedings{du2022svtr,
-  author    = {Du, Yongkun and Chen, Zhineng and Jia, Caiyan and Yin, Xiaoting and Zheng, Tianlun and Li, Chenxia and Du, Yuning and Jiang, Yu-Gang},
-  title     = {{SVTR}: Scene Text Recognition with a Single Visual Model},
-  booktitle = {International Joint Conference on Artificial Intelligence (IJCAI)},
-  pages     = {884--890},
-  year      = {2022},
-  doi       = {10.24963/ijcai.2022/124}
-}
+```
