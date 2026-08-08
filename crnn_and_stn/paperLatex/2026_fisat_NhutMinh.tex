@@ -3,7 +3,6 @@
 
 \usepackage[T1]{fontenc}
 \usepackage{amsmath,amssymb,amsfonts}
-\usepackage{subcaption}
 \usepackage{graphicx}
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
@@ -65,43 +64,44 @@ MF-SR-OCR is our attempt to deal with all three at once. It keeps the multi-fram
 
 Trained this way, MF-SR-OCR reaches $79.95\% \pm 0.15$ across three seeds, above the baseline and with the smallest spread between seeds of anything we trained. The accompanying ablation, however, complicates that result. Take the restoration path out entirely, leave every other setting untouched, and accuracy becomes $80.45\% \pm 0.45$ at $4.17\times$ fewer floating-point operations per track. That difference sits inside the noise floor, so the branch provides no measurable recognition gain. What does help, once each factor is held fixed in turn, is the much cheaper combination of geometric rectification, domain-matched degradation, constrained decoding and weight averaging. A closer look at individual tracks points the same way: the plates the model misreads score $2.30$~dB \emph{higher} in PSNR than the ones it reads correctly ($r = -0.41$, $n = 999$). On this data, reconstruction fidelity and legibility are not simply unrelated; they pull in opposite directions. We report that result alongside the positive one.
 
-The rest of the paper is organized as follows. Section~2 covers the data, the six stages of the architecture, the training objective that ties restoration to recognition, the constrained decoder, the reduced configurations used for ablation, and the evaluation protocol. Section~3 presents the results, the ablations, and the analysis of image-quality metrics against recognition accuracy. Section~4 concludes and points to what we would try next.
+The rest of the paper is organized as follows. Section~\ref{sec:method} describes the benchmark data, the architecture and the joint objective that ties restoration to recognition, along with the reduced configurations and the multi-seed protocol used to evaluate them. Section~\ref{sec:results} reports the comparison against the baselines, the ablation of the restoration path, and the relationship between image quality and readability. Section~\ref{sec:conclusion} concludes and outlines the experiments we would run next.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Methodology}
+\label{sec:method}
 
-This section walks through the framework in the order a track passes through it: first the data and what makes it hard, then the six stages of the network, the loss that ties them together, the decoder, the reduced variants we compare against, and finally the protocol behind every number in Section~3. Where a design choice looks arbitrary, we say what went wrong before we settled on it; several of the details below exist because a simpler version failed.
+This section follows the framework in the order a track passes through it, and closes with the reduced variants and the evaluation protocol. Where a design choice requires justification, we say what went wrong before we settled on it; several of the details below exist because a simpler version failed.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Problem Formulation and Data}
 
-The unit of prediction is a \emph{track}: five consecutive low-resolution captures $\{I^{(1)}_{\mathrm{LR}},\dots,I^{(5)}_{\mathrm{LR}}\}$ of one plate, for which the model returns a single seven-character string. A track is correct only under exact match, so there is no partial credit for getting six characters right. We work with the LRLPR benchmark corpus \cite{laroca2026icpr}. Its $20{,}000$ training tracks come from two acquisition scenarios and two plate layouts: Scenario-A ($10{,}000$ tracks, PNG, daylight) and the harder Scenario-B ($10{,}000$ tracks, JPEG, including rain and night), each covering the older Brazilian pattern \texttt{LLLNNNN} and the Mercosur pattern \texttt{LLLNLNN}. Every training track also carries five high-resolution captures, and those are what the restoration branch is trained against.
+The unit of prediction is a \emph{track}: five consecutive low-resolution captures of one plate, $\{I^{(i)}_{\mathrm{LR}}\}_{i=1}^{5}$, for which the model returns a single seven-character string. A track is correct only under exact match, so there is no partial credit for getting six characters right. We work with the LRLPR benchmark corpus \cite{laroca2026icpr}. Its $20{,}000$ training tracks come from two acquisition scenarios and two plate layouts: Scenario-A ($10{,}000$ tracks, PNG, daylight) and the harder Scenario-B ($10{,}000$ tracks, JPEG, including rain and night), each covering the older Brazilian pattern \texttt{LLLNNNN} and the Mercosur pattern \texttt{LLLNLNN}. Every training track also carries five high-resolution captures, and those are what the restoration branch is trained against.
 
-For validation we hold out a fixed set of $999$ tracks, all from Scenario-B, leaving $19{,}001$ for training. Drawing them from the harder scenario keeps the estimate conservative, and keeping the split on disk means every ablation is scored on exactly the same tracks. It is worth being concrete about how little signal these images carry. Native crops average roughly $46 \times 19$ pixels and go as low as $38 \times 12$, which leaves about five pixels of width for each of the seven characters and a stroke roughly one pixel thick. Fig.~\ref{fig2} shows a few tracks at their true sampling grid, with no interpolation to flatter them. Everything is resized to $32 \times 128$ on the way in, and labels are written over $36$ symbols plus the CTC blank, giving $37$ classes.
+For validation we hold out a fixed set of $999$ tracks, all from Scenario-B, leaving $19{,}001$ for training. Drawing them from the harder scenario keeps the estimate conservative, and keeping the split on disk means every ablation is scored on exactly the same tracks. It is worth being concrete about how little signal these images carry. Native crops average roughly $46 \times 19$ pixels and go as low as $38 \times 12$, which leaves between five and seven pixels of width for each of the seven characters. Fig.~\ref{fig:data} shows a few tracks at their true sampling grid, with no interpolation to flatter them. Everything is resized to $32 \times 128$ on the way in, and labels are written over $36$ symbols plus the CTC blank, giving $37$ classes.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\textwidth]{Methonology/DataSamples.png}
     \caption{Scenario-B tracks at the resolution the network receives, shown without interpolation.}
-    \label{fig2}
+    \label{fig:data}
 \end{figure}
 
-Each training track produces two samples. One uses the real low-resolution frames. The other takes the high-resolution frames and degrades them into synthetic low-resolution ones, which doubles the corpus without touching the labels. The order of operations here matters more than it might seem. We downscale to the native low-resolution size \emph{first} and degrade afterwards, because a blur kernel or a JPEG block is measured in pixels: applied to a $46 \times 19$ image it does something quite different from what it does to a $115 \times 42$ one, and degrading at the wrong scale yields noise that does not resemble a real capture. We call this domain-matched degradation, and we tuned its parameters by matching the Laplacian variance of the synthetic samples against real low-resolution crops over $200$ Scenario-B tracks. It is one of the four settings we later group as the \emph{baseline cluster} (Section~2.5), and we did not ablate it on its own. Real low-resolution samples also receive random affine and perspective warps, rotation up to $10^{\circ}$, brightness, contrast and hue jitter, and coarse dropout.
+Each training track produces two samples. One uses the real low-resolution frames. The other takes the high-resolution frames and degrades them into synthetic low-resolution ones, which doubles the corpus without touching the labels. The order of operations here matters more than it might seem. We downscale to the native low-resolution size \emph{first} and degrade afterwards, because a blur kernel or a JPEG block is measured in pixels: applied to a $46 \times 19$ image it does something quite different from what it does to a $115 \times 42$ one, and degrading at the wrong scale yields noise that does not resemble a real capture. We call this domain-matched degradation, and we tuned its parameters by matching the Laplacian variance of the synthetic samples against real low-resolution crops over $200$ Scenario-B tracks. It is one of the four settings we later group as the \emph{baseline cluster} (Section~\ref{sec:configs}), and we did not ablate it on its own. Real low-resolution samples also receive random affine and perspective warps, rotation up to $10^{\circ}$, brightness, contrast and hue jitter, and coarse dropout.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Network Architecture}
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=1\textwidth,  height = 0.4\textheight, keepaspectratio]{Methonology/SystemOverview.png}
     \caption{The MF-SR-OCR pipeline.}
-    \label{fig1}
+    \label{fig:overview}
 \end{figure}
 
-The network maps a tensor of shape $[B, 5, 3, 32, 128]$ to per-timestep class log-probabilities through the six stages numbered in Fig.~\ref{fig1}. Weights are shared across frames throughout, so the parameter count does not depend on how many frames a track contains.
+The network maps a tensor of shape $[B, 5, 3, 32, 128]$ to per-timestep class log-probabilities through the six stages numbered in Fig.~\ref{fig:overview}. Weights are shared across frames throughout, so the parameter count does not depend on how many frames a track contains.
 
 \textbf{Stage 1 --- Straightening each frame.} A Spatial Transformer Network \cite{jaderberg2015stn} predicts six affine parameters $\theta_i$ per frame and resamples it. One detail of the localization network is worth calling out. It uses stride-1 convolutions with max-pooling and keeps a $4 \times 8$ spatial grid before the fully connected head instead of pooling down to $1 \times 1$. Rotation and translation are spatial quantities, and a descriptor that has been averaged over the whole image has very little left with which to express \emph{``the plate leans five degrees and sits left of centre''}; a head fed such a descriptor appears able to fit little beyond zoom. The last layer is initialized so that $\theta_i$ starts as the identity, which makes the module a no-op on the first pass and lets it learn a correction gradually.
 
@@ -121,18 +121,18 @@ The network maps a tensor of shape $[B, 5, 3, 32, 128]$ to per-timestep class lo
 
 The six stages settle what the network computes. What it is asked to get right is a separate question, and until we answer it nothing forces the images leaving Stage~3 to look like plates at all: under the recognition loss alone that branch is free to emit whatever representation the encoder finds convenient. Supervising it against the high-resolution frames is what makes the pipeline jointly trained rather than merely sequential, so restoration and recognition share one loss:
 \begin{equation}
-\mathcal{L}_{\mathrm{Total}} = \mathcal{L}_{\mathrm{CTC}} + \lambda_{\mathrm{SR}} \cdot \mathcal{L}_{\mathrm{SR}},
+\mathcal{L}_{\mathrm{Total}} = \mathcal{L}_{\mathrm{CTC}} + \lambda_{\mathrm{SR}}\mathcal{L}_{\mathrm{SR}},
 \label{eq:total}
 \end{equation}
 where $\mathcal{L}_{\mathrm{CTC}}$ is the transcription loss over the seven-character label and $\mathcal{L}_{\mathrm{SR}}$ compares the restored frames against their high-resolution counterparts:
 \begin{equation}
 \mathcal{L}_{\mathrm{SR}} = \frac{1}{N}\sum_{i=1}^{N}
-  \left\| I_{\mathrm{SR}}^{(i)} - \mathrm{Warp}_{\mathrm{sg}[\theta_i]}\!\left(I_{\mathrm{HR}}^{(i)}\right) \right\|_1 ,
+  \left\| I_{\mathrm{SR}}^{(i)} - \mathrm{Warp}_{\mathrm{sg}[\theta_i]}\!\left(I_{\mathrm{HR}}^{(i)}\right) \right\|_1,
 \label{eq:sr}
 \end{equation}
 with $N$ the number of frames in the batch that have a high-resolution target, and $\lambda_{\mathrm{SR}} = 0.1$ throughout.
 
-Two details of Eq.~\eqref{eq:sr} are deliberate and easy to get wrong. The first is that only the \emph{target} is warped. Restoration runs after the rectifier, so $I_{\mathrm{SR}}$ is already expressed in the straightened frame while $I_{\mathrm{HR}}$ is not; warping both would apply the geometry twice, and warping neither would compare two different coordinate systems, in which case the branch can do little except blur. The second is the stop-gradient on $\theta_i$, written $\mathrm{sg}[\cdot]$. Without it the branch has an easy way to lower its own loss: pull the rectifier toward whichever geometry is simplest to reconstruct, and let the auxiliary task quietly take over the primary one. With it, the branch may sharpen the image but has no say in how the plate is straightened. The implementation also supports a VGG perceptual term and a Sobel edge term inside $\mathcal{L}_{\mathrm{SR}}$; both weights are zero in every configuration reported here, so Eq.~\eqref{eq:sr} is exact for all of Section~3.
+Two details of Eq.~\eqref{eq:sr} are deliberate and easy to get wrong. The first is that only the \emph{target} is warped. Restoration runs after the rectifier, so $I_{\mathrm{SR}}$ is already expressed in the straightened frame while $I_{\mathrm{HR}}$ is not; warping both would apply the geometry twice, and warping neither would compare two different coordinate systems, in which case the branch can do little except blur. The second is the stop-gradient on $\theta_i$, written $\mathrm{sg}[\cdot]$. Without it the branch has an easy way to lower its own loss: pull the rectifier toward whichever geometry is simplest to reconstruct, and let the auxiliary task quietly take over the primary one. With it, the branch may sharpen the image but has no say in how the plate is straightened. The implementation also supports a VGG perceptual term and a Sobel edge term inside $\mathcal{L}_{\mathrm{SR}}$; both weights are zero in every configuration reported here, so Eq.~\eqref{eq:sr} is exact for all of Section~\ref{sec:results}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -143,12 +143,13 @@ Everything above concerns training. One further choice belongs to inference. The
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Ablation Configurations}
+\label{sec:configs}
 
-To find out what the restoration path actually contributes, Section~3 compares the full model against the two reduced variants in Table~\ref{tab:configs}. All three share a backbone, a schedule, and the same baseline cluster---the $4 \times 8$ localization grid, domain-matched degradation, constrained decoding and weight averaging---so each comparison moves one group of modules and nothing else.
+To find out what the restoration path actually contributes, Section~\ref{sec:results} compares the full model against the two reduced variants in Table~\ref{tab:configs}. All three share a backbone, a schedule, and the same baseline cluster---the $4 \times 8$ localization grid, domain-matched degradation, constrained decoding and weight averaging---so each comparison moves one group of modules and nothing else.
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
-\caption{The three configurations compared in Section~3. $T$ is the number of CTC timesteps.}
+\caption{The three configurations compared in Section~\ref{sec:results}. $T$ is the number of CTC timesteps.}
 \label{tab:configs}
 \begin{tabular}{llccccrc}
 \hline
@@ -166,6 +167,7 @@ The \emph{w/o~SR} variant drops the second term of Eq.~\eqref{eq:total} along wi
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Optimization and Evaluation Protocol}
+\label{sec:protocol}
 
 Models are trained with AdamW at a peak learning rate of $8\times10^{-4}$ and weight decay $10^{-4}$, on a cosine schedule with $5\%$ linear warmup decaying to $5\%$ of the peak, with gradients clipped at global norm $2.0$ and mixed precision throughout. The effective batch size is $64$, reached as a micro-batch of $32$ with two accumulation steps. Runs last at most $60$ epochs and stop early after $18$ without improvement. We select the reported checkpoint by validation exact-match accuracy rather than validation loss, because the two disagree in practice: validation loss bottoms out around epoch $16$--$20$ and then climbs, while exact-match accuracy keeps improving until epoch $24$--$32$. An exponential moving average of the weights with decay $0.999$ \cite{tarvainen2017mean} runs throughout, and the averaged weights are the ones we evaluate.
 
@@ -175,23 +177,24 @@ Alongside exact match we report character error rate and normalized edit distanc
 
 Two caveats come with this protocol. Early stopping picks the reported checkpoint on the same validation split we then measure on, which makes the absolute numbers mildly optimistic; comparisons between configurations remain sound, since every configuration is chosen and scored the same way on the same tracks. And every number in this paper is a validation number. The benchmark ships its public and blind test sets without labels, so no test accuracy can be computed locally. We did generate predictions for all $1{,}000$ public and $3{,}000$ blind tracks, from a single checkpoint---the seed-$42$ run of the full model, chosen because its score does not move when cuDNN autotuning is enabled---but we did not submit them, and no test-set result is claimed anywhere here. That checkpoint also happens to be the weakest of the three seeds on validation, so the choice cannot be read as picking the most flattering run.
 
-The nine runs behind Section~3, three configurations at three seeds, cost $39.1$ GPU-hours in total on a single GPU: $5.6$~h for \emph{w/o~SR}, $22.2$~h for the full model and $11.3$~h for \emph{SR$\times 1$}. The restoration path accounts for most of that difference. It makes the proposed model $4.01\times$ more expensive to train, $4.17\times$ more expensive in floating-point operations per track, and $3.76\times$ slower at inference, $192.8$ against $51.3$~ms per track.
+The nine runs behind Section~\ref{sec:results}, three configurations at three seeds, cost $39.1$ GPU-hours in total on a single GPU: $5.6$~h for \emph{w/o~SR}, $22.2$~h for the full model and $11.3$~h for \emph{SR$\times 1$}. The restoration path accounts for most of that difference. It makes the proposed model $3.96\times$ more expensive to train, $4.17\times$ more expensive in floating-point operations per track, and $3.76\times$ slower at inference, $192.8$ against $51.3$~ms per track.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Results and Discussion}
+\label{sec:results}
 
-We start by putting the three configurations of Section~2.5 next to the baselines that ship with the competition. Then we ask the question the architecture was built around: does the restoration path earn what it costs? The answer is no, at least not here, and the two subsections that follow try to work out why. The first looks at the image-quality metrics that motivated the branch in the first place. The second looks at the mistakes the model actually makes.
+We begin by setting the three configurations of Section~\ref{sec:configs} alongside the baselines that ship with the competition, then turn to the question the architecture was built around: whether the restoration path earns what it costs. On this benchmark it does not appear to, and the last subsection asks why, revisiting the image-quality metrics that motivated the branch in the first place.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{Main Comparison}
+\subsection{Recognition Accuracy}
 
 Table~\ref{tab:main} reports all three configurations over three seeds each. The full model reaches $79.95\% \pm 0.15$, roughly three points above the multi-frame CRNN+STN baseline it extends and above the stronger ResNet+Transformer+STN baseline as well. It is also the most stable of the three across seeds: its runs span $0.30$ points, against $0.90$ for the variant without restoration and $0.80$ for the one without upscaling.
 
-\begin{table}[!h]
+\begin{table}[!ht]
 \centering
-\caption{Recognition on the $999$ held-out Scenario-B tracks. The four baseline rows are single numbers measured by the competition's baseline material, not by the authors of the architectures they are named after; our rows are mean $\pm$ standard deviation over seeds $42$, $100$ and $2026$. n/m: not measured.}
+\caption{Recognition on the $999$ held-out Scenario-B tracks. The four baseline rows are single numbers measured by the competition's baseline material, not by the authors of the architectures they are named after; our rows are mean $\pm$ standard deviation over seeds $42$, $100$ and $2026$. A dash marks a quantity we did not measure.}
 \label{tab:main}
 \begin{tabular}{lccr}
 \hline
@@ -204,26 +207,28 @@ ResNet+Transformer+STN & 78.70 & --- & --- \\
 \hline
 \textbf{Full} (proposed) & \textbf{79.95 $\pm$ 0.15} & 0.0541 $\pm$ 0.0016 & 109.08 \\
 w/o~SR & 80.45 $\pm$ 0.45 & \textbf{0.0525 $\pm$ 0.0007} & \textbf{26.14} \\
-SR$\times 1$ & 79.48 $\pm$ 0.44 & 0.0543 $\pm$ 0.0001 & n/m \\
+SR$\times 1$ & 79.48 $\pm$ 0.44 & 0.0543 $\pm$ 0.0001 & --- \\
 \hline
 \end{tabular}
 \end{table}
 
-The baseline rows come with a caveat. They are numbers released with the competition's baseline material\footnote{Baseline implementation and reported accuracies: \url{https://github.com/duongtruongbinh/MultiFrame-LPR}}, measured on the organizers' split rather than ours, so the comparison is indicative rather than exact. When we reproduced CRNN+STN on the split used here it scored about $75.8\%$, which would put the improvement nearer four points than three.
+The baseline rows come with a caveat. They are numbers released with the competition's baseline material\footnote{Baseline implementation and reported accuracies: \url{https://github.com/duongtruongbinh/MultiFrame-LPR}}, measured on the organizers' split rather than ours, so the comparison is indicative rather than exact. Our own retraining of CRNN+STN on the split used here scored $75.8\%$, which would put the improvement nearer four points than three.
 
-Set the baselines aside and the picture among our own three configurations is more sober. Section~2.6 asks a gap to clear twice the standard error of the difference before we call it real, and only one of the three pairwise comparisons manages it. The variant without upscaling is genuinely worse than the variant without restoration, by $0.97$ points against a standard error of $0.36$. The two comparisons that involve the full model do not clear the bar: $+0.50 \pm 0.28$ against \emph{w/o~SR} and $+0.47 \pm 0.27$ against \emph{SR$\times 1$}. On this data the full model and the \emph{w/o~SR} variant are indistinguishable.
+Set the baselines aside and the picture among our own three configurations is more sober. Section~\ref{sec:protocol} requires a gap to exceed twice the standard error of the difference before we call it real, and only one of the three pairwise comparisons manages it. The variant without upscaling is genuinely worse than the variant without restoration, by $0.97$ points against a standard error of $0.36$. The two comparisons that involve the full model do not clear the bar: \emph{w/o~SR} leads the full model by $0.50 \pm 0.28$, and the full model leads \emph{SR$\times 1$} by $0.47 \pm 0.27$. On this data the full model and the \emph{w/o~SR} variant are indistinguishable.
 
 The character error rates in Table~\ref{tab:main} rank the three the same way exact match does, but they are not simply saying it again. The variant without restoration leads on both, and it is the only configuration that never emitted a prediction of the wrong length: $0$, $0$ and $0$ length errors across its three seeds, against $0$, $1$, $0$ for the full model and $1$, $0$, $0$ for \emph{SR$\times 1$}. Where the two metrics part company is stability. \emph{SR$\times 1$} has the steadiest character error rate by a wide margin, $\pm 0.0001$ against $\pm 0.0016$ for the full model, and at the same time the least steady exact-match rate, $\pm 0.44$ against $\pm 0.15$. A model can be consistent about how many characters it gets wrong and erratic about which plates it gets entirely right. That is worth remembering whenever a single metric is used to rank models that are already close.
 
 Constrained decoding adds very little on top of all this. Turning it off changes $0$, $2$ and $0$ tracks across the three seeds. It costs nothing at inference and never hurt a prediction in our runs, so we keep it, but it is not where the accuracy comes from.
 
+One measurement puts every margin above in context. Comparing the three seeds of each configuration track by track, the predictions agree on $789$ of $999$ tracks for \emph{w/o~SR}, $778$ for the full model and $768$ for \emph{SR$\times 1$}: each configuration changes $21$ to $23\%$ of its answers between otherwise identical runs. That is why Section~\ref{sec:protocol} reports three seeds rather than one, and why gaps of half a point are read here with caution.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{Does the Restoration Branch Justify Its Cost?}
+\subsection{Ablation of the Restoration Branch}
 
 The branch improves reconstruction quality. Fig.~\ref{fig:srloss} follows its reconstruction loss against a bilinear upscale of the same input, epoch by epoch. The learned path sits below interpolation at every one of the $46$ epochs, and the margin grows from $2.5\%$ at the start to $13.8\%$ by the end, so whatever Stage~3 has learned, it is not a slower way of doing what interpolation already does.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\textwidth]{Result/SRLossVsBilinear.png}
     \caption{Reconstruction loss of the learned branch against a bilinear upscale of the same input: (a) both losses per epoch, (b) their relative gap.}
@@ -238,13 +243,13 @@ The upscaling factor is a cleaner story. \emph{SR$\times 1$} keeps the branch bu
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{Reconstruction Fidelity Is Not Recognition Performance}
+\subsection{Image Quality versus Readability}
 
 Work on plate super-resolution has already reported that PSNR and SSIM follow recognition accuracy only loosely \cite{nascimento2025toward,tsai2025deep}. Our measurements push that further: here the two quantities move in opposite directions. Judged the conventional way the branch looks like a success. Against the high-resolution targets it gains $+0.72$~dB PSNR and $+0.043$ SSIM over the bilinear baseline, and \emph{SR$\times 1$} gains more still, $+1.04$~dB and $+0.076$. \emph{SR$\times 1$} is also the weakest recognizer of the three.
 
 Fig.~\ref{fig:psnr} shows the inversion at track level. Panel~(a) splits the $999$ validation tracks by whether the model read them correctly. The misread tracks average $18.42$~dB against $16.12$~dB for the correct ones, so the failures score $2.30$~dB \emph{higher}, and the point-biserial correlation between PSNR and correctness comes out at $r = -0.41$. Panel~(b) puts the same tracks into PSNR quintiles, where exact-match accuracy falls all the way down from $93.5\%$ in the lowest quintile to $51.0\%$ in the highest. Running the same measurement on \emph{SR$\times 1$}, a different checkpoint at a different output resolution, gives $r = -0.40$ and a gap of $2.22$~dB. The effect looks like a property of the data rather than of one run.
 
-\begin{figure}[!h]
+\begin{figure}[!ht]
     \centering
     \includegraphics[width=\textwidth]{Result/PsnrVsCorrect.png}
     \caption{PSNR against readability on the $999$ validation tracks: (a) the two distributions, (b) exact-match accuracy per PSNR quintile.}
@@ -255,17 +260,8 @@ A plausible explanation is that PSNR on this corpus is driven more by what is in
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection{Error Analysis}
-
-The full model gets $202$ tracks wrong at seed $42$. Of those, $114$ differ from the ground truth in exactly one character, which is $56.4\%$, and another $18.3\%$ differ in two. This is the whole distance between the two metrics in Table~\ref{tab:main}. A character error rate of $0.054$ and an exact-match rate of $79.95\%$ describe the same predictions, one counting characters and the other refusing to give partial credit. It also says something about where the remaining headroom is. Most failures are not collapses but single confusions, usually between glyph pairs that survive downsampling badly.
-
-Confidence is no help in finding them. Of the $202$ failures, $103$ carry a decoder confidence above $0.9$, and the mean confidence over all of them is $0.868$. A threshold set to catch errors would miss more than half. That is a warning for any deployment that plans to gate on the model's own certainty, and it matters for the benchmark too, whose tie-break rule is the confidence gap between correct and incorrect predictions. Over three seeds the full model separates those two groups by only $0.124 \pm 0.018$, or $0.990$ against $0.868$ at seed $42$. A ranking settled on that margin would rest on a quantity the model estimates poorly.
-
-One last observation. About a fifth of the validation set depends on the seed. Comparing the three seeds of each configuration track by track, the predictions agree on $789$ of $999$ tracks for \emph{w/o~SR}, $778$ for the full model and $768$ for \emph{SR$\times 1$}. Every configuration changes $21$ to $23\%$ of its answers between otherwise identical runs. That is the strongest argument we can give for the multi-seed protocol of Section~2.6, and it is why we do not report any single run on its own.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 \section{Conclusion}
+\label{sec:conclusion}
 
 We presented MF-SR-OCR, a multi-frame framework in which the restoration and the recognition of low-resolution license plates are trained under a single objective, with the reconstruction term supervised through a stop-gradient warp so that it can sharpen the image without steering the geometric rectifier. Over three seeds on $999$ authentic surveillance tracks the model reaches $79.95\% \pm 0.15$, above the multi-frame CRNN+STN baseline it extends and with the lowest seed-to-seed variance of the configurations we trained. A controlled ablation nonetheless removes the restoration path entirely and matches that accuracy at $4.17\times$ fewer floating-point operations, so on this benchmark the branch shows no measurable recognition gain---despite reconstructing more faithfully than bilinear interpolation at every epoch of training.
 
