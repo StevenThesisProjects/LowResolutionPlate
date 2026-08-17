@@ -1,0 +1,23 @@
+[project]
+name = "restran"
+version = "0.1.0"
+requires-python = "==3.11.*"
+
+# Chỉ giữ đúng những thư viện mà pipeline ResTran thực sự import
+dependencies = [
+    "albumentations>=2.0.8",
+    "numpy>=2.3.5",
+    "opencv-python>=4.10.0",
+    "torch>=2.9.1",
+    "torchvision>=0.24.1",
+    "tqdm>=4.66.5",
+]
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu128"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "jupyter>=1.1.1",
+]
