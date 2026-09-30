@@ -1,19 +1,19 @@
 # MF-SR-OCR — Đề xuất & Xác nhận Tuần 1
 
-> Người trả lời: Minh · Ngày: \_**\_/\_\_**/2026
+> Người trả lời: Minh · Ngày: 30/09/2026
 
 ---
 
 ## 1. ĐỀ XUẤT BÀI TOÁN
 
-| Mục                    | Nội dung                                                                                                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mục                    | Nội dung                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Tên**                | **MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate** — theo bài đã nộp Hội nghị FISAT ngày 10/08/2026 ([link hội nghị](https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/)). Prototype demo: nhận dạng biển số độ phân giải thấp từ chuỗi 5 frame camera giám sát, có cờ kiểm tra thủ công |
-| **Problem**            | Camera giao thông nén mạnh, biển số chỉ ~46×19 px. OCR đơn frame sai nhiều (74.45%). Người vận hành phải đọc tay từng track.                                                      |
-| **Đối tượng**          | Nhân viên vận hành/điều tra xem lại footage; bãi xe, trạm thu phí cần tra cứu lại phương tiện                                                                                     |
-| **AI**                 | Mô hình S1 (Joint MF-SR-OCR) + ngưỡng tin cậy để tự động chấp nhận hoặc chuyển người kiểm tra (selective prediction)                                                              |
-| **Prototype**          | Web app: upload 1–5 ảnh crop biển số (hoặc file zip nhiều track) → chuỗi biển số, confidence từng ký tự, ảnh SR, cờ "cần kiểm tra"; xuất CSV                                      |
-| **Khả thi 3 tháng vì** | Model, data pipeline, training CLI đã có. Inference chạy được trên CPU (~0.2 s/track) → deploy không cần GPU. Chỉ thêm: kiểm chứng thống kê, 1 module ngưỡng tin cậy, 1 app mỏng. |
+| **Problem**            | Camera giao thông nén mạnh, biển số chỉ ~46×19 px. OCR đơn frame sai nhiều (74.45%). Người vận hành phải đọc tay từng track.                                                                                                                                                                                                                   |
+| **Đối tượng**          | Nhân viên vận hành/điều tra xem lại footage; bãi xe, trạm thu phí cần tra cứu lại phương tiện                                                                                                                                                                                                                                                  |
+| **AI**                 | Mô hình S1 (Joint MF-SR-OCR) + ngưỡng tin cậy để tự động chấp nhận hoặc chuyển người kiểm tra (selective prediction)                                                                                                                                                                                                                           |
+| **Prototype**          | Web app: upload 1–5 ảnh crop biển số (hoặc file zip nhiều track) → chuỗi biển số, confidence từng ký tự, ảnh SR, cờ "cần kiểm tra"; xuất CSV                                                                                                                                                                                                   |
+| **Khả thi 3 tháng vì** | Model, data pipeline, training CLI đã có. Inference chạy được trên CPU (~0.2 s/track) → deploy không cần GPU. Chỉ thêm: kiểm chứng thống kê, 1 module ngưỡng tin cậy, 1 app mỏng.                                                                                                                                                              |
 
 ---
 
