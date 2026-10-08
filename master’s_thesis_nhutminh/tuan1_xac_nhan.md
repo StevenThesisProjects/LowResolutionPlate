@@ -72,10 +72,10 @@ User (laptop/điện thoại)
     | 2026           | 79.98%            | 24             | 42                            |
     | **Mean ± std** | **79.95 ± 0.15%** |                |                               |
 
-  - Thư mục kết quả: `LowResolutionPlate/crnn_and_stn/results/multi-seed/s1_mf_sr_ocr/`
+  - Thư mục kết quả: [`eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr)
 
 - **PR #12 → đổi tên đề tài:** _MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate_ (trùng tên bài nộp Hội nghị FISAT, 10/08/2026 — <https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/>)
-  - Nhánh code: [` MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh) (đã push lên `origin`)
+  - Thư mục code: [`eai_fisat_2026_nhutminh/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh) (đã push lên `origin`)
 
 ### Câu 2 — 1 run S1 (55 epoch) mất bao nhiêu giờ trên GPU hiện có?
 
@@ -87,7 +87,7 @@ User (laptop/điện thoại)
 - **1 run thực tế (early stopping, patience 18):** **6.8–8.0 giờ** (dừng ở epoch 42–50)
 - **Chi phí ước tính / run:** full 55 epoch ≈ 8.9 h × 9,000 ≈ **80,000 ⚡** · thực tế (early stop) ≈ **61,000–72,000 ⚡**
 - **Hệ quả cho Tuần 2–4:** ~3 run/ngày/GPU nếu chạy liên tục (lý thuyết ≤ ~60 run / 21 ngày) → dự kiến chạy \_\_\_ run (≈ \_\_\_ ⚡)
-- Ghi chú: config hiện tại là 60 epoch, không phải 55. Nguồn số liệu: cột `epoch_time_s` trong `history_s1_seed*.csv`.
+- Ghi chú: config hiện tại là 60 epoch, không phải 55. Nguồn số liệu: cột `epoch_time_s` trong [`eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr/history_s1_seed*.csv`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr).
 
 ### Câu 3 — License dataset ICPR 2026 LRLPR có cho phép hiển thị ảnh trên demo có URL public không?
 
