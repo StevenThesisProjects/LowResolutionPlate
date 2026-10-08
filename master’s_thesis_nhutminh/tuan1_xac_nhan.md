@@ -75,9 +75,7 @@ User (laptop/điện thoại)
   - Thư mục kết quả: `LowResolutionPlate/crnn_and_stn/results/multi-seed/s1_mf_sr_ocr/`
 
 - **PR #12 → đổi tên đề tài:** _MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate_ (trùng tên bài nộp Hội nghị FISAT, 10/08/2026 — <https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/>)
-  - Nhánh code: [`feature/run-multi-seeda-and-evulate`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/feature/run-multi-seeda-and-evulate) (đã push lên `origin`)
-  - Trạng thái merge: ☐ Đã merge · ☑ **Chưa merge** — lý do: tách nhánh code riêng (`feature/run-multi-seeda-and-evulate`)
-- Ghi chú: **\_\_**
+  - Nhánh code: [` MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh) (đã push lên `origin`)
 
 ### Câu 2 — 1 run S1 (55 epoch) mất bao nhiêu giờ trên GPU hiện có?
 
