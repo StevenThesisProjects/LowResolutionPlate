@@ -1,0 +1,220 @@
+@article{odob,
+  author  = {Octavia A. Dobre and Ali Abdi and Yosef Bar-Ness and Wei Su},
+  title   = {Survey of Automatic Modulation Classification Techniques: Classical Approaches and New Trends},
+  journal = {IET Communications},
+  volume  = {1},
+  number  = {2},
+  pages   = {137--156},
+  month   = apr,
+  year    = {2007}
+}
+
+@article{mleb,
+  author  = {Mehmet Leblebici and Ahmet {\c C}alhan and Mustafa Cicio{\u g}lu},
+  title   = {CNN-based Automatic Modulation Recognition for Index Modulation Systems},
+  journal = {Expert Systems with Applications},
+  volume  = {240},
+  pages   = {122665},
+  year    = {2024}
+}
+
+@article{abde,
+  author  = {Mohamed A. Abdel-Moneim and Walid El-Shafai and Nariman Abdel-Salam and El-Sayed M. El-Rabaie and Fathi E. Abd El-Samie},
+  title   = {A Survey of Traditional and Advanced Automatic Modulation Classification Techniques, Challenges, and Some Novel Trends},
+  journal = {Digital Communications and Networks},
+  volume  = {7},
+  number  = {2},
+  pages   = {214--232},
+  year    = {2021},
+  doi     = {10.1002/dac.4762}
+}
+
+@ARTICLE{huynh,
+  author={Huynh-The, Thien and Pham, Quoc-Viet and Nguyen, Toan-Van and Nguyen, Thanh Thi and Ruby, Rukhsana and Zeng, Ming and Kim, Dong-Seong},
+  journal={IEEE Access}, 
+  title={Automatic Modulation Classification: A Deep Architecture Survey}, 
+  year={2021},
+  volume={9},
+  number={},
+  pages={142950-142971},
+  keywords={Modulation;Feature extraction;Wireless communication;Task analysis;Recurrent neural networks;Receivers;Interference;Automatic modulation classification;convolutional neural networks;deep learning architectures;deep neural networks;recurrent neural networks;wireless communications},
+  doi={10.1109/ACCESS.2021.3120419}}
+
+
+
+
+@article{fham,
+  author  = {F. Hameed and Octavia A. Dobre and Dan C. Popescu},
+  title   = {On the Likelihood-Based Approach to Modulation Classification},
+  journal = {IEEE Transactions on Wireless Communications},
+  volume  = {8},
+  number  = {12},
+  pages   = {5884--5892},
+  month   = dec,
+  year    = {2009}
+}
+
+@article{swam,
+  author  = {Ananthram Swami and Brian M. Sadler},
+  title   = {Hierarchical Digital Modulation Classification Using Cumulants},
+  journal = {IEEE Transactions on Communications},
+  volume  = {48},
+  number  = {3},
+  pages   = {416--429},
+  month   = mar,
+  year    = {2000}
+}
+
+@article{simi,
+  author  = {Mirko Simic and Milos Stankovic and Vladimir D. Orlic},
+  title   = {Automatic Modulation Classification of Real Signals in AWGN Channel Based on Sixth-Order Cumulants},
+  journal = {Radio Engineering},
+  volume  = {30},
+  number  = {1},
+  pages   = {204--214},
+  year    = {2021},
+  doi     = {10.13164/re.2021.0204}
+}
+
+@article{shah,
+  author  = {Ali H. Shah and Abbas H. Miry and Tariq M. Salman},
+  title   = {Automatic Modulation Classification Using Deep Learning Polar Feature},
+  journal = {Journal of Engineering and Sustainable Development},
+  volume  = {27},
+  number  = {04},
+  pages   = {477--486},
+  year    = {2023},
+  doi     = {10.31272/jeasd.27.4.5}
+}
+
+
+
+@article{shua,
+  author  = {Sheng Huang and Yu Yao and Zhiyong Wei and Zhifeng Feng and Ping Zhang},
+  title   = {Automatic Modulation Classification of Overlapped Sources Using Multiple Cumulants},
+  journal = {IEEE Transactions on Vehicular Technology},
+  volume  = {66},
+  number  = {7},
+  pages   = {6089--6101},
+  month   = jul,
+  year    = {2017}
+}
+
+@ARTICLE{swami,
+  author={Swami, A. and Sadler, B.M.},
+  journal={IEEE Transactions on Communications}, 
+  title={Hierarchical digital modulation classification using cumulants}, 
+  year={2000},
+  volume={48},
+  number={3},
+  pages={416-429},
+  keywords={Digital modulation;Baseband;Statistical distributions;Shape;Noise shaping;Signal to noise ratio;Computational complexity;Robustness;Frequency;Computational modeling},
+  doi={10.1109/26.837045}}
+
+
+@article{zhou,
+  author    = {Siyang Zhou and Zhendong Yin and Zhilu Wu and Yunfei Chen and Nan Zhao and Zhutian Yang},
+  title     = {A Robust Modulation Classification Method Using Convolutional Neural Networks},
+  journal   = {EURASIP Journal on Advances in Signal Processing},
+  volume    = {2019},
+  number    = {1},
+  pages     = {21},
+  year      = {2019},
+  doi       = {10.1186/s13634-019-0616-6}
+}
+
+
+@article{popo,
+  author  = {J. J. Popoola and Ronald van Olst},
+  title   = {A Novel Modulation-Sensing Method},
+  journal = {IEEE Vehicular Technology Magazine},
+  volume  = {6},
+  number  = {3},
+  pages   = {60--69},
+  year    = {2011}
+}
+
+@inproceedings{liu,
+  author    = {Xiaoli Liu and Di Yang and Abbas El Gamal},
+  title     = {Deep Neural Network Architectures for Modulation Classification},
+  booktitle = {2017 51st IEEE Asilomar Conference on Signals, Systems, and Computers},
+  year      = {2017},
+  pages     = {915--919}
+}
+
+@inproceedings{oshe,
+  author    = {Timothy J. O'Shea and James Corgan and Thomas C. Clancy},
+  title     = {Convolutional Radio Modulation Recognition Networks},
+  booktitle = {Engineering Applications of Neural Networks},
+  series    = {Lecture Notes in Computer Science},
+  year      = {2016},
+  publisher = {Springer},
+  pages     = {213--226}
+}
+
+@article{wu20,
+  author  = {Peng Wu and Bei Sun and Shaojing Su and Junyu Wei and Jinhui Zhao and Xudong Wen},
+  title   = {Automatic Modulation Classification Based on Deep Learning for Software-Defined Radio},
+  journal = {Mathematical Problems in Engineering},
+  volume  = {2020},
+  pages   = {1--13},
+  year    = {2020},
+  doi     = {10.1155/2020/2678310}
+}
+
+
+@inproceedings{li2019dbn_amc,
+  author    = {Wei Li and Zhi Dou and Chao Wang and Yong Zhang},
+  title     = {Signal Modulation Classification Based on Deep Belief Network},
+  booktitle = {2019 IEEE Globecom Workshops (GC Wkshps)},
+  year      = {2019},
+  pages     = {1--6}
+}
+
+@inproceedings{hu2018rnn_noise,
+  author    = {Sheng Hu and Yiyang Pei and Pei-Pei Liang and Ying-Chang Liang},
+  title     = {Robust Modulation Classification Under Uncertain Noise Condition Using Recurrent Neural Network},
+  booktitle = {IEEE Global Communications Conference (GLOBECOM)},
+  year      = {2018},
+  pages     = {1--7}
+}
+
+@inproceedings{zhang2018dl_amc,
+  author    = {Ming Zhang and Yong Zeng and Zhu Han and Yonghong Gong},
+  title     = {Automatic Modulation Recognition Using Deep Learning Architectures},
+  booktitle = {2018 IEEE 19th International Workshop on Signal Processing Advances in Wireless Communications (SPAWC)},
+  year      = {2018},
+  pages     = {1--5}
+}
+
+@article{ke20,
+  author  = {Ziqi Ke and Haris Vikalo},
+  title   = {Real-Time Radio Technology and Modulation Classification via an LSTM Auto-Encoder},
+  journal = {IEEE Transactions on Wireless Communications},
+  volume  = {21},
+  number  = {1},
+  pages   = {370--382},
+  year    = {2022},
+  doi     = {10.1109/TWC.2021.3095855}
+}
+
+
+@inproceedings{west2017deep_amc,
+  author    = {Nathan E. West and Timothy J. O'Shea},
+  title     = {Deep Architectures for Modulation Recognition},
+  booktitle = {IEEE International Symposium on Dynamic Spectrum Access Networks (DySPAN)},
+  year      = {2017},
+  pages     = {1--6}
+}
+
+@article{wang,
+  author  = {Na Wang and Yunxia Liu and Liang Ma and Yang Yang and Hongjun Wang},
+  title   = {Multidimensional {CNN}-{LSTM} Network for Automatic Modulation Classification},
+  journal = {Electronics},
+  volume  = {10},
+  number  = {14},
+  pages   = {1649},
+  year    = {2021},
+  doi     = {10.3390/electronics10141649}
+}
+
