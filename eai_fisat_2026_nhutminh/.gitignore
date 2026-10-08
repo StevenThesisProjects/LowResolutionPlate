@@ -84,3 +84,5 @@ uv.lock
 
 !submission_s1_seed42_blind.txt
 !submission_s1_seed42_public.txt
+# ── Training logs trong results ──
+results/**/log_*.txt
