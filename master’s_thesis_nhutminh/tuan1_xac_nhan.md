@@ -72,10 +72,10 @@ User (laptop/điện thoại)
     | 2026           | 79.98%            | 24             | 42                            |
     | **Mean ± std** | **79.95 ± 0.15%** |                |                               |
 
-  - Thư mục kết quả: [`eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh/results/multi-seed/s1_mf_sr_ocr)
+  - Thư mục kết quả: [`master’s_thesis_nhutminh/results/multi-seed/s1_mf_sr_ocr/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh/results/multi-seed/s1_mf_sr_ocr)
 
 - **PR #12 → đổi tên đề tài:** _MF-SR-OCR: End-to-End Joint Multi-Frame Super-Resolution and Recognition for Low-Resolution License Plate_ (trùng tên bài nộp Hội nghị FISAT, 10/08/2026 — <https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/>)
-  - Thư mục code: [`eai_fisat_2026_nhutminh/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/eai_fisat_2026_nhutminh) (đã push lên `origin`)
+  - Thư mục code: [`master’s_thesis_nhutminh/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh) (đã push lên `origin`)
 
 ### Câu 2 — 1 run S1 (55 epoch) mất bao nhiêu giờ trên GPU hiện có?
 
