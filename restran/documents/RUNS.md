@@ -1209,6 +1209,142 @@ Bảng cuối cho bài báo: mean ± std (3 seed) của best và TB6 trên val 9
 
 ---
 
+## Run #52 → #54 — seed trên giao thức của tác giả (18/10/2026)
+
+Lệnh ở mục "Vòng cuối: seed theo giao thức của tác giả". Run `restran_base999_s43` **chưa có kết quả**.
+
+| # | Run | Seed | Best (ep) | TB6 | Epoch cuối | M / B @best |
+|---|---|---|---|---|---|---|
+| 51 | `restran_combo3_999` | 42 | 79,28 (29) | 78,33 | 78,48 | 84,16 / 60,95 |
+| 52 | `restran_combo3_999_s43` | 43 | 78,48 (30) | 77,83 | 78,48 | 83,78 / 58,57 |
+| 53 | `restran_combo3_999_s7` | 7 | 78,88 (30) | 78,41 | 78,88 | 84,03 / 59,52 |
+| 6 | `restran_30ep_lr3e4` (baseline) | 42 | 77,18 (28) | 75,98 | 76,58 | — |
+| 3 | `restran_stn_v2` (baseline, chạy lại seed 42) | 42 | 76,68 (27) | 76,29 | 76,68 | — |
+| 54 | `restran_base999_s7` (baseline) | 7 | 77,58 (30) | 76,99 | 77,58 | 82,13 / 60,48 |
+
+**Tổng hợp (val 999, cùng giao thức với tác giả):**
+
+| | Phương pháp (3 seed) | Baseline chạy lại (3 run) | Chênh | Welch t-test |
+|---|---|---|---|---|
+| Best epoch | **78,88 ± 0,40** | 77,14 ± 0,45 | **+1,74** | p = 0,008 |
+| TB6 | **78,19 ± 0,32** | 76,42 ± 0,52 | **+1,77** | p = 0,012 |
+| Epoch cuối | **78,61 ± 0,23** | 76,94 ± 0,55 | **+1,67** | p = 0,022 |
+
+- **Hơn baseline chạy lại khoảng +1,7 điểm, có ý nghĩa thống kê**, và ổn định qua các seed: seed tệ nhất của phương pháp vẫn hơn run tốt nhất của baseline (best 78,48 so với 77,58; TB6 77,83 so với 76,99).
+- **So với 78,70 tác giả công bố: ngang mốc.** Best trung bình 78,88 ± 0,40 không khác 78,70 có ý nghĩa thống kê (p = 0,52); 2/3 seed vượt. TB6 trung bình 78,19 thấp hơn nhưng cũng không có ý nghĩa (p = 0,11). Trong bài nên viết là "đạt ngang mức công bố", không viết "vượt".
+- Baseline chạy lại (77,14 ± 0,45) thấp hơn 78,70 khoảng 1,6 điểm. Cấu hình gốc của tác giả (LR 5e-4, clip 5) bị nổ khi mình chạy (run #1), còn bản đã ổn định cho 77,14. Con số 78,70 có thể là một run thuận lợi, hoặc do khác môi trường chạy. Trong bài cần báo cáo cả hai con số và giải thích.
+- Lưu ý: hai trong ba run baseline cùng seed 42 (#3 và #6, khác nhau do GPU không tất định). Cần `base999_s43` để đủ 3 seed khác nhau.
+
+---
+
+## Run #55 → #57 — cấu hình gốc của tác giả, seed 2026 (18/10/2026)
+
+```bash
+# #55 — cấu hình GỐC của tác giả (LR 5e-4, clip 5, không skip guard), seed 43
+python -u train.py -n restran_orig999_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 5e-4 --grad-clip 5.0 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    2>&1 | tee results/restran_orig999_s43_train.log
+
+# #56 — phương pháp (combo3), seed 2026
+python -u train.py -n restran_combo3_999_s2026 --seed 2026 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_combo3_999_s2026_train.log
+
+# #57 — baseline đã ổn định (cấu hình run #6), seed 2026
+python -u train.py -n restran_base999_s2026 --seed 2026 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    2>&1 | tee results/restran_base999_s2026_train.log
+```
+
+| # | Run | Best (ep) | TB6 | Epoch cuối | Kết cục |
+|---|---|---|---|---|---|
+| 55 | `restran_orig999_s43` (cấu hình gốc) | 54,25 (9) | 0,00 | 0,00 | ❌ **nổ ở ep10**: grad norm 49.348, 21 batch inf/nan; accuracy về 0 và train loss kẹt ở 3,65 tới hết |
+| 56 | `restran_combo3_999_s2026` | 79,18 (26) | **78,91** | 79,08 | ✅ |
+| 57 | `restran_base999_s2026` | 77,78 (28) | 77,14 | 77,48 | baseline |
+
+**Cấu hình gốc của tác giả nổ 2/2 lần** trên giao thức 999: run #1 (seed 42) nổ ở ep12, run #55 (seed 43) nổ ở ep10. Cả hai đều nổ đúng lúc OneCycle đưa LR lên đỉnh 5e-4, trong khi train loss đã xuống khoảng 0,3. Đây là bằng chứng cho bài báo rằng con số 78,70 không tái lập được ổn định bằng cấu hình đã công bố, và là lý do phải dùng baseline đã ổn định hoá.
+
+**Bảng tổng hợp cập nhật (val 999, giao thức của tác giả):**
+
+| | Phương pháp (4 seed: 42, 43, 7, 2026) | Baseline ổn định (4 run) | Chênh | Welch t-test |
+|---|---|---|---|---|
+| Best epoch | **78,95 ± 0,36** | 77,30 ± 0,49 | **+1,65** | p = 0,002 |
+| TB6 | **78,37 ± 0,44** | 76,60 ± 0,56 | **+1,77** | p = 0,003 |
+| Epoch cuối | **78,73 ± 0,30** | 77,08 ± 0,52 | **+1,65** | p = 0,003 |
+
+- Baseline "4 run" gồm #6 (seed 42), #3 (chạy lại seed 42), seed 7, seed 2026. Nếu chỉ tính 3 seed khác nhau (42, 7, 2026): best 77,51 ± 0,31, TB6 76,70 ± 0,64. Chênh vẫn +1,44 / +1,67 (p = 0,003 / 0,024).
+- Không chồng lấn: seed tệ nhất của phương pháp vẫn hơn run baseline tốt nhất (best 78,48 so với 77,78; TB6 77,83 so với 77,14).
+- So với 78,70 tác giả công bố: best trung bình 78,95 ± 0,36, có 3/4 seed vượt, nhưng p = 0,25 nên **"ngang hoặc nhỉnh hơn, chưa có ý nghĩa thống kê"**.
+
+---
+
+## Run #58 — baseline seed 43; bảng chính 4 seed vs 4 seed (18/10/2026)
+
+`restran_base999_s43` (lệnh ở mục "Vòng cuối: seed theo giao thức của tác giả"): best 77,78 (ep29), TB6 77,21, epoch cuối 77,38, M/B 83,02 / 58,10.
+
+**Bảng chính cho bài báo (val 999, giao thức của tác giả, 4 seed khác nhau mỗi bên: 42, 43, 7, 2026):**
+
+| | Phương pháp (combo3) | Baseline đã ổn định | Chênh | Welch t-test |
+|---|---|---|---|---|
+| Best epoch | **78,95 ± 0,36** | 77,58 ± 0,28 | **+1,38** | p = 0,001 |
+| TB6 | **78,37 ± 0,44** | 76,83 ± 0,58 | **+1,54** | p = 0,006 |
+| Epoch cuối | **78,73 ± 0,30** | 77,25 ± 0,46 | **+1,48** | p = 0,003 |
+| Tác giả công bố (1 run, cấu hình gốc) | — | 78,70 | | cấu hình gốc nổ 2/2 lần khi chạy lại (#1, #55) |
+
+Phương pháp so với 78,70: p = 0,25 (best) và 0,23 (TB6), tức ngang mức công bố. Run #3 (chạy lại seed 42) không còn dùng trong bảng.
+
+Đường cong trung bình 4 seed của phương pháp: accuracy tăng tới ep29 (78,90). **val loss đứng yên khoảng 0,200 từ ep24 tới ep30**, khác hẳn các cấu hình chưa điều chuẩn, nơi val loss tăng ở cuối. Đây là lý do thử lại train dài hơn.
+
+### Thí nghiệm 40 epoch với cấu hình tốt nhất (giao thức 999, cùng 4 seed)
+
+LR đỉnh giảm từ 3e-4 xuống 2,5e-4 theo tiêu chí LR/loss (cùng mức với #14, 40 epoch, không nổ). Mỗi seed so cặp với run 30 epoch cùng seed.
+
+```bash
+for SEED in 42 43 7 2026; do
+python -u train.py -n restran_combo3_999_40ep_s$SEED --seed $SEED --num-workers $(( $(nproc) / 4 )) \
+    --epochs 40 --lr 2.5e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    > results/restran_combo3_999_40ep_s${SEED}_train.log 2>&1 &
+done
+wait
+```
+
+Tiêu chí đặt trước: chỉ dùng 40 epoch nếu TB6 trung bình 4 seed hơn bản 30 epoch (78,37) ít nhất 0,5. Nếu đạt, **phải chạy thêm baseline 40 epoch** (cùng LR 2,5e-4) để bảng so sánh cùng ngân sách train. Bảng chính so với tác giả vẫn giữ 30 epoch.
+
+---
+
+## Run #59 → #62 — cấu hình tốt nhất với 40 epoch (19/10/2026)
+
+Lệnh ở mục "Thí nghiệm 40 epoch với cấu hình tốt nhất" (`--epochs 40 --lr 2.5e-4`, giao thức 999). Các file `*_best.pth` đã có ở `results/`.
+
+| # | Seed | 30 epoch: best / TB6 / cuối | 40 epoch: best (ep) / TB6 / cuối | Chênh TB6 | val_loss cuối (40ep) | train_loss cuối (40ep) |
+|---|---|---|---|---|---|---|
+| 59 | 42 | 79,28 / 78,33 / 78,48 | **79,68** (39) / 79,08 / 79,48 | +0,75 | 0,2161 | 0,0308 |
+| 60 | 43 | 78,48 / 77,83 / 78,48 | 78,88 (38) / 78,55 / 78,58 | +0,72 | 0,2264 | 0,0286 |
+| 61 | 7 | 78,88 / 78,41 / 78,88 | 78,68 (38) / 78,08 / 78,68 | −0,33 | 0,2184 | 0,0284 |
+| 62 | 2026 | 79,18 / 78,91 / 79,08 | 79,18 (36) / 78,75 / 78,68 | −0,17 | 0,2109 | 0,0276 |
+
+| | 30 epoch (4 seed) | 40 epoch (4 seed) | Chênh theo cặp seed |
+|---|---|---|---|
+| Best | 78,95 ± 0,36 | 79,10 ± 0,44 | +0,15 (paired t-test p = 0,39) |
+| TB6 | 78,37 ± 0,44 | 78,61 ± 0,42 | +0,24 (p = 0,46) |
+| Epoch cuối | 78,73 ± 0,30 | 78,85 ± 0,42 | +0,13 (p = 0,71) |
+
+- **Không đạt tiêu chí đặt trước** (TB6 ≥ 78,87): 2 seed tăng, 2 seed giảm, chênh trung bình không có ý nghĩa thống kê. **Giữ 30 epoch** cho cấu hình chốt. Như vậy không cần chạy baseline 40 epoch.
+- Train dài hơn làm overfit quay lại: val loss cuối 0,211–0,226 so với khoảng 0,200 ở bản 30 epoch, train loss 0,028 so với 0,042.
+- Run đơn cao nhất từ trước tới nay: 79,68% (#59, seed 42, 40 epoch). Không dùng làm con số báo cáo, vì đó là chọn run tốt nhất.
+
+Report tổng hợp gửi thầy: [`documents/REPORT_ket_qua.md`](REPORT_ket_qua.md).
+
+---
+
 ## Việc chưa làm
 
 - [x] ~~Constrained decoding theo pattern biển số~~ → đo được +0,00–0,05 (mục Phân tích 01/10, §1)
@@ -1221,7 +1357,12 @@ Bảng cuối cho bài báo: mean ± std (3 seed) của best và TB6 trên val 9
 - [x] ~~Vòng frame-dropout / frame-mask / grayscale / clean-geo~~ → run #45–#48: fmask, fdrop, gray thắng
 - [x] ~~Vòng combo~~ → run #49–#51: combo3_999 đạt 79,28 (TB6 78,33) trên giao thức của tác giả
 - [ ] Kết quả `restran_combo3_40ep` (nếu đã chạy)
-- [ ] Vòng seed cuối: combo3_999 seed 43, 7 + baseline 999 seed 43, 7
+- [x] ~~Vòng seed cuối~~ → run #52–#54: phương pháp 78,88 ± 0,40 so với baseline 77,14 ± 0,45 (p = 0,008)
+- [x] ~~Kiểm tra cấu hình gốc của tác giả~~ → run #55 nổ ở ep10 (cùng với run #1: 2/2 lần nổ)
+- [x] ~~Seed 2026~~ → run #56, #57
+- [x] ~~Kết quả `restran_base999_s43`~~ → run #58; bảng chính 4 vs 4 seed
+- [x] ~~Thí nghiệm 40 epoch, 4 seed~~ → run #59–#62: +0,24 TB6, p = 0,46 → giữ 30 epoch
+- [x] ~~Report tổng hợp gửi thầy~~ → `documents/REPORT_ket_qua.md`
 - [ ] Ablation `--no-stn` để đối chiếu +2,90 điểm mà slide báo
 
 ---
