@@ -4,6 +4,24 @@ Ngày 19/10/2026. Toàn bộ lệnh chạy, số liệu từng epoch và phân t
 
 ---
 
+## Kết quả tốt nhất đạt được
+
+**79,68%** (796/999 track) trên tập val 999 track Scenario-B, theo cùng cách tính với số công bố 78,70% của ResTran + STN. Đây là **một mô hình duy nhất, train một lần**: không ensemble, không dùng dữ liệu tập test, kiến trúc ResTran giữ nguyên.
+
+| Mô hình | Số epoch train | Val 999, epoch tốt nhất | Mercosur / Brazilian |
+|---|---|---|---|
+| ResTran + STN, số công bố (1 run) | 30 | 78,70 | — |
+| **Tốt nhất của chúng tôi** (#59, cấu hình đề xuất, seed 42) | 40 | **79,68** (+0,98) | 84,79 / 60,48 |
+| Tốt nhất với cùng 30 epoch như số công bố (#51, seed 42) | 30 | **79,28** (+0,58) | 84,16 / 60,95 |
+| Trung bình 4 seed của cấu hình đề xuất (con số đại diện) | 30 | 78,95 ± 0,36 | 84,16 / 59,40 |
+
+- **Cùng cách đo với số công bố**: epoch tốt nhất của một lần chạy, chọn trên chính tập val.
+- **Đây là run cao nhất trong 8 run** của cấu hình đề xuất (4 seed × 30 và 40 epoch). Con số đại diện để so sánh khoa học là trung bình 4 seed (mục Tóm tắt): nó tránh việc trình bày một run được chọn lọc như kết quả kỳ vọng.
+- Checkpoint: `results/restran_combo3_999_40ep_s42_best.pth` (epoch 39). Kiến trúc 31,08M tham số, chi phí suy luận như ResTran gốc.
+- **Ghi chú về số công bố:** 78,70% không ứng với số nguyên track nào trên 999 track (786/999 = 78,68%; 787/999 = 78,78%), nhưng đúng bằng 787/1000. Vậy tập val của số công bố có thể có 1000 track, hoặc slide đã làm tròn 78,68% thành 78,7%. Chênh lệch này nhỏ hơn nhiều so với sai số chuẩn của tập val (khoảng ±1,3).
+
+---
+
 ## Tóm tắt
 
 **Mục tiêu.** Cải thiện mô hình ResTran (STN + ResNet34 + Attention Fusion + Transformer + CTC) cho bài toán nhận dạng biển số từ 5 khung hình độ phân giải thấp. Ràng buộc: một mô hình duy nhất, train một lần, không ensemble, không dùng dữ liệu tập test để train.
@@ -34,7 +52,7 @@ Ngày 19/10/2026. Toàn bộ lệnh chạy, số liệu từng epoch và phân t
 - Hai loại biển: Mercosur (`LLLNLNN`) và Brazilian cũ (`LLLNNNN`), khoảng 80/20 trong Scenario-B và tập test.
 
 **Giao thức chính** (dùng cho bảng tóm tắt và mục 4):
-- Val gồm 999 track Scenario-B, theo cách chia mặc định của code gốc (seed 42, tỉ lệ 0.9). Chạy lại logic này cho ra đúng 999 track đó, nên đây gần như chắc chắn là tập val của số công bố 78,70%.
+- Val gồm 999 track Scenario-B, theo cách chia mặc định của code gốc (seed 42, tỉ lệ 0.9). Chạy lại logic này cho ra đúng 999 track đó, nên nhiều khả năng đây là tập val của số công bố 78,70%. Tuy vậy, xem ghi chú ở mục "Kết quả tốt nhất đạt được": 78,70% đúng bằng 787/1000, không ứng với số nguyên track nào trên 999.
 - Train 19.001 track. Mỗi track tạo thêm một mẫu synthetic (HR bị degrade), như code gốc.
 - Chỉ số: accuracy khớp tuyệt đối theo track. Báo cáo 3 con số:
   - **Best epoch**: như số công bố, chọn trên chính tập val nên hơi lạc quan.

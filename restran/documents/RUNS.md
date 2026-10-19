@@ -1341,7 +1341,7 @@ Lệnh ở mục "Thí nghiệm 40 epoch với cấu hình tốt nhất" (`--epo
 - Train dài hơn làm overfit quay lại: val loss cuối 0,211–0,226 so với khoảng 0,200 ở bản 30 epoch, train loss 0,028 so với 0,042.
 - Run đơn cao nhất từ trước tới nay: 79,68% (#59, seed 42, 40 epoch). Không dùng làm con số báo cáo, vì đó là chọn run tốt nhất.
 
-Report tổng hợp gửi thầy: [`documents/REPORT_ket_qua.md`](REPORT_ket_qua.md).
+Report tổng hợp gửi thầy: [`documents/REPORT.md`](REPORT.md).
 
 ---
 
@@ -1362,7 +1362,7 @@ Report tổng hợp gửi thầy: [`documents/REPORT_ket_qua.md`](REPORT_ket_qua
 - [x] ~~Seed 2026~~ → run #56, #57
 - [x] ~~Kết quả `restran_base999_s43`~~ → run #58; bảng chính 4 vs 4 seed
 - [x] ~~Thí nghiệm 40 epoch, 4 seed~~ → run #59–#62: +0,24 TB6, p = 0,46 → giữ 30 epoch
-- [x] ~~Report tổng hợp gửi thầy~~ → `documents/REPORT_ket_qua.md`
+- [x] ~~Report tổng hợp gửi thầy~~ → `documents/REPORT.md`
 - [ ] Ablation `--no-stn` để đối chiếu +2,90 điểm mà slide báo
 
 ---
