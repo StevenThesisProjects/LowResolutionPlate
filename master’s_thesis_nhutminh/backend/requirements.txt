@@ -1,0 +1,12 @@
+# Backend API (CPU inference). torch/torchvision CPU wheels are installed
+# separately in the Dockerfile from the PyTorch CPU index.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic-settings>=2.4
+psycopg[binary]>=3.2
+psycopg-pool>=3.2
+numpy>=1.26
+opencv-python-headless>=4.8
+albumentations>=2.0.8
+tqdm>=4.66

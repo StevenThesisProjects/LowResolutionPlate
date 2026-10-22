@@ -1,0 +1,16 @@
+# Chỉ cần configs/, src/, tools/, backend/ để build API image.
+dataset/
+results/
+backup/
+backups/
+report/
+api-docs/
+summary/
+**/.venv/
+**/__pycache__/
+**/*.pth
+**/*.pt
+.env
+.env.*
+.git/
+*.md
