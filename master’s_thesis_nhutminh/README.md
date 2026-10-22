@@ -143,3 +143,49 @@ User (laptop/điện thoại)
 - Framework cụ thể: ☑ **React + Vite** · ☐ Next.js
 - UI library dự kiến: **Tailwind CSS**
 - Thời gian ước lượng cho FE MVP: \_\_\_ tuần
+
+---
+
+## 4. TUẦN 2 — MULTI-SEED S1 & BACKEND API (22/10/2026)
+
+> Báo cáo chi tiết: [`tuan2_bao_cao.md`](https://github.com/StevenThesisProjects/LowResolutionPlate/blob/main/master%E2%80%99s_thesis_nhutminh/tuan2_bao_cao.md) · API docs: [`api-docs/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh/api-docs) (mở [`api-docs/index.html`](https://github.com/StevenThesisProjects/LowResolutionPlate/blob/main/master%E2%80%99s_thesis_nhutminh/api-docs/index.html) bằng trình duyệt)
+
+### 4.1. Kết quả chính
+
+| Hạng mục | Kết quả |
+| --- | --- |
+| Multi-seed S1 (val 999) | **79.95 ± 0.15%** (79.78 / 80.08 / 79.98) → [`results/multi-seed/multiseed_results.csv`](https://github.com/StevenThesisProjects/LowResolutionPlate/blob/main/master%E2%80%99s_thesis_nhutminh/results/multi-seed/multiseed_results.csv) |
+| Backend Tuần 2 | FastAPI load S1; `GET /health`, `POST /predictions` (= `/predict`) trả đúng track val (`track_10007 → AYG7579`) |
+| Parity API vs offline | constrained **999/999** và greedy **999/999** (0 track lệch), accuracy qua API **79.78%** |
+| Kiểm thử | 12/12 test pytest pass; load test đọc/ghi đồng thời 0 lỗi |
+| Làm sẵn cho Tuần 7–9 | Batch zip → CSV, review + endpoint gợi ý top-5, Docker + PostgreSQL + backup |
+
+### 4.2. Chạy backend
+
+```bash
+cd master’s_thesis_nhutminh
+cp .env.example .env                      # đổi POSTGRES_PASSWORD
+docker compose up -d --build              # PostgreSQL + API
+```
+
+| Link | Địa chỉ |
+| --- | --- |
+| **Swagger UI** | **<http://localhost:8000/api/v1/docs>** (lối tắt <http://localhost:8000/docs>) |
+| ReDoc | <http://localhost:8000/api/v1/redoc> |
+| OpenAPI JSON | <http://localhost:8000/api/v1/openapi.json> |
+| Health check | <http://localhost:8000/api/v1/health> |
+| Base URL cho React | `http://localhost:8000/api/v1` |
+
+![Swagger — danh sách endpoint](report/tuan2/swagger_endpoints.png)
+
+### 4.3. Cấu trúc thêm mới
+
+| Đường dẫn | Nội dung |
+| --- | --- |
+| [`backend/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh/backend) | FastAPI (`app/`), `Dockerfile`, `requirements.txt`, `scripts/` (backup, restore, parity, load test), `tests/` |
+| [`docker-compose.yml`](https://github.com/StevenThesisProjects/LowResolutionPlate/blob/main/master%E2%80%99s_thesis_nhutminh/docker-compose.yml) | `db` (PostgreSQL 16) + `api`; profile `backup` (tắt khi dev), `public` (Cloudflare Tunnel) |
+| [`.env.example`](https://github.com/StevenThesisProjects/LowResolutionPlate/blob/main/master%E2%80%99s_thesis_nhutminh/.env.example) | Mẫu biến môi trường (copy thành `.env`, không commit) |
+| [`api-docs/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh/api-docs) | `README.md`, `system-overview.md`, `database-schema.md`, `endpoints/*.md` (14 endpoint), `index.html` |
+| [`report/tuan2/`](https://github.com/StevenThesisProjects/LowResolutionPlate/tree/main/master%E2%80%99s_thesis_nhutminh/report/tuan2) | Ảnh chụp Swagger và API docs cho báo cáo |
+
+Backend **không sửa** code training (`src/`, `configs/`, `train.py`) mà chỉ import để load model.
