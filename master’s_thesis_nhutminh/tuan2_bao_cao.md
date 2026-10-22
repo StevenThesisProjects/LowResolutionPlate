@@ -156,23 +156,23 @@ Base URL: `http://localhost:8000/api/v1`
 
 **Hình 1. Swagger UI: 14 endpoint theo nhóm System / Predictions / Batches**
 
-![Swagger endpoints](report/tuan2/swagger_endpoints.png)
+![Swagger endpoints](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/swagger_endpoints.png)
 
 **Hình 2. Swagger UI: `POST /predictions` (endpoint `/predict` của Tuần 2), tham số, response 201 / 4XX / 503**
 
-![Swagger POST /predictions](report/tuan2/swagger_post_predictions.png)
+![Swagger POST /predictions](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/swagger_post_predictions.png)
 
 **Hình 3. Tài liệu API (`api-docs/index.html`): danh sách endpoint và ánh xạ với roadmap**
 
-![API docs overview](report/tuan2/apidocs_html_overview.png)
+![API docs overview](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/apidocs_html_overview.png)
 
 **Hình 4. Tài liệu API: `POST /predictions` với response thật của `track_10011`**
 
-![API docs POST /predictions](report/tuan2/apidocs_html_post_predictions.png)
+![API docs POST /predictions](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/apidocs_html_post_predictions.png)
 
 **Hình 5. Tài liệu API: endpoint gợi ý `GET /predictions/{id}/suggestions`**
 
-![API docs suggestions](report/tuan2/apidocs_html_suggestions.png)
+![API docs suggestions](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/apidocs_html_suggestions.png)
 
 ---
 
