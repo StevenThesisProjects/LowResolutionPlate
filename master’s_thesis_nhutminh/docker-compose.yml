@@ -1,0 +1,106 @@
+# PlateReader LR — backend stack.
+#
+#   cp .env.example .env        # lần đầu, rồi sửa mật khẩu
+#   docker compose up -d --build
+#   open http://localhost:8000/api/v1/docs
+#
+# Services mặc định: db (PostgreSQL) · api (FastAPI + model S1, CPU)
+# Tuỳ chọn (profile):
+#   backup  — pg_dump định kỳ; TẮT trong giai đoạn dev, bật từ Tuần 10:
+#               docker compose --profile backup up -d
+#             chụp 1 lần bằng tay:  docker compose run --rm -e BACKUP_ONCE=1 backup
+#   public  — Cloudflare Tunnel:     docker compose --profile public up -d
+# Frontend React sẽ thêm thành service `web` ở Tuần 8.
+
+name: platereader
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    # Tham số cho máy demo nhỏ (≤ 8 GB RAM); đọc/ghi đồng thời được nhờ MVCC.
+    command:
+      - postgres
+      - -c
+      - max_connections=${POSTGRES_MAX_CONNECTIONS:-50}
+      - -c
+      - shared_buffers=${POSTGRES_SHARED_BUFFERS:-256MB}
+      - -c
+      - wal_compression=on
+      - -c
+      - log_min_duration_statement=500
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Chỉ bind localhost: DB không lộ ra ngoài, chỉ để psql/DBeaver lúc dev.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: platereader-api:${API_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      # Ghi đè các đường dẫn cho môi trường container.
+      PLATEREADER_DB_HOST: db
+      PLATEREADER_DB_PORT: "5432"
+      PLATEREADER_DB_USER: ${POSTGRES_USER}
+      PLATEREADER_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      PLATEREADER_DB_NAME: ${POSTGRES_DB}
+      PLATEREADER_CHECKPOINT_PATH: /models/${MODEL_CHECKPOINT_FILE}
+    volumes:
+      - ${MODEL_CHECKPOINT_DIR}:/models:ro
+    ports:
+      - "${API_PORT:-8000}:8000"
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY_LIMIT:-3g}
+
+  backup:
+    image: postgres:16-alpine
+    profiles: ["backup"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-6}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_ONCE: ${BACKUP_ONCE:-0}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    volumes:
+      - ./backend/scripts/backup.sh:/backup.sh:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+    entrypoint: ["sh", "/backup.sh"]
+
+  tunnel:
+    # URL public cho demo (roadmap Tuần 9). Chỉ chạy khi bật profile `public`.
+    image: cloudflare/cloudflared:2024.12.2
+    profiles: ["public"]
+    restart: unless-stopped
+    depends_on:
+      - api
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+
+volumes:
+  pgdata:

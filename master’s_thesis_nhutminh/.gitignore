@@ -15,6 +15,7 @@ ENV/
 # Environment & secrets
 .env
 .env.*
+!.env.example
 
 # ── Dataset (nặng ~1.2GB — tải riêng, không push) ──
 dataset/data/
