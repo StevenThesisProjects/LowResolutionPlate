@@ -28,15 +28,14 @@
 % If the paper title is too long for the running head, you can set
 % an abbreviated paper title here
 %
-\author{Nhut-Minh Nguyen\inst{1,4} and 
-Vo-Trung-Dung Huynh\inst{2,3,5}\orcidID{0000-0002-9678-8335} 
+\author{Nhut-Minh Nguyen\inst{1,2,5} and
+Vo-Trung-Dung Huynh\inst{3,4,6}\orcidID{0000-0002-9678-8335}
 }
 %
 \authorrunning{Nhut-Minh Nguyen et al.}
-% First names are abbreviated in the running head.
-% If there are more than two authors, 'et al.' is used.
 %
-\institute{FPT School of Business and Technology, Ho Chi Minh City, Vietnam \and
+\institute{FPT University, Ho Chi Minh City, Vietnam \and
+FPT School of Business and Technology, Ho Chi Minh City, Vietnam \and
 International University, VNU-HCM, Ho Chi Minh City, Vietnam \and
 Viet Nam National University Ho Chi Minh City, Vietnam \and
 \email{minhnn25ms23283@fpt.edu.vn} \and
@@ -267,6 +266,12 @@ We presented MF-SR-OCR, a multi-frame framework in which the restoration and the
 
 Two observations follow from that result. Reconstruction fidelity and readability are not merely uncorrelated on this data but opposed: the tracks the model misreads score $2.30$~dB higher in PSNR than the ones it reads correctly, and exact-match accuracy falls monotonically across PSNR quintiles. And the margins separating architectural variants here are no larger than the variation between random seeds, which leaves single-run comparison uninformative. Taken together, the improvement over the baseline appears to rest on geometric rectification, domain-matched degradation, constrained decoding and weight averaging rather than on super-resolution. Decomposing that cluster, and comparing against a modern scene-text recognizer such as SVTRv2 \cite{du2025svtrv2}, are the two experiments we would run next.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\subsubsection*{Acknowledgements.}
+We acknowledge International University, VNU-HCM for supporting this study. The first author also acknowledge FPT University, Ho Chi Minh City for supporting this study. 
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \bibliographystyle{splncs04}
