@@ -1,0 +1,29 @@
+% Work breakdown structure (Section 5.1).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{wp/.style={base, text width=25.8mm, align=left, anchor=north, minimum height=29mm},
+           bus/.style={draw=cInk, line width=0.6pt}}
+  \node[app, font=\figfont\bfseries, text width=50mm] (root) at (5.85,0) {1.0 PlateReader LR capstone};
+  \foreach \x/\c/\t/\body [count=\k] in {
+    1.45/app/{1.1 Scope and\\requirements}/{1.1.1 Stakeholders\\1.1.2 MoSCoW\\1.1.3 Data license\\1.1.4 Splits, hashes},
+    4.38/svc/{1.2 Model\\validation}/{1.2.1 Multi-seed\\1.2.2 Paired tests\\1.2.3 Ablation\\1.2.4 Threshold $\tau$\\1.2.5 Freeze, test},
+    7.31/data/{1.3 Architecture\\and database}/{1.3.1 Design, ADRs\\1.3.2 API contract\\1.3.3 DB schema\\1.3.4 Concurrency},
+    10.24/app/{1.4 Backend\\\phantom{x}}/{1.4.1 Inference\\1.4.2 Decoding\\1.4.3 Batch worker\\1.4.4 Review flow\\1.4.5 Error model}}{
+    \node[\c, wp] (w\k) at (\x,-1.0) {\textbf{\t}\\[2pt]\body};
+  }
+  \foreach \x/\c/\t/\body [count=\k from 5] in {
+    1.45/ok/{1.5 Frontend\\\phantom{x}}/{1.5.1 Single track\\1.5.2 Batch screen\\1.5.3 Review screen\\1.5.4 Mobile layout},
+    4.38/svc/{1.6 DevOps and\\deployment}/{1.6.1 Images\\1.6.2 Compose\\1.6.3 CI/CD\\1.6.4 Tunnel\\1.6.5 Backup},
+    7.31/bad/{1.7 Testing and\\evaluation}/{1.7.1 Unit tests\\1.7.2 Parity, load\\1.7.3 E2E, devices\\1.7.4 Security scans\\1.7.5 User study},
+    10.24/ext/{1.8 Documents\\and closure}/{1.8.1 User manual\\1.8.2 Thesis\\1.8.3 Demo, video\\1.8.4 Release \code{v1.0}}}{
+    \node[\c, wp] (w\k) at (\x,-4.5) {\textbf{\t}\\[2pt]\body};
+  }
+  \draw[bus] (root.south) -- (root.south |- 0,-0.75);
+  \draw[bus] (-0.12,-0.75) -- (10.24,-0.75);
+  \foreach \k in {1,...,4} \draw[bus] (w\k.north |- 0,-0.75) -- (w\k.north);
+  \draw[bus] (-0.12,-0.75) -- (-0.12,-4.25) -- (10.24,-4.25);
+  \foreach \k in {5,...,8} \draw[bus] (w\k.north |- 0,-4.25) -- (w\k.north);
+\end{tikzpicture}
+\end{document}

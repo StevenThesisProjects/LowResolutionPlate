@@ -1,0 +1,63 @@
+% High-level layered architecture (Section 3.1).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  % ---------------- bands ----------------
+  \draw[layer] (0,0)     rectangle (12,-1.6);
+  \node[layertitle] at (0,0) {CLIENTS};
+  \draw[layer] (0,-1.9)  rectangle (12,-3.3);
+  \node[layertitle] at (0,-1.9) {EDGE (Compose profile \code{public})};
+  \draw[layer] (0,-3.6)  rectangle (12,-8.45);
+  \node[layertitle] at (0,-3.6) {APPLICATION: container \code{api}};
+  \draw[layer] (0,-8.75) rectangle (12,-10.25);
+  \node[layertitle] at (0,-8.75) {DATA AND ARTEFACTS};
+
+  % ---------------- clients ----------------
+  \node[app, text width=38mm] (spa) at (2.3,-1.0) {\textbf{React SPA} (Vite)\\single track, batch, review};
+  \node[app, text width=24mm] (mob) at (6.3,-1.0) {\textbf{Mobile browser}\\Chrome, Safari};
+  \node[ext, text width=27mm] (cli) at (9.95,-1.0) {\textbf{Swagger UI, curl}\\test scripts};
+
+  % ---------------- edge ----------------
+  \node[svc, text width=56mm] (edge) at (3.75,-2.75)
+    {\textbf{Cloudflare Access} (identity) $\rightarrow$ \textbf{Tunnel}\\outbound only, no open inbound port};
+
+  % ---------------- application ----------------
+  \node[app, text width=28mm] (rsys) at (1.85,-4.55) {\textbf{System router}\\health, model info};
+  \node[app, text width=33mm] (rpre) at (5.8,-4.55) {\textbf{Predictions router}\\recognize, list, review};
+  \node[app, text width=36mm] (rbat) at (9.95,-4.55) {\textbf{Batches router}\\ZIP upload, progress, CSV};
+  \node[base, draw=cGray, dashed, fill=white, text width=113mm, font=\lblfont] (mw) at (6,-5.4)
+    {Pydantic request validation $\cdot$ upload limits $\cdot$ RFC 9457 \code{problem+json} errors $\cdot$ CORS};
+  \node[svc, text width=25mm] (inf) at (1.5,-6.35)  {\textbf{Inference}\\PyTorch, CPU,\\model lock};
+  \node[svc, text width=25mm] (dec) at (4.5,-6.35)  {\textbf{Decoding}\\constrained beam,\\top-5, char conf.};
+  \node[svc, text width=25mm] (pol) at (7.5,-6.35)  {\textbf{Policy}\\$c(x)\ge\tau\Rightarrow$ status,\\row $\leftrightarrow$ schema};
+  \node[svc, text width=25mm] (wrk) at (10.5,-6.35) {\textbf{Batch worker}\\1 thread,\\chunks of 4 tracks};
+  \node[base, draw=cPurple, fill=white, text width=82mm] (dal) at (6.85,-8.0)
+    {\textbf{Data access} (\code{db.py}): psycopg3 pool 1--10, 15\,s statement timeout};
+
+  % ---------------- data ----------------
+  \node[data, text width=27mm] (ckpt) at (1.75,-9.6) {\textbf{Model checkpoint}\\\code{/models} (read-only)};
+  \node[data, text width=44mm] (pg) at (6.4,-9.6) {\textbf{PostgreSQL 16}\\batches $\cdot$ predictions $\cdot$ reviews};
+  \node[data, text width=22mm] (bak) at (10.6,-9.6) {\textbf{Backups}\\\code{pg\_dump} every 6\,h};
+
+  % ---------------- flows ----------------
+  \draw[arr] (spa.south) -- (spa.south |- edge.north);
+  \draw[arr] (mob.south) -- (mob.south |- edge.north);
+  \draw[arr] (edge.south -| rpre.north) -- node[lblbg, pos=0.17] {HTTPS, REST + JSON} (rpre.north);
+  \draw[arr] (cli.south) -- node[lblbg, pos=0.5] {HTTP (LAN)} (cli.south |- rbat.north);
+
+  \draw[arr] ([xshift=-8mm]rpre.south) -- (inf.north east);
+  \draw[arr] ([xshift=8mm]rpre.south) -- (pol.north);
+  \draw[arr] (rbat.south -| wrk.north) -- (wrk.north);
+  \draw[arr] (rsys.south -| inf.north) -- (inf.north);
+  \draw[arr] (inf) -- (dec);
+  \draw[arr] (dec) -- (pol);
+  \draw[arr] (wrk) -- (pol);
+  \draw[darr] ([xshift=-6mm]wrk.south) -- ++(0,-0.33) -| node[lblbg, pos=0.25] {worker sends one chunk of 4 tracks per model-lock turn} (inf.south);
+  \draw[arr] (pol.south) -- (pol.south |- dal.north);
+  \draw[arr] ([xshift=6mm]wrk.south) -- ([xshift=6mm]wrk.south |- dal.north);
+  \draw[biarr] (pg.north |- dal.south) -- node[lbl, right] {SQL} (pg.north);
+  \draw[arr] (ckpt.north) -- node[lbl, left, pos=0.5] {load once} (ckpt.north |- inf.south);
+  \draw[darr] (pg) -- node[lbl, above] {dump} (bak);
+\end{tikzpicture}
+\end{document}

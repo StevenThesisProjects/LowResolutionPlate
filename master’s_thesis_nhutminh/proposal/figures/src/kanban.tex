@@ -1,0 +1,38 @@
+% Kanban board layout with WIP limit and definition of done (Section 3.3).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{col/.style={draw=cGray!60, fill=cGray!4, rounded corners=2pt, line width=0.5pt},
+           card/.style={base, draw=cBlue, fill=white, text width=19mm, font=\lblfont, align=left},
+           head/.style={font=\figfont\bfseries, anchor=north, inner sep=2pt}}
+  \foreach \i/\t in {0/Backlog, 1/Ready, 2/In progress, 3/Review, 4/Done}{
+    \draw[col] (\i*2.38,0) rectangle ++(2.26,-4.45);
+    \node[head] at (\i*2.38+1.13,0) {\t};
+  }
+  \node[lbl, text=cRed] at (2*2.38+1.13,-0.42) {WIP limit $\le$ 2};
+  \node[lbl, text=cGray] at (3*2.38+1.13,-0.42) {PR + CI green};
+  \node[lbl, text=cGray] at (0*2.38+1.13,-0.42) {GitHub Issues};
+  \node[lbl, text=cGray] at (1*2.38+1.13,-0.42) {sized $\le$ 1 week};
+  \node[lbl, text=cGray] at (4*2.38+1.13,-0.42) {weekly report};
+
+  \foreach \i/\y/\t in {
+     0/-0.95/{React screens (W8)},
+     0/-1.8/{Tunnel + Access (W9)},
+     0/-2.65/{User study, SUS (W10)},
+     0/-3.5/{Thesis ch.\ 4--5 (W11)},
+     1/-0.95/{Ablation runs (W4)},
+     1/-1.8/{Threshold $\tau$ (W5)},
+     2/-0.95/{Paired tests, CI (W3)},
+     2/-1.8/{CI workflows (W3--4)},
+     3/-0.95/{Held-out split, retrain},
+     4/-0.95/{Multi-seed S1, J1, S4},
+     4/-1.8/{API v1 + parity 999/999},
+     4/-2.65/{Docker + PostgreSQL},
+     4/-3.5/{API docs, DB schema}}
+    \node[card, anchor=north] at (\i*2.38+1.13,\y+0.25) {\t};
+  \node[base, draw=cGreen, fill=fGreen, font=\lblfont, text width=113mm, anchor=north west, align=left]
+    at (0,-4.6) {\textbf{Definition of done}: code merged through a pull request; lint, tests and scans pass in CI;
+    numbers come from a script in the repository; docs and the weekly report link to the evidence.};
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,87 @@
+% Entity-relationship diagram of the PostgreSQL schema (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\usepackage{array}
+\newcommand{\pk}[1]{\underline{\smash{#1}}}
+\newcommand{\ty}[1]{{\lblfont\textcolor{cGray}{#1}}}
+\newenvironment{cols}{\renewcommand{\arraystretch}{1.05}\setlength{\tabcolsep}{2pt}%
+  \begin{tabular}{@{}l l@{}}}{\end{tabular}}
+\tikzset{
+  entity/.style={rectangle split, rectangle split parts=2, draw=cPurple, line width=0.6pt,
+    rectangle split part fill={cPurple!16,white}, align=left, inner xsep=3pt, inner ysep=2.5pt,
+    text=cInk, font=\figfont, anchor=north west},
+  comp/.style={draw=cInk, line width=0.6pt},
+}
+\begin{document}
+\begin{tikzpicture}
+  \node[entity] (bat) at (0,0) {\textbf{batches}\nodepart{two}
+    \begin{cols}
+      \pk{id}            & \ty{UUID, PK} \\
+      created\_at       & \ty{TIMESTAMPTZ} \\
+      finished\_at      & \ty{TIMESTAMPTZ} \\
+      filename          & \ty{TEXT} \\
+      status            & \ty{TEXT, CHECK$^{a}$} \\
+      decode\_mode      & \ty{TEXT, CHECK$^{c}$} \\
+      total\_tracks     & \ty{INT $>0$} \\
+      processed\_tracks & \ty{INT $\ge0$} \\
+      error             & \ty{TEXT} \\
+    \end{cols}};
+
+  \node[entity] (rev) at (0,-4.0) {\textbf{reviews} (append-only)\nodepart{two}
+    \begin{cols}
+      \pk{id}            & \ty{BIGSERIAL, PK} \\
+      prediction\_id    & \ty{UUID, FK} \\
+      plate             & \ty{VARCHAR(16)} \\
+      reviewer          & \ty{VARCHAR(64)} \\
+      note              & \ty{TEXT} \\
+      created\_at       & \ty{TIMESTAMPTZ} \\
+    \end{cols}};
+
+  \node[entity] (pre) at (6.2,0) {\textbf{predictions}\nodepart{two}
+    \begin{cols}
+      \pk{id}            & \ty{UUID, PK} \\
+      batch\_id         & \ty{UUID, FK, nullable} \\
+      track\_id         & \ty{TEXT} \\
+      plate             & \ty{VARCHAR(16)} \\
+      track\_conf       & \ty{REAL, 0--1} \\
+      char\_conf        & \ty{JSONB} \\
+      suggestions       & \ty{JSONB (top-$k$)} \\
+      status            & \ty{TEXT, CHECK$^{b}$} \\
+      decode\_mode      & \ty{TEXT, CHECK$^{c}$} \\
+      num\_frames       & \ty{SMALLINT, 1--5} \\
+      latency\_ms       & \ty{REAL} \\
+      model\_version    & \ty{TEXT} \\
+      ground\_truth     & \ty{VARCHAR(16)} \\
+      created\_at       & \ty{TIMESTAMPTZ} \\
+    \end{cols}};
+
+  % UML composition: filled diamond on the owner side = ON DELETE CASCADE
+  \draw[comp] ([yshift=-10mm]bat.north east) -- ([yshift=-10mm]bat.north east -| pre.west);
+  \fill[cInk] ([yshift=-10mm]bat.north east) -- ++(0.15,0.08) -- ++(0.15,-0.08) -- ++(-0.15,-0.08) -- cycle;
+  \node[lbl, above right] at ([yshift=-10mm, xshift=3mm]bat.north east) {0..1};
+  \node[lbl, above left]  at ([yshift=-10mm]bat.north east -| pre.west) {*};
+  \node[lbl, below, text=cGray] at ($([yshift=-10mm]bat.north east)!0.5!([yshift=-10mm]bat.north east -| pre.west)$) {cascade};
+
+  \draw[comp] ([yshift=-10mm]rev.north east) -- ([yshift=-10mm]rev.north east -| pre.west);
+  \fill[cInk] ([yshift=-10mm]rev.north east -| pre.west) -- ++(-0.15,0.08) -- ++(-0.15,-0.08) -- ++(0.15,-0.08) -- cycle;
+  \node[lbl, above right] at ([yshift=-10mm]rev.north east) {*};
+  \node[lbl, above left]  at ([yshift=-10mm, xshift=-3mm]rev.north east -| pre.west) {1};
+  \node[lbl, below, text=cGray] at ($([yshift=-10mm]rev.north east)!0.5!([yshift=-10mm]rev.north east -| pre.west)$) {cascade};
+
+  % notes strip
+  \node[base, draw=cGray, fill=fGray, font=\lblfont, align=left, anchor=north west, inner sep=3pt]
+    at ([yshift=-3mm]rev.south west) {%
+    \begin{tabular}{@{}>{\raggedright\arraybackslash}p{33mm}>{\raggedright\arraybackslash}p{43mm}>{\raggedright\arraybackslash}p{33mm}@{}}
+    \textbf{CHECK values} & \textbf{Indexes} & \textbf{Design notes}\\
+    $^{a}$ queued, running, completed, failed &
+    \code{predictions(status, created\_at)}: review queue &
+    no image columns (dataset license) \\
+    $^{b}$ accepted, needs\_review, reviewed &
+    \code{predictions(batch\_id, track\_id)}: CSV &
+    batch counters via \code{COUNT(*) FILTER} \\
+    $^{c}$ constrained, greedy &
+    \code{reviews(prediction\_id, created\_at)}: latest &
+    newest review row wins \\
+    \end{tabular}};
+\end{tikzpicture}
+\end{document}

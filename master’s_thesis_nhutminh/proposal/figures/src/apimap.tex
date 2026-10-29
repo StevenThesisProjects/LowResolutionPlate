@@ -1,0 +1,57 @@
+% REST resource map of /api/v1 -- replaces the Swagger screenshots (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\usepackage{array}
+\setlength{\fboxsep}{0.9pt}
+\setlength{\fboxrule}{0.5pt}
+\newcommand{\badge}[3]{\fcolorbox{#1}{#2}{\makebox[9.5mm]{\ttfamily\scriptsize\bfseries\color{#1}#3}}}
+\newcommand{\GET}{\badge{cGreen}{fGreen}{GET}}
+\newcommand{\POST}{\badge{cBlue}{fBlue}{POST}}
+\newcommand{\PUT}{\badge{cOrange}{fOrange}{PUT}}
+\newcommand{\DEL}{\badge{cRed}{fRed}{DELETE}}
+\newcommand{\st}[1]{\textcolor{cGray}{\ttfamily #1}}
+\newenvironment{ops}{\renewcommand{\arraystretch}{1.12}\setlength{\tabcolsep}{2.5pt}%
+  \begin{tabular}{@{}l >{\ttfamily}p{41mm} >{\raggedright\arraybackslash}p{33mm} r@{}}}{\end{tabular}}
+\tikzset{grp/.style={base, draw=cBlue, fill=white, align=left, inner sep=3pt, anchor=north west}}
+\begin{document}
+\begin{tikzpicture}
+  \node[app, minimum height=14mm, text width=11mm] (root) at (0.75,-3.1) {\code{/api/v1}\\[1pt]\lblfont OpenAPI\\\lblfont 3.1};
+
+  \node[grp] (sys) at (2.0,0) {\textbf{System}\\[1pt]
+    \begin{ops}
+      \GET & /health & model and DB status & \st{200} \\
+      \GET & /model  & checkpoint, SHA-256, $\tau$ & \st{200} \\
+    \end{ops}};
+  \node[grp, below=2.5mm of sys.south west, anchor=north west] (pre) {\textbf{Predictions} (one track)\\[1pt]
+    \begin{ops}
+      \POST & /predictions & recognize 1--5 crops & \st{201} \\
+      \GET  & /predictions & list, filter by status & \st{200} \\
+      \GET  & /predictions/\{id\} & one result & \st{200} \\
+      \DEL  & /predictions/\{id\} & remove & \st{204} \\
+      \GET  & /predictions/\{id\}/suggestions & top-5 layout-valid plates & \st{200} \\
+      \PUT  & /predictions/\{id\}/review & append a review & \st{200} \\
+    \end{ops}};
+  \node[grp, below=2.5mm of pre.south west, anchor=north west] (bat) {\textbf{Batches} (ZIP of tracks, asynchronous; each track becomes one prediction)\\[1pt]
+    \begin{ops}
+      \POST & /batches & queue a ZIP job & \st{202} \\
+      \GET  & /batches & list jobs & \st{200} \\
+      \GET  & /batches/\{id\} & progress, accuracy & \st{200} \\
+      \GET  & /batches/\{id\}/predictions & per-track results & \st{200} \\
+      \GET  & /batches/\{id\}/export & CSV download & \st{200} \\
+      \DEL  & /batches/\{id\} & remove, cascades & \st{204} \\
+    \end{ops}};
+
+  \foreach \g in {sys,pre,bat} \draw[arr] (root.east) -- ++(0.25,0) |- (\g.west);
+
+  % conventions
+  \node[base, draw=cGray, fill=fGray, align=left, text width=113mm, anchor=north west, font=\lblfont]
+    (conv) at ([yshift=-3mm]root.west |- bat.south) {%
+    \textbf{Conventions.}
+    \textbf{Input}: \code{multipart/form-data} (JPG/PNG $\le$5\,MB each; ZIP $\le$200\,MB, $\le$5{,}000 tracks).
+    \textbf{Output}: JSON; CSV for export; \code{Location} header on \code{201}/\code{202}.\\
+    \textbf{Errors}: one shape, \code{application/problem+json} (RFC 9457) with a stable \code{code}, e.g.\ \code{invalid\_frame\_count};
+    \code{404}, \code{409}, \code{413}, \code{415}, \code{422}, \code{503} + \code{Retry-After}.\\
+    \textbf{Lists}: \code{page}, \code{page\_size} $\rightarrow$ \{\code{items}, \code{total}\}.
+    \textbf{Result body}: \code{plate}, \code{char\_conf[]}, \code{track\_conf}, \code{status}, \code{sr\_images[]} (never stored), \code{latency\_ms}, \code{model\_version}.};
+\end{tikzpicture}
+\end{document}

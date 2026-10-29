@@ -1,0 +1,55 @@
+% Timeline of concurrent work: batch chunks, a single request, DB pool, UI reads (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[x=0.655cm, y=1cm]
+  \def\L{0}   % lanes start (time 0)
+  \tikzset{
+    fwd/.style={draw=cOrange, fill=fOrange, line width=0.5pt},
+    wr/.style={draw=cPurple, fill=cPurple!45, line width=0.4pt},
+    rd/.style={draw=cGreen, fill=cGreen!55, line width=0.3pt},
+    wait/.style={draw=cGray, pattern=north east lines, pattern color=cGray!60, line width=0.4pt},
+    lane/.style={font=\figfont\bfseries, anchor=east, align=right},
+  }
+  % lanes
+  \foreach \y/\t in {0/Batch worker, -1/Request A, -2/DB connections, -3/UI polling}{
+    \node[lane] at (-0.15,\y) {\t};
+    \draw[cGray!40, line width=0.4pt] (0,\y-0.5) -- (12.2,\y-0.5);
+  }
+  \draw[cGray!40, line width=0.4pt] (0,0.5) -- (12.2,0.5);
+  % time axis
+  \draw[arr] (0,-3.6) -- (12.4,-3.6) node[lbl, right] {$t$ (s)};
+  \foreach \t in {0,2,...,12} \draw[cInk] (\t,-3.6) -- ++(0,-0.07) node[lbl, below] {\t};
+
+  % batch worker: 4 tracks x 0.66 s = 2.64 s per chunk
+  \foreach \a/\b/\n in {0/2.64/1, 3.30/5.94/2, 6.02/8.66/3, 8.74/11.38/4}{
+    \draw[fwd] (\a,-0.22) rectangle (\b,0.22);
+    \node[lbl] at ({(\a+\b)/2},0) {chunk \n};
+  }
+  % request A arrives at t = 1.2 s, waits for the lock, runs, writes
+  \draw[cInk, line width=0.6pt, ->] (1.2,-0.55) -- (1.2,-0.78);
+  \node[lbl, anchor=south] at (1.2,-0.57) {arrives};
+  \draw[wait] (1.2,-1.2) rectangle (2.64,-0.8);
+  \node[lblbg, fill=white] at (1.92,-1.32) {waits $\le$1 chunk};
+  \draw[fwd] (2.64,-1.2) rectangle (3.30,-0.8);
+  \node[lbl] at (2.97,-1.0) {fwd};
+  \node[lbl, anchor=west] at (3.45,-1.0) {$\rightarrow$ \code{201} after $\approx$2.1\,s};
+
+  % DB connections: borrowed only for short write transactions
+  \foreach \a in {2.64, 5.94, 8.66, 11.38} \draw[wr] (\a,-2.12) rectangle (\a+0.1,-1.78);
+  \draw[wr] (3.30,-2.12) rectangle (3.36,-1.78);
+  \node[lbl, anchor=north west, text=cPurple] at (0,-2.2) {one write per chunk (4 rows); no connection held during a forward pass};
+
+  % UI polling every 0.5 s, p95 20--46 ms
+  \foreach \a in {0.25,0.75,...,11.75} \draw[rd] (\a,-3.0) rectangle (\a+0.05,-2.78);
+  \node[lbl, anchor=north west, text=cGreen] at (0,-3.06) {polls every 0.5\,s; reads do not wait for writers (MVCC), p95 $\le$46\,ms};
+
+  % legend
+  \begin{scope}[shift={(0,0.85)}]
+    \draw[fwd] (0,-0.08) rectangle (0.35,0.08); \node[lbl, anchor=west] at (0.4,0) {holds model lock};
+    \draw[wait] (3.9,-0.08) rectangle (4.25,0.08); \node[lbl, anchor=west] at (4.3,0) {waits for lock};
+    \draw[wr] (7.4,-0.08) rectangle (7.75,0.08); \node[lbl, anchor=west] at (7.8,0) {write txn};
+    \draw[rd] (9.9,-0.08) rectangle (10.25,0.08); \node[lbl, anchor=west] at (10.3,0) {read query};
+  \end{scope}
+\end{tikzpicture}
+\end{document}

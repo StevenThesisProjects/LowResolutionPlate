@@ -1,0 +1,151 @@
+% =====================================================================
+\section{Literature and Technical Review}
+% =====================================================================
+
+\subsection{Overview of Existing Solutions}
+
+Three groups of solutions are relevant. Table~\ref{tab:existing} summarizes how each one relates to
+the requirements of this project.
+
+\textbf{Commercial ALPR services and cloud OCR.} Rekor (the company behind OpenALPR)
+\cite{openalpr}, Plate Recognizer \cite{platerecognizer} and the text detection feature of Amazon
+Rekognition \cite{awsrekognition} are mature products, and dedicated ALPR products are common in
+parking access control. They handle many countries and camera types, scale on demand and come with
+documentation and support. They are built around one image per
+request, and the cloud versions process images on the provider's servers, with a price per call.
+
+\textbf{Open-source OCR libraries.} The open-source OpenALPR engine \cite{openalpr} and general OCR
+systems such as PP-OCR \cite{du2020ppocr} can be self-hosted and adapted. They are designed for
+images in which the characters are legible, and they read one image at a time.
+
+\textbf{Research models for low-resolution plates.} One line of work restores the image before
+reading it, using attention and sub-pixel convolution \cite{nascimento2023attention} or layout- and
+character-aware losses \cite{nascimento2024lcdnet}. Another line combines several frames: voting over
+super-resolved frames \cite{nascimento2025toward} and optical-flow restoration in MF-LPR$^2$
+\cite{na2025mflpr2}. Most recognizers in this area build on CRNN with CTC
+\cite{shi2017crnn,graves2006ctc}. In the ICPR 2026 competition, the best entry reached $82.13\%$ on
+the competition test set \cite{laroca2026icpr}. These models are released as training and evaluation
+code, which suits research use.
+
+\textbf{Selective prediction.} Selective classification \cite{geifman2017selective} lets a model
+abstain when its confidence is low and studies the trade-off between coverage (the share of inputs
+answered) and the accuracy on the answered inputs. This is the basis for the review queue.
+
+\begin{table}[tbp]
+\centering
+\caption{Existing solutions against the needs of this project.}
+\label{tab:existing}
+\begin{tabularx}{\textwidth}{@{}P{25mm} P{17mm} P{19mm} L@{}}
+\toprule
+Solution group & Input & Deployment & Fit with this project \\
+\midrule
+Commercial ALPR, cloud OCR & one image & cloud or licensed SDK & Designed for legible plates; images leave the site, which the dataset license does not allow \\
+Open-source OCR & one image & self-hosted & Can run on site; designed for legible characters \\
+Research LR models & 1--5 frames & training code & Target the right images; packaged for experiments rather than for operators \\
+\textbf{PlateReader LR} & 1--5 frames & self-hosted service & Adds API, review workflow, storage and deployment; limited to Brazilian layouts \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Technical Gaps for This Use Case}
+
+The solutions above serve their intended settings. For low-resolution surveillance tracks, five
+needs remain open in the material reviewed.
+
+\begin{description}
+  \item[G1. Resolution.] At five to seven pixels per character, the input is below the range that
+        general ALPR and OCR engines document, and closed engines cannot be retrained on it.
+  \item[G2. Multiple frames.] Single-image interfaces cannot use the extra evidence in the other
+        frames of a track.
+  \item[G3. Abstention and review.] The tools reviewed return a reading for every input. None of
+        them routes low-confidence readings to a reviewer with aids for correction.
+  \item[G4. Data and cost constraints.] The dataset license allows academic use only and forbids
+        redistribution \cite{icpr26license}, so images cannot be sent to a third-party cloud. The
+        target sites have CPUs but no GPU.
+  \item[G5. Engineering.] Research models usually come without an API, persistent storage, model
+        versioning or a repeatable evaluation pipeline, which are needed to run a model as a
+        service \cite{sculley2015hidden}.
+\end{description}
+
+\subsection{Rationale for the Selected Approach and Stack}
+
+\textbf{Model.} MF-SR-OCR addresses G1 and G2. It rectifies, aligns, super-resolves and fuses five
+frames in one network and reaches $79.95\%\pm0.15$ over three seeds, against $75.78\%$ for the
+retrained CRNN+STN baseline (Fig.~\ref{fig:multiseed}). A variant without the super-resolution
+branch (J1) reaches $80.45\%\pm0.45$; paired McNemar tests per seed give $p=0.91$, $0.43$ and
+$0.64$, so the two are statistically indistinguishable on this data \cite{nguyen2026mfsrocr}.
+MF-SR-OCR is served because it has the lowest seed-to-seed spread and because its super-resolved
+frames can be shown to reviewers. Whether those frames help reviewers is tested in RQ3. J1 needs
+$4.17\times$ fewer operations per track and remains available as a fallback through configuration.
+
+\textbf{Architecture.} Table~\ref{tab:arch} compares three options. A modular monolith fits one
+developer, one CPU host and one model that should be loaded once.
+
+\begin{table}[tbp]
+\centering
+\caption{Architecture options.}
+\label{tab:arch}
+\begin{tabularx}{\textwidth}{@{}P{22mm} L L@{}}
+\toprule
+Option & Strengths & Costs for this project \\
+\midrule
+\textbf{Modular monolith} (chosen) & One process loads the 29.6M-parameter model once; simple to test and deploy; module boundaries kept in code \cite{fowler_monolithfirst} & Scales as one unit; a split is possible later along the existing modules \\
+Microservices & Independent scaling and deployment & Network calls between services, several images to run and monitor; more than one developer can maintain in 12 weeks \\
+Serverless functions & No server to manage & Cold starts would reload the model; GPU-free functions with a 120\,MB model are slow to start; images would leave the site \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Database.} The workload mixes long batch writes with frequent reads from the review screen.
+Table~\ref{tab:db} compares the options. PostgreSQL was chosen; in a Week~2 load test, review-queue
+reads stayed at $46$\,ms p95 with no errors while a batch was writing (Section~\ref{sec:vv}).
+
+\begin{table}[tbp]
+\centering
+\caption{Database options for the result and review store.}
+\label{tab:db}
+\begin{tabularx}{\textwidth}{@{}P{22mm} L L@{}}
+\toprule
+Option & Strengths & Costs for this project \\
+\midrule
+SQLite (first roadmap) & No server; one file & One writer at a time \cite{sqlite_lock}, so reviewers wait behind batch writes; no hot backup tool \\
+\textbf{PostgreSQL 16} (chosen) & MVCC: reads and writes do not block each other \cite{postgres_mvcc}; \code{JSONB}, \code{UUID}, \code{CHECK}; hot backup with \code{pg\_dump} & One more container to run and back up \\
+MongoDB & Flexible documents & The data is relational (batch, prediction, review); joins and constraints would move into application code \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Backend, API style and frontend.} FastAPI \cite{fastapi} keeps the service in Python, so the
+API reuses the exact preprocessing of the training code; this is what makes the 999/999 parity
+possible. It also generates the OpenAPI description. REST with JSON fits browser clients and file
+uploads; errors follow RFC~9457 \cite{rfc9457}. gRPC would add a proxy layer for browsers without a
+clear gain at this load. Batch progress uses polling for now; Server-Sent Events are an option if
+polling becomes a cost. For the frontend, Gradio, Streamlit and React \cite{react} were compared in
+Week~1. React was chosen because the review screen needs custom interaction (suggestion buttons,
+per-character highlights) and the author has production experience with it. Its extra cost of two to
+three weeks is contained by freezing the interface at three screens after Week~8.
+
+\textbf{Deployment.} Docker Compose runs the whole stack on one host with one command; Kubernetes
+would add a control plane that a single CPU host does not need. Cloudflare Tunnel with Cloudflare
+Access \cite{cloudflare_tunnel} gives a public demo address without opening an inbound port and adds
+sign-in in front of an API that has no accounts of its own. Table~\ref{tab:stack} summarizes the
+stack.
+
+\begin{table}[tbp]
+\centering
+\caption{Technology stack.}
+\label{tab:stack}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}P{20mm} P{34mm} L@{}}
+\toprule
+Layer & Choice & Note \\
+\midrule
+Model & PyTorch, MF-SR-OCR (EMA weights) & CPU inference, 0.19--0.27\,s per track natively \\
+Backend & Python 3.11, FastAPI, Uvicorn & Pydantic schemas form the API contract \\
+Database & PostgreSQL 16, psycopg 3 pool & Text results only; no images \\
+Frontend & React, Vite, Tailwind CSS & Three screens, desktop and mobile \\
+Packaging & Docker, Docker Compose & Profiles for optional services \\
+Access & Cloudflare Tunnel and Access & Outbound-only connection, sign-in at the edge \\
+CI/CD & GitHub Actions \cite{github_actions}, GHCR & Lint, tests, scans, image build \\
+\bottomrule
+\end{tabularx}
+\end{table}

@@ -1,0 +1,25 @@
+% CI/CD pipeline on GitHub Actions (Section 3.3).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[node distance=3mm]
+  \tikzset{st/.style={app, text width=19mm, minimum height=14mm},
+           sec/.style={svc, text width=19mm, minimum height=14mm}}
+  \node[font=\figfont\bfseries, text=cBlue, anchor=west] at (0,0.55) {Continuous integration: every pull request to \code{main}};
+  \node[ext, text width=19mm, minimum height=14mm, anchor=west] (c1) at (0,-0.4) {\textbf{Pull request}\\one issue,\\one branch};
+  \node[st, right=of c1] (c2) {\textbf{Static checks}\\Ruff, ESLint,\\Prettier};
+  \node[st, right=of c2] (c3) {\textbf{Unit tests}\\pytest, Vitest,\\coverage $\ge$80\%};
+  \node[st, right=of c3] (c4) {\textbf{Integration}\\API + PostgreSQL\\service container};
+  \node[sec, right=of c4] (c5) {\textbf{Security}\\Bandit, pip-audit,\\npm audit, Trivy};
+  \foreach \a/\b in {c1/c2,c2/c3,c3/c4,c4/c5} \draw[arr] (\a) -- (\b);
+
+  \node[font=\figfont\bfseries, text=cGreen, anchor=west] at (0,-1.75) {Continuous delivery: release tag \code{vX.Y} at a milestone};
+  \node[ext, text width=19mm, minimum height=14mm, anchor=west] (d1) at (0,-2.7) {\textbf{Tag}\\\code{vX.Y} on\\\code{main}};
+  \node[sec, right=of d1] (d2) {\textbf{Release gate}\\parity 0 divergent,\\p95 $\le$1\,s};
+  \node[st, right=of d2] (d3) {\textbf{Build, push}\\images to GHCR,\\tagged \code{vX.Y}};
+  \node[st, right=of d3] (d4) {\textbf{Deploy}\\\code{compose pull}\\\code{up -d}};
+  \node[ok, text width=19mm, minimum height=14mm, right=of d4] (d5) {\textbf{Smoke test}\\health, 1 track,\\1 small batch};
+  \foreach \a/\b in {d1/d2,d2/d3,d3/d4,d4/d5} \draw[arr] (\a) -- (\b);
+  \draw[darr] (d5.south) -- ++(0,-0.3) -| node[lbl, pos=0.25, below] {on failure: roll back to the previous tag} (d4.south);
+\end{tikzpicture}
+\end{document}

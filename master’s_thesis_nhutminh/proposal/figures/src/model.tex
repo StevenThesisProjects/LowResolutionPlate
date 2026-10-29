@@ -1,0 +1,36 @@
+% MF-SR-OCR recognition pipeline as served by the Inference service (Section 3.1).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[node distance=4mm]
+  \tikzset{blk/.style={app, text width=17.5mm, minimum height=12mm}}
+  % row 1 (left to right)
+  \node[ext, text width=17.5mm, minimum height=12mm] (in) at (0,0) {5 LR frames\\$3\times32\times128$};
+  \node[blk, right=of in]  (stn) {\textbf{STN}\\per-frame\\affine warp};
+  \node[blk, right=of stn] (dcn) {\textbf{DCNv2}\\align to the\\middle frame};
+  \node[blk, right=of dcn] (sr)  {\textbf{FrameSR}\\$\times2$, temporal\\$3\times64\times256$};
+  \node[blk, right=of sr]  (bb)  {\textbf{Backbone}\\ResNet, GN,\\SE blocks};
+  % row 2 (right to left)
+  \node[blk, below=8mm of bb]  (fus) {\textbf{Attention}\\fusion,\\$5\rightarrow1$ map};
+  \node[blk, left=of fus] (lstm) {\textbf{BiLSTM}\\2 layers,\\256 units};
+  \node[blk, left=of lstm] (ctc) {\textbf{CTC head}\\$T=32$ steps,\\37 classes};
+  \node[svc, text width=17.5mm, minimum height=12mm, left=of ctc] (beam)
+    {\textbf{Beam search}\\width 16,\\2 layouts};
+  \node[ok, text width=17.5mm, minimum height=12mm, left=of beam] (out) {plate, $c(x)$,\\char conf.,\\top-5};
+
+  \draw[arr] (in) -- (stn);  \draw[arr] (stn) -- (dcn);
+  \draw[arr] (dcn) -- (sr);  \draw[arr] (sr) -- (bb);
+  \draw[arr] (bb) -- (fus);  \draw[arr] (fus) -- (lstm);
+  \draw[arr] (lstm) -- (ctc); \draw[arr] (ctc) -- (beam);
+  \draw[arr] (beam) -- (out);
+
+  % training-only loss and SR output for reviewers
+  \node[bad, text width=33mm, above=6mm of dcn.north, anchor=south] (loss)
+    {\textit{training only}\\$\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$,\\HR warped by $\mathrm{sg}[\theta]$};
+  \draw[darr] (stn.north) |- node[lbl, pos=0.3, left] {$\theta$} (loss.west);
+  \draw[darr] ([xshift=-3mm]sr.north) |- (loss.east);
+  \node[ok, text width=21mm, above=6mm of bb.north, anchor=south] (rev) {SR frames sent\\to the reviewer};
+  \draw[darr] ([xshift=3mm]sr.north) -- ++(0,0.3) -| (rev.south);
+  \node[lbl, text=cGray, below=0.5mm of beam.south, align=center] {\code{LLLNNNN} | \code{LLLNLNN}};
+\end{tikzpicture}
+\end{document}

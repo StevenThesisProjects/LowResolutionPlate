@@ -1,0 +1,140 @@
+% =====================================================================
+%  MSE Applied Capstone Project Proposal -- PlateReader LR
+%  Springer LLNCS class (llncs.cls v2.24, included in this folder).
+%  Compiles with pdfLaTeX (Overleaf default) or XeLaTeX. No BibTeX run:
+%  the references are in sections/06_references.tex.
+%  Figures are vector PDFs in figures/, built from the TikZ sources in
+%  figures/src/ (run `sh build_figures.sh` after editing a source).
+%  Figures are included at their natural size, never scaled, so every
+%  diagram uses the same 8 pt / 7 pt Computer Modern text.
+% =====================================================================
+\documentclass[runningheads]{llncs}
+
+\usepackage{iftex}
+\ifPDFTeX
+  % T5 = Vietnamese encoding (vntex), used only for the Vietnamese title;
+  % T1 stays the default encoding for the English text.
+  \usepackage[T5,T1]{fontenc}
+  \newcommand{\vn}[1]{{\fontencoding{T5}\selectfont #1}}
+\else
+  \usepackage{fontspec}   % Latin Modern, same design as Computer Modern
+  \newcommand{\vn}[1]{#1}
+\fi
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{etoolbox}
+\usepackage[section]{placeins}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------
+% Project metadata
+% ---------------------------------------------------------------------
+\newcommand{\projecttitle}{A Web Application for Multi-Frame Restoration and Recognition of Low-Resolution License Plates Based on MF-SR-OCR for Parking Facilities}
+\newcommand{\vntitle}{\vn{Xây dựng ứng dụng Web khôi phục và nhận dạng biển số xe độ phân giải thấp từ đa khung hình dựa trên mô hình MF-SR-OCR phục vụ cho bãi giữ xe}}
+\newcommand{\field}{Computer Vision}
+\newcommand{\studentname}{Nguyen Nhut Minh}
+\newcommand{\studentid}{25ms23283}
+\newcommand{\studentclass}{MSA34HCM}
+\newcommand{\studentemail}{minh25ms23283@fsb.edu.vn}
+\newcommand{\studentemailalt}{nhutminh.it19@gmail.com}
+\newcommand{\studentphone}{0369269410}
+\newcommand{\supervisorname}{Dr.\ Huynh Vo Trung Dung}
+\newcommand{\supervisoraffil}{International University, VNU-HCM}
+\newcommand{\supervisoremail}{hvtdung@hcmiu.edu.vn}
+\newcommand{\supervisorphone}{0862909326}
+\newcommand{\repourl}{https://github.com/StevenThesisProjects/LowResolutionPlate}
+\newcommand{\proposaldate}{October 26, 2026}
+
+% ---------------------------------------------------------------------
+% Small helpers (no change to the LLNCS fonts or sizes)
+% ---------------------------------------------------------------------
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\fig}[3]{% file, caption, label
+  \begin{figure}[tbp]\centering\includegraphics{figures/#1}\caption{#2}\label{#3}\end{figure}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\tabcolsep}{4pt}           % LLNCS default (1.4pt) is too tight for text tables
+\renewcommand{\arraystretch}{1.15}
+\setcounter{tocdepth}{2}
+\setlength{\emergencystretch}{1.5em} % avoid overfull lines with long code words
+\definecolor{done}{HTML}{1B7A3A}
+\definecolor{plan}{HTML}{B4540A}
+\newcommand{\Done}{\textcolor{done}{Done}}
+\newcommand{\Plan}{\textcolor{plan}{Planned}}
+\newcommand{\Prog}{\textcolor{plan}{In progress}}
+
+% Numbered "6 References" heading (IEEE [n] labels are set in 06_references.tex).
+\makeatletter
+\patchcmd{\thebibliography}{\section*{\refname}}{}{}{}
+\makeatother
+
+\begin{document}
+
+\title{\projecttitle}
+\subtitle{MSE Applied Capstone Project Proposal}
+\titlerunning{Low-Resolution Plate Recognition for Parking Facilities}
+\author{\studentname}
+\authorrunning{N.~N.~Minh}
+\institute{Master of Software Engineering, FPT School of Business and Technology (FSB),\\
+FPT University, Ho Chi Minh City, Vietnam\\
+\email{\studentemail}}
+
+\maketitle
+
+\begin{abstract}
+Many parking facilities record vehicles with low-cost overview cameras, so a license plate in the
+footage may cover only about $46\times19$ pixels, and a single frame often does not hold enough
+detail for a reliable reading. This proposal describes PlateReader LR, a web application for parking
+operators that restores and reads such plates from a short track of up to five frames, and shows which
+readings can be accepted automatically and which need a check by staff. The system serves MF-SR-OCR, a multi-frame
+recognition model that reaches $79.95\%\pm0.15$ exact-match accuracy over three seeds on 999
+validation tracks of the ICPR 2026 LRLPR benchmark, against $75.78\%$ for a retrained CRNN+STN
+baseline. Around the model, the project builds a FastAPI service, a PostgreSQL store for results and
+reviews, a React review interface, and a Docker Compose deployment for CPU-only machines. The
+backend, its database and its tests were completed in Weeks 1--2; the API reproduces the offline model
+on all 999 validation tracks. The remaining ten weeks cover statistical validation on a sealed test
+set, confidence-based routing to reviewers, the user interface, CI/CD, and a five-user study.
+\keywords{license plate recognition \and low-resolution images \and multi-frame super-resolution
+\and parking management \and selective prediction \and web application}
+\end{abstract}
+
+\clearpage
+% Page 2: project information (in place, not floating) and the table of contents.
+\begin{center}\small
+\makeatletter\def\@captype{table}\makeatother
+\caption{Project information.}
+\label{tab:info}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}l L@{}}
+\toprule
+Title (Vietnamese) & \vntitle \\
+Field        & \field \\
+Student      & \studentname \\
+Student ID   & \studentid \quad Class: \studentclass \\
+Contact      & \href{mailto:\studentemail}{\studentemail}, \href{mailto:\studentemailalt}{\studentemailalt}, \studentphone \\
+Supervisor   & \supervisorname, \supervisoraffil \\
+             & \href{mailto:\supervisoremail}{\supervisoremail}, \supervisorphone \\
+Duration     & 12 weeks, October 5 -- December 27, 2026 \\
+Repository   & \href{\repourl}{\code{github.com/StevenThesisProjects/LowResolutionPlate}} \\
+Date         & \proposaldate \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begingroup\let\clearpage\relax % keep the LLNCS contents list on the same page
+\makeatletter\def\@makeschapterhead#1{\vskip 6pt{\normalfont\large\bfseries #1\par}\vskip 6pt}\makeatother
+\tableofcontents
+\endgroup
+\clearpage
+
+\input{sections/01_introduction}
+\input{sections/02_literature}
+\input{sections/03_design}
+\input{sections/04_evaluation}
+\input{sections/05_plan}
+\input{sections/06_references}
+
+\end{document}

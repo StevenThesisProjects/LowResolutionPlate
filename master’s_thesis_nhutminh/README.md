@@ -176,7 +176,7 @@ docker compose up -d --build              # PostgreSQL + API
 | Health check | <http://localhost:8000/api/v1/health> |
 | Base URL cho React | `http://localhost:8000/api/v1` |
 
-![Swagger — danh sách endpoint](report/tuan2/swagger_endpoints.png)
+![Swagger — danh sách endpoint](https://raw.githubusercontent.com/StevenThesisProjects/LowResolutionPlate/main/master%E2%80%99s_thesis_nhutminh/report/tuan2/swagger_endpoints.png)
 
 ### 4.3. Cấu trúc thêm mới
 

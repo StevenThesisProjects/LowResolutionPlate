@@ -1,0 +1,50 @@
+% UML state machines for a batch job and for a prediction (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\tikzset{
+  st/.style={app, rounded corners=6pt, minimum width=20mm, minimum height=7mm},
+  stok/.style={st, draw=cGreen, fill=fGreen},
+  stbad/.style={st, draw=cRed, fill=fRed},
+  init/.style={circle, fill=cInk, minimum size=2.2mm, inner sep=0},
+  final/.style={circle, draw=cInk, line width=0.6pt, minimum size=3.2mm, inner sep=0,
+                path picture={\fill[cInk] (path picture bounding box.center) circle (0.9mm);}},
+}
+\begin{document}
+\begin{tikzpicture}
+  % ---------------- (a) batch ----------------
+  \node[font=\figfont\bfseries, anchor=west] at (0,0.55) {(a) Batch job (\code{batches.status})};
+  \node[init] (b0) at (0.25,-0.3) {};
+  \node[st] (q) at (1.9,-0.3) {\code{queued}};
+  \node[st] (r) at (1.9,-1.75) {\code{running}};
+  \node[stok] (c) at (1.9,-3.2) {\code{completed}};
+  \node[stbad] (f) at (4.55,-3.2) {\code{failed}};
+  \node[final] (bf) at (3.2,-4.2) {};
+  \draw[arr] (b0) -- (q);
+  \draw[arr] (q) -- node[lbl, left, align=right] {worker\\takes job} (r);
+  \draw[arr] (r) -- node[lbl, left, align=right] {all chunks\\written} (c);
+  \draw[arr] (r) -| node[lbl, pos=0.25, above, align=center] {bad image\\or error} (f);
+  \draw[arr] (q) -| node[lbl, pos=0.25, above, align=center] {server restart} ([xshift=3mm]f.north);
+  \draw[arr] (c.south) |- (bf);
+  \draw[arr] (f.south) |- node[lbl, pos=0.75, below] {\code{DELETE}} (bf);
+  \node[lbl, text=cGray, align=left, anchor=north west] at (0,-5.0)
+    {\code{processed\_tracks} grows by 4 per chunk.\\On restart, jobs left \code{queued} or\\\code{running} are marked \code{failed}.};
+
+  % ---------------- (b) prediction ----------------
+  \begin{scope}[xshift=6.3cm]
+  \node[font=\figfont\bfseries, anchor=west] at (0,0.55) {(b) Prediction (\code{predictions.status})};
+  \node[init] (p0) at (2.8,-0.3) {};
+  \node[decision, aspect=2.4, font=\lblfont] (g) at (2.8,-1.25) {$c(x)\ge\tau$?};
+  \node[stok] (a) at (1.05,-2.45) {\code{accepted}};
+  \node[stbad, minimum width=22mm] (n) at (4.5,-2.45) {\code{needs\_review}};
+  \node[st] (v) at (2.8,-3.9) {\code{reviewed}};
+  \draw[arr] (p0) -- node[lbl, right] {model result} (g);
+  \draw[arr] (g) -| node[lbl, pos=0.3, above] {yes} (a);
+  \draw[arr] (g) -| node[lbl, pos=0.3, above] {no} (n);
+  \draw[arr] (a) |- node[lbl, pos=0.3, left, align=right] {\code{PUT}\\\code{review}} (v);
+  \draw[arr] (n) |- node[lbl, pos=0.3, right, align=left] {\code{PUT}\\\code{review}} (v);
+  \draw[arr] ([xshift=-4mm]v.south) .. controls +(-0.2,-0.55) and +(0.2,-0.55) .. node[lbl, below] {another \code{PUT} appends} ([xshift=4mm]v.south);
+  \node[lbl, text=cGray, align=left, anchor=north west] at (0,-5.0)
+    {\code{PUT} confirms or corrects the plate. Each call\\appends a row to \code{reviews}; the newest\\row is the final plate.};
+  \end{scope}
+\end{tikzpicture}
+\end{document}

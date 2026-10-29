@@ -1,0 +1,35 @@
+% Validation accuracy of the baselines and the three multi-frame configurations (Section 4.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\begin{document}
+\begin{tikzpicture}
+  \begin{axis}[
+      width=11.4cm, height=5.6cm,
+      ybar, bar width=9mm, ymin=73, ymax=82,
+      ylabel={Exact-match accuracy (\%)},
+      symbolic x coords={a,b,c,d,e}, xtick={a,b,c,d,e},
+      xticklabels={{CRNN\\single frame\\1 run},{CRNN+STN\\multi-frame\\1 run},{SR$\times$1 (S4)\\3 seeds},{\textbf{MF-SR-OCR}\\\textbf{(S1, served)}\\3 seeds},{w/o SR (J1)\\3 seeds}},
+      xticklabel style={align=center, font=\lblfont, text=cInk},
+      yticklabel style={font=\lblfont, text=cInk},
+      ylabel style={font=\figfont, text=cInk},
+      enlarge x limits=0.13,
+      axis line style={cGray}, tick style={cGray},
+      ymajorgrids, grid style={cGray!25},
+      nodes near coords, point meta=explicit symbolic,
+      every node near coord/.append style={font=\lblfont, text=cInk, yshift=7pt},
+      error bars/y dir=both, error bars/y explicit,
+      error bars/error bar style={cInk, line width=0.6pt},
+      error bars/error mark options={rotate=90, mark size=2.2pt, cInk},
+    ]
+    \addplot[draw=cGray, fill=cGray!25, bar shift=0pt] coordinates {
+      (a,74.45) +- (0,0) [74.45]
+      (b,75.78) +- (0,0) [75.78]};
+    \addplot[draw=cBlue, fill=cBlue!35, bar shift=0pt] coordinates {
+      (c,79.48) +- (0,0.44) [79.48\,$\pm$\,0.44]
+      (d,79.95) +- (0,0.15) [79.95\,$\pm$\,0.15]
+      (e,80.45) +- (0,0.45) [80.45\,$\pm$\,0.45]};
+  \end{axis}
+\end{tikzpicture}
+\end{document}
