@@ -1,0 +1,40 @@
+% UML-style deployment view: Docker Compose on one CPU host (Section 3.3).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{svcbox/.style={app, text width=25mm, minimum height=15mm},
+           vol/.style={data, text width=21mm}}
+  % host
+  \draw[draw=cGray, dashed, line width=0.6pt, rounded corners=3pt] (2.3,0.45) rectangle (12.05,-5.1);
+  \node[layertitle, font=\lblfont\bfseries] at (2.3,0.45) {Demo host: Linux, CPU only; Compose project \code{platereader}};
+
+  % external actors
+  \node[ext, text width=15mm, minimum height=12mm] (br) at (0.95,-0.9) {\textbf{Browser}\\LAN user};
+  \node[svc, text width=16mm, minimum height=12mm] (cf) at (1.0,-3.0) {\textbf{Cloudflare}\\edge,\\Access};
+  \node[lbl, text=cGray, align=center] (ru) at (1.0,-4.5) {remote user\\(signed in)};
+  \draw[arr] (ru) -- (cf);
+
+  % services
+  \node[svcbox] (web) at (3.85,-0.9) {\textbf{web} (W8)\\Nginx, React build\\\code{:80}, proxies API};
+  \node[svcbox, line width=1pt] (api) at (7.0,-0.9) {\textbf{api}\\FastAPI, PyTorch\\\code{:8000}, 3\,GB limit};
+  \node[svcbox, draw=cPurple, fill=fPurple, text width=27.5mm] (db) at (10.5,-0.9) {\textbf{db}\\\code{postgres:16-alpine}\\\code{127.0.0.1:5432}};
+  \node[svcbox, draw=cOrange, fill=fOrange] (tun) at (3.85,-3.0) {\textbf{tunnel}\\\code{cloudflared},\\outbound only,\\profile \code{public}};
+  \node[svcbox, draw=cGray, fill=fGray] (bak) at (7.0,-4.25) {\textbf{backup}\\\code{pg\_dump}, every 6\,h\\profile \code{backup}};
+
+  % volumes
+  \node[vol] (mod) at (7.0,-2.55) {\code{/models}\\checkpoint (ro)};
+  \node[vol] (pgd) at (10.5,-2.75) {\code{pgdata}\\named volume};
+  \node[vol, text width=17mm] (bdir) at (3.85,-4.55) {\code{./backups}\\on host};
+
+  \draw[arr] (br) -- (web);
+  \draw[arr] (web) -- (api);
+  \draw[arr] (api) -- (db);
+  \draw[arr] (tun) -- (cf);
+  \draw[arr] (tun) -- (web);
+  \draw[darr] (mod) -- node[lbl, right] {mount} (api);
+  \draw[darr] (db) -- node[lbl, right] {data} (pgd);
+  \draw[arr] (bak.north east) -- node[lbl, right, pos=0.4] {dump} (db.south west);
+  \draw[arr] (bak) -- (bdir);
+\end{tikzpicture}
+\end{document}

@@ -1,0 +1,37 @@
+% UML sequence diagram: asynchronous batch job POST /batches (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \def\C{1.1}\def\R{3.6}\def\W{6.1}\def\I{8.5}\def\P{10.9}
+  \lifeline{c}{\C}{Client}{-10.5}
+  \lifeline{r}{\R}{Batches\\router}{-10.5}
+  \lifeline{w}{\W}{Batch worker\\(1 thread)}{-10.5}
+  \lifeline{i}{\I}{Inference}{-10.5}
+  \lifeline{p}{\P}{PostgreSQL}{-10.5}
+
+  \msg{\C}{\R}{-0.95}{\code{POST /batches}}
+  \selfmsg{\R}{-1.5}{read ZIP in memory, enforce\\$\le$200\,MB, $\le$5{,}000 tracks}
+  \msg{\R}{\P}{-2.1}{\code{INSERT batches} (status \code{queued})}
+  \draw[->, draw=cInk, line width=0.6pt, densely dashed] (\R,-2.55) -- node[lbl, above] {\code{submit(job)}} (\W,-2.55);
+  \ret{\R}{\C}{-3.0}{\code{202} + \code{Location}}
+  \msg{\W}{\P}{-3.45}{\code{status = running}}
+
+  % par fragment: worker loop || client polling
+  \fragment{par}{}{0.15}{-3.8}{11.85}{-8.35}
+  \fragment{loop}{each chunk of 4 tracks}{4.75}{-4.1}{11.75}{-5.98}
+  \msg{\W}{\I}{-4.9}{forward (model lock)}
+  \ret{\I}{\W}{-5.3}{4 results}
+  \msg{\W}{\P}{-5.75}{1 txn: 4 \code{INSERT}s + progress}
+  \draw[cGray, dashed, line width=0.5pt] (0.15,-6.12) -- (11.85,-6.12);
+  \fragment{loop}{every 2--5 s}{0.25}{-6.3}{11.75}{-8.2}
+  \msg{\C}{\R}{-6.95}{\code{GET /batches/\{id\}}}
+  \msg{\R}{\P}{-7.4}{\code{COUNT(*) FILTER (...)} at read time}
+  \ret{\R}{\C}{-7.9}{\code{200} progress}
+
+  \msg{\W}{\P}{-8.75}{\code{status = completed | failed}}
+  \msg{\C}{\R}{-9.3}{\code{GET .../export}}
+  \msg{\R}{\P}{-9.7}{\code{SELECT} predictions}
+  \ret{\R}{\C}{-10.2}{\code{200 text/csv}}
+\end{tikzpicture}
+\end{document}

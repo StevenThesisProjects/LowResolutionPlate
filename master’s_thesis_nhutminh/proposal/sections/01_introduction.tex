@@ -1,0 +1,142 @@
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+
+\subsection{Background}
+
+The project serves parking facilities: car parks of apartment and office buildings, shopping-center
+garages and paid lots for cars and motorbikes. Staff record each vehicle at the entry and exit lanes,
+look a vehicle up when a customer loses a ticket or disputes a fee, and reconcile the records at the
+end of a shift. Automatic License Plate Recognition (ALPR) turns camera images into plate text and
+performs well when the plate is large and sharp \cite{laroca2018robust}. Many facilities, however,
+rely on low-cost overview cameras placed some distance from the lane and keep compressed recordings,
+so the plate may cover only a few dozen pixels. In those cases staff fall back to reading the footage
+themselves.
+
+The ICPR 2026 Low-Resolution License Plate Recognition (LRLPR) benchmark \cite{laroca2026icpr}
+captures this setting. It provides 20{,}000 training \emph{tracks}. Each track holds five
+low-resolution (LR) crops of the same plate, about $46\times19$ pixels on average, five
+high-resolution (HR) crops and the plate text. Plates follow two Brazilian layouts, \code{LLLNNNN}
+and \code{LLLNLNN}, and a track counts as correct only when all seven characters match. With five
+to seven pixels of width per character, a single frame often leaves some glyphs ambiguous.
+
+The author's model MF-SR-OCR \cite{nguyen2026mfsrocr} restores and reads these tracks by combining
+the five frames. Today it exists as research code: training scripts, evaluation scripts and
+checkpoints. This capstone turns it into a web application that parking staff can use. The benchmark
+plates are Brazilian and the model is trained on them, so the system is built and evaluated on that
+domain. Vietnamese plates follow other layouts, often on two rows, and supporting them needs labeled
+Vietnamese data; this is outside the present scope (Section~1.4).
+
+\textbf{Stakeholders.} Table~\ref{tab:stakeholders} lists who is affected and what each group needs.
+Fig.~\ref{fig:usecase} shows the use cases in scope.
+
+\begin{table}[tbp]
+\centering
+\caption{Stakeholders and their needs.}
+\label{tab:stakeholders}
+\begin{tabularx}{\textwidth}{@{}P{30mm} L@{}}
+\toprule
+Stakeholder & Need \\
+\midrule
+Parking attendants and operators (primary users) & Read plates at the entry and exit lanes or from recorded footage; know which readings to trust; correct the rest with as little typing as possible. \\
+Parking managers & Process the footage of a shift or a day as one batch, export the records, and settle lost-ticket or fee disputes from them. \\
+Vehicle owners (indirect) & Their vehicle is identified correctly at exit, and a dispute can be checked against a stored record. \\
+System administrators & Install, update and back up the service on CPU-only machines. \\
+ML engineer (the author) & Swap a model or threshold without code changes; trace every result to a model version. \\
+Dataset owners (UFPR) & Images are used only for non-commercial academic work and are not redistributed \cite{icpr26license}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\fig{usecase.pdf}{Use cases in scope. Operators recognize, review and export; the administrator
+runs the stack; the ML engineer manages the model and the threshold $\tau$.}{fig:usecase}
+
+\subsection{Practical Problem Statement and User Pain-Point}
+
+Parking staff currently have no tool that uses all the frames in which a vehicle appears, indicates
+which automatic readings are reliable, and helps them correct the others. Fig.~\ref{fig:workflow}
+compares the current workflow with the proposed one. The problem breaks down into five concrete
+pain points.
+
+\begin{description}
+  \item[P1. Accuracy.] On the 999 validation tracks, a single-frame CRNN reads $74.45\%$ of tracks
+        correctly and the multi-frame CRNN+STN baseline, retrained on this codebase, reads
+        $75.78\%$. About one plate in four is wrong.
+  \item[P2. No reliability signal.] Results come without a usable confidence, so the operator has
+        to check every plate to find the wrong ones.
+  \item[P3. Slow correction.] A wrong plate is re-typed from a blurry crop, with no hint of which
+        character is doubtful and no list of likely alternatives.
+  \item[P4. Not deployable.] The model runs only as Python scripts. There is no API, no batch mode,
+        no record of corrections, and the target parking sites run ordinary PCs without a GPU.
+  \item[P5. Concurrent load.] Batch jobs write results continuously while reviewers read the queue.
+        A file-locking database such as SQLite allows one writer at a time \cite{sqlite_lock}, so
+        reviewers would wait behind the batch.
+\end{description}
+
+\fig{workflow.pdf}{Current workflow (a) and proposed workflow with confidence-based routing (b).}{fig:workflow}
+
+\subsection{Research Objectives and Questions}
+
+Table~\ref{tab:objectives} states the engineering objectives in SMART form. Week~1 starts on
+October 5, 2026.
+
+\begin{table}[tbp]
+\centering
+\caption{SMART objectives.}
+\label{tab:objectives}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}l P{27mm} L l@{}}
+\toprule
+ID & Objective & Measurable target & Due \\
+\midrule
+O1 & Validate the model & Mean $\pm$ std over 3 seeds $\ge 79\%$ on validation; paired McNemar test and bootstrap 95\% CI against the baseline; one run on a sealed 1{,}000-track test set & W3, W6 \\
+O2 & Selective prediction & Threshold $\tau$ that gives $\ge 95\%$ precision on auto-accepted validation tracks; coverage reported & W5 \\
+O3 & REST API & 0 divergent tracks of 999 between API and offline model; p95 latency $\le 1$\,s per track on CPU & W7 \\
+O4 & Web interface & Single-track, batch and review screens usable on desktop and mobile browsers & W8--9 \\
+O5 & Reliable operation & 1{,}000-track batch with no error; 30/30 end-to-end cases pass; RPO $\le 6$\,h, RTO $< 5$\,min & W9--12 \\
+O6 & User value & 5-user study with SUS $\ge 68$ \cite{brooke1996sus}; $\ge 30\%$ less review time per flagged track than manual reading & W10 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Three research questions guide the evaluation.
+
+\begin{description}
+  \item[RQ1.] Does the multi-frame model improve on the CRNN+STN baseline on data that played no
+        part in model selection?
+  \item[RQ2.] What share of tracks can be accepted automatically while keeping precision at or
+        above $95\%$?
+  \item[RQ3.] Do the review aids (super-resolved frames, per-character confidence and top-5
+        suggestions) shorten the time a reviewer needs per flagged track?
+\end{description}
+
+\subsection{Scope}
+
+Table~\ref{tab:scope} separates what will be built and tested from what is left out. The model is
+trained on Brazilian plates, so the system is described as working on that domain only.
+
+\begin{table}[tbp]
+\centering
+\caption{Project scope.}
+\label{tab:scope}
+\begin{tabularx}{\textwidth}{@{}L L@{}}
+\toprule
+\textbf{In-scope components} & \textbf{Out-of-scope components} \\
+\midrule
+MF-SR-OCR inference with greedy and layout-constrained decoding &
+Plate detection and tracking in raw video (stretch goal only); gate hardware such as barriers, ticket machines or RFID readers \\
+Selective prediction: track confidence, threshold $\tau$, review queue &
+Non-Brazilian plates (10 Vietnamese plates tested qualitatively to document the limitation) \\
+FastAPI REST API: single track, ZIP batch, review, suggestions, CSV export &
+In-app user accounts (identity is delegated to Cloudflare Access) \\
+PostgreSQL storage of results and review history (text only, no images) &
+GPU or edge deployment, INT8 quantization, Kubernetes \\
+React web app with single-track, batch and review screens &
+Live camera streams and integration with police or VMS systems \\
+Docker Compose deployment on one CPU host, Cloudflare Tunnel, backups &
+Storing or publishing dataset images \\
+Automated tests, CI/CD pipeline, API and user documentation &
+New model research beyond a minimal ablation \\
+Roles: operator/reviewer, administrator, ML engineer & \\
+\bottomrule
+\end{tabularx}
+\end{table}

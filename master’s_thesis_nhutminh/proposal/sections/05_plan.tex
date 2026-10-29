@@ -1,0 +1,88 @@
+% =====================================================================
+\section{Project Implementation and Research Plan}
+% =====================================================================
+
+\subsection{Work Breakdown Structure and Project Phases}
+
+The work is split into eight packages (Fig.~\ref{fig:wbs}) and five phases that overlap in time
+(Table~\ref{tab:phases}). Model validation and backend work run in parallel because GPU runs take
+about 7 hours each and leave time for coding.
+
+\fig{wbs.pdf}{Work breakdown structure.}{fig:wbs}
+
+\begin{table}[tbp]
+\centering
+\caption{Project phases.}
+\label{tab:phases}
+\begin{tabularx}{\textwidth}{@{}P{36mm} l L@{}}
+\toprule
+Phase & Weeks & Main outputs \\
+\midrule
+Requirements and analysis & W1 & Scope, data license review, splits with hashes, reproducible training \\
+Architecture and database design & W1--3 & API contract, schema, concurrency design, ADRs \\
+Core implementation & W2--9 & Model validation, backend, frontend, CI/CD, deployment \\
+Testing and security audit & W7--10 & Error cases, scans, end-to-end and load tests, user study \\
+Deployment and handover & W9--12 & Public demo, documentation, thesis chapters, release \code{v1.0} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Project Timeline and Milestones}
+
+Fig.~\ref{fig:gantt} shows the schedule and Table~\ref{tab:milestones} the milestones. Weeks~1 and~2
+are complete. Some Week~2 deliverables were taken further than planned: batch processing, the review
+endpoints and the Docker stack were built together with the API skeleton, which leaves room in
+Weeks~7--9.
+
+\fig{gantt.pdf}{Gantt chart. Filled bars are complete; the dashed line marks the proposal date.}{fig:gantt}
+
+\begin{table}[tbp]
+\centering
+\caption{Milestones.}
+\label{tab:milestones}
+\begin{tabularx}{\textwidth}{@{}l l L l@{}}
+\toprule
+ID & Date & Milestone & State \\
+\midrule
+M1 & Oct 11 (W1) & Scope, data split and reproducibility fixed & \Done \\
+M2 & Oct 18 (W2) & Multi-seed results; API skeleton; database schema & \Done \\
+M3 & Oct 25 (W3) & Statistical decision gate (McNemar, bootstrap CI) & \Prog \\
+M4 & Nov 15 (W6) & Model frozen; sealed test set run once & \Plan \\
+M5 & Nov 22 (W7) & API v1 complete with parity report & \Plan \\
+M6 & Nov 29 (W8) & MVP web interface & \Plan \\
+M7 & Dec 6 (W9) & Public demo deployed & \Plan \\
+M8 & Dec 13 (W10) & Full test cycle and user study done & \Plan \\
+M9 & Dec 27 (W12) & Release \code{v1.0} and defense & \Plan \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Feasibility Assessment and Risk Mitigation Strategy}
+
+The plan looks feasible within 12 weeks. The model is trained and validated over three seeds, the
+backend already runs in Docker with full parity, inference needs no GPU, and every tool in the stack
+is open source or has a free tier. The main external cost is GPU time: one training run takes 6.8--8.0
+hours on a rented V100, and the plan needs about four more runs (one retrain on the new split and
+the ablation arms). The official defense date has not been announced; the schedule will be adjusted
+when it is. Table~\ref{tab:risks} lists the identified risks.
+
+\begin{table}[tbp]
+\centering
+\caption{Risk register (L = likelihood, I = impact; H/M/L).}
+\label{tab:risks}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}P{20mm} L c L@{}}
+\toprule
+Category & Identified threat & L/I & Mitigation strategy \\
+\midrule
+Technical & MF-SR-OCR is not significantly better than J1 at the W3 gate & H/M & Report the equivalence as a result; keep J1 as a configuration-only fallback \\
+Technical & The current checkpoint saw tracks that would form the sealed test set & H/H & Retrain once (seed 42, $\approx$7 GPU-hours) on the new split; use the sealed set exactly once \\
+Technical & CPU latency above 1\,s on the demo host & M/M & Measure on Linux (0.19--0.27\,s natively); tune threads; fall back to J1 ($4.17\times$ fewer operations) \\
+Domain & Parking lots in Vietnam use Vietnamese plates, which the model has not been trained on & H/H & State the Brazilian domain in the interface and the thesis; test 10 Vietnamese plates qualitatively; keep the layout rules configurable so a model trained on Vietnamese data can replace the current one \\
+Data and legal & Dataset images cannot be shown publicly & H/H & Store no images; demo with own or openly licensed samples; dataset images only in the thesis and defense \\
+Resource & Limited GPU budget & M/M & One seed per ablation arm; reuse existing runs \\
+Schedule & UI scope grows; defense date not yet fixed & M/H & Freeze the UI at three screens after W8; MoSCoW priorities; re-plan when the date is set \\
+Security & The API has no accounts of its own & M/H & Expose it only behind Cloudflare Access; bind the database to localhost; scan images in CI \\
+Operational & Loss of reviewer corrections during the user study & L/H & Backups every 6\,h kept 7 days, manual dumps before and after sessions; restore tested \\
+\bottomrule
+\end{tabularx}
+\end{table}

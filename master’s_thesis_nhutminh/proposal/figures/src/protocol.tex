@@ -1,0 +1,37 @@
+% Data split and model-validation protocol (Section 3.3).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \tikzset{pstep/.style={app, text width=23.5mm, minimum height=13mm},
+           gate/.style={svc, text width=23.5mm, minimum height=13mm},
+           wk/.style={font=\lblfont\bfseries, text=cOrange, anchor=south east, inner sep=1pt}}
+  % ---------------- data split (to scale) ----------------
+  \node[font=\figfont\bfseries, anchor=west] at (0,0.75) {ICPR 2026 LRLPR training data: 20{,}000 tracks};
+  \draw[draw=cBlue, fill=fBlue, line width=0.6pt] (0,0) rectangle (10.44,0.4);
+  \draw[draw=cPurple, fill=cPurple!25, line width=0.6pt] (10.44,0) rectangle (11.02,0.4);
+  \draw[draw=cOrange, fill=cOrange!30, line width=0.6pt] (11.02,0) rectangle (11.6,0.4);
+  \node[lbl] at (5.2,0.2) {train: 18{,}001 tracks (Scenario-A + Scenario-B)};
+  \node[lbl, anchor=north east, align=right, text=cPurple] (vl) at (10.6,-0.08) {validation: 999 tracks (Scenario-B), fixed};
+  \node[lbl, anchor=north east, align=right, text=cOrange] (hl) at (11.6,-0.42) {held-out test: 1{,}000 tracks (Scenario-B), sealed until W6};
+  \draw[cPurple, line width=0.5pt] (10.73,0) -- (10.73,-0.15);
+  \draw[cOrange, line width=0.5pt] (11.31,0) -- (11.31,-0.5);
+
+  % ---------------- protocol ----------------
+  \node[pstep] (s1) at (1.35,-2.0) {\textbf{1. Train}\\3 seeds per config\\(42, 100, 2026)};
+  \node[pstep, right=4.5mm of s1] (s2) {\textbf{2. Score on val}\\exact match, CER,\\mean $\pm$ std};
+  \node[gate, right=4.5mm of s2] (s3) {\textbf{3. Paired tests}\\McNemar,\\bootstrap 95\% CI};
+  \node[gate, right=4.5mm of s3] (s4) {\textbf{4. Choose $\tau$}\\on val: precision\\$\ge$95\% accepted};
+  \node[gate, below=7mm of s4] (s5) {\textbf{5. Freeze}\\weights, config, $\tau$;\\SHA-256 manifest};
+  \node[pstep, left=4.5mm of s5] (s6) {\textbf{6. Held-out test}\\run exactly once,\\no re-tuning};
+  \node[pstep, left=4.5mm of s6] (s7) {\textbf{7. API parity}\\offline vs.\ API,\\0 divergent tracks};
+  \node[ok, text width=23.5mm, minimum height=13mm, left=4.5mm of s7] (s8) {\textbf{8. Report}\\with CIs and\\limitations};
+  \foreach \a/\b in {s1/s2,s2/s3,s3/s4,s4/s5,s5/s6,s6/s7,s7/s8} \draw[arr] (\a) -- (\b);
+  \node[wk] at (s3.north east) {W3 gate};
+  \node[wk] at (s4.north east) {W5};
+  \node[wk] at (s5.south east) [anchor=north east] {W6};
+  \node[wk] at (s6.south east) [anchor=north east] {W6};
+  \node[wk] at (s7.south east) [anchor=north east] {W7};
+  \draw[darr] (2.5,0) -- (s1.north);
+\end{tikzpicture}
+\end{document}

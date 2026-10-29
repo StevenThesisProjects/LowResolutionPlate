@@ -1,0 +1,38 @@
+% UML sequence diagram: POST /predictions for one track (Section 3.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}
+  \def\C{1.1}\def\R{3.6}\def\I{6.1}\def\D{8.5}\def\P{10.9}
+  \lifeline{c}{\C}{React SPA}{-8.55}
+  \lifeline{r}{\R}{Predictions\\router}{-8.55}
+  \lifeline{i}{\I}{Inference}{-8.55}
+  \lifeline{d}{\D}{Decoding}{-8.55}
+  \lifeline{p}{\P}{PostgreSQL}{-8.55}
+
+  \msg{\C}{\R}{-0.95}{\code{POST /predictions}}
+  \node[lbl, text=cGray] at ({(\C+\R)/2-0.15},-1.2) {multipart form};
+  \activation{\R}{-0.95}{-8.2}
+  \selfmsg{\R}{-1.65}{validate type, size ($\le$5\,MB),\\frame count (1--5); pad to 5}
+
+  \fragment{alt}{input invalid}{0.15}{-2.15}{6.0}{-3.05}
+  \ret{\R}{\C}{-2.75}{\code{413/415/422}}
+  \node[lbl, anchor=west] at (\R+0.15,-2.75) {problem+json, nothing stored};
+
+  \msg{\R}{\I}{-3.45}{\code{predict(frames)}}
+  \node[lbl, text=cGray] at ({(\R+\I)/2},-3.7) {in thread pool};
+  \activation{\I}{-3.45}{-4.85}
+  \selfmsg{\I}{-4.15}{forward pass\\under model lock}
+  \msg{\I}{\D}{-4.85}{log-probs $32{\times}37$}
+  \activation{\D}{-4.85}{-5.85}
+  \selfmsg{\D}{-5.35}{beam top-5, $c(x)$,\\char conf.\ ($\approx$9\,ms)}
+  \ret{\D}{\R}{-5.85}{plate, confidences, suggestions, SR frames}
+  \selfmsg{\R}{-6.45}{status $=$ \code{accepted} if $c(x)\ge\tau$,\\else \code{needs\_review}}
+  \msg{\R}{\P}{-7.1}{\code{INSERT ... RETURNING} (pooled connection)}
+  \ret{\P}{\R}{-7.6}{row}
+  \ret{\R}{\C}{-8.2}{\code{201} + \code{Location}}
+
+  \node[ext, text width=27mm, font=\lblfont, anchor=north west] at (0.15,-3.35)
+    {The DB connection is borrowed only after inference, so a slow forward pass never holds the pool.};
+\end{tikzpicture}
+\end{document}

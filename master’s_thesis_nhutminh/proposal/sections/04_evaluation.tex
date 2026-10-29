@@ -1,0 +1,101 @@
+% =====================================================================
+\section{Expected Results and Performance Evaluation}
+% =====================================================================
+
+\subsection{Deliverables}
+
+Table~\ref{tab:deliverables} lists the artifacts that will be handed over, with their state on the
+proposal date.
+
+\begin{table}[tbp]
+\centering
+\caption{Deliverables.}
+\label{tab:deliverables}
+\begin{tabularx}{\textwidth}{@{}L P{38mm} l@{}}
+\toprule
+Deliverable & Content & State \\
+\midrule
+Source code repository with README & Model, FastAPI backend, tests & \Done \\
+ & React frontend, release tag \code{v1.0} & \Plan \\
+Deployment configuration & Docker Compose with PostgreSQL, backup and restore scripts, \code{.env.example} & \Done \\
+ & \code{web} service, tunnel token, production settings & \Plan \\
+API documentation & OpenAPI 3.1 (Swagger UI, ReDoc), one page per endpoint, database schema & \Done \\
+CI/CD workflows & GitHub Actions for pull requests and releases & \Plan \\
+Model package and evaluation reports & Frozen checkpoint with manifest; statistics, parity, latency, user study & \Plan \\
+User manual and architecture document & Operator guide, administrator guide, design decisions (ADRs) & \Plan \\
+Thesis chapters and demo & Chapters 3--5, demo script, backup video & \Plan \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Verification and Validation Plan}
+\label{sec:vv}
+
+Table~\ref{tab:vv} gives the test tiers. Each tier has a tool and a pass criterion that can be checked
+from a script in the repository.
+
+\begin{table}[tbp]
+\centering
+\caption{Verification and validation plan.}
+\label{tab:vv}
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}P{22mm} L L@{}}
+\toprule
+Testing tier & Methodology and tools & Success criteria / target metrics \\
+\midrule
+Unit & pytest (backend), Vitest (frontend) & $\ge 80\%$ backend statement coverage; all tests pass \\
+Integration & API against a real PostgreSQL container & Every endpoint returns the documented status code and body \\
+Model parity & API vs.\ offline evaluation on 999 validation tracks, greedy and constrained & 0 divergent tracks with the same checkpoint hash \\
+Model validation & 3 seeds; McNemar \cite{mcnemar1947} and bootstrap CI \cite{efron1993bootstrap}; sealed test set used once & 95\% CI of the gain over the baseline excludes 0; $p<0.05$ \\
+Performance & Load script and Locust on the demo host & p95 $\le 1$\,s per track; 1{,}000 tracks in $\le 20$\,min; reads p95 $\le 100$\,ms during a batch \\
+Robustness & Corrupt images, wrong types, too many frames, oversized or broken ZIPs & $\ge 8$ error cases, each with its documented 4xx code; no \code{500} \\
+Security & Bandit, pip-audit, npm audit, Trivy, OWASP ZAP baseline \cite{owasp2021} & 0 high or critical findings \\
+End to end & 30 cases (20 validation, 10 test tracks) on Chrome Android and Safari iOS & 30/30 pass \\
+Usability & 5 users, SUS questionnaire, timed review with and without the app & SUS $\ge 68$; review time per flagged track $-30\%$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Results so far.} The Week~2 backend passes 12 of 12 automated tests. Sending the 999
+validation tracks through the API gives the same plates as the offline evaluation for all 999 tracks,
+with greedy and with constrained decoding, both natively and in Docker; accuracy through the API is
+$79.78\%$, equal to the offline seed-42 run. In a load test with a 40-track batch writing, five clients
+posting single tracks and five clients polling, review-queue reads took 8\,ms at p50 and 46\,ms at p95,
+batch-progress reads 6\,ms and 20\,ms, with no errors. Single-track latency on CPU is about 270\,ms
+natively on the development laptop and 192.75\,ms on the lab server; inside Docker Desktop on macOS it
+is 810--910\,ms, so the official measurement will be taken on the Linux demo host in Week~6.
+Fig.~\ref{fig:multiseed} shows the multi-seed model results.
+
+\fig{multiseed.pdf}{Exact-match accuracy on the 999 validation tracks. Error bars show the standard
+deviation over seeds 42, 100 and 2026.}{fig:multiseed}
+
+On the same tracks, the super-resolved frames reach a PSNR of 16.59\,dB and an SSIM of 0.397, against
+15.87\,dB and 0.354 for bicubic upscaling. Across the three seeds, 741 tracks are read correctly every
+time and 143 are wrong every time; the second group is the input for the error analysis in Week~5.
+
+\subsection{Success Metrics and SLA Compliance}
+
+Table~\ref{tab:kpi} lists the indicators used to judge the final system, with the value measured so
+far where one exists.
+
+\begin{table}[tbp]
+\centering
+\caption{Key performance indicators.}
+\label{tab:kpi}
+\begin{tabularx}{\textwidth}{@{}L P{27mm} P{22mm}@{}}
+\toprule
+KPI & Target & Current \\
+\midrule
+Exact-match accuracy, validation (3 seeds) & $\ge 79\%$ & 79.95\% $\pm$ 0.15 \\
+Exact-match accuracy, sealed test set & reported once with 95\% CI & W6 \\
+Precision of auto-accepted tracks & $\ge 95\%$ & W5 \\
+Coverage (share auto-accepted) & reported at $\tau^{*}$ & 88.8\% at $\tau=0.90$ (provisional) \\
+API vs.\ offline parity & 0 divergent tracks & 0 of 999 \\
+Single-track latency on CPU & p95 $\le 1$\,s & $\approx$0.27\,s (native) \\
+Batch of 1{,}000 tracks & $\le 20$\,min, 0 errors & $\approx$11\,min (estimate) \\
+Availability during demo and user tests & $\ge 99\%$ of health checks OK & W9--12 \\
+Data protection & RPO $\le 6$\,h, RTO $< 5$\,min & restore tested on Oct.\ 22 \\
+Usability & SUS $\ge 68$ & W10 \\
+Review time per flagged track & $-30\%$ vs.\ manual & W10 \\
+\bottomrule
+\end{tabularx}
+\end{table}

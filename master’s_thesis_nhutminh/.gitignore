@@ -95,4 +95,5 @@ backup/
 
 # ── Backend runtime ──
 backups/
-proposal/*
+# proposal/
+.claude/

@@ -1,0 +1,41 @@
+% Current vs proposed operator workflow (Section 1.2).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\begin{document}
+\begin{tikzpicture}[node distance=5mm and 5mm]
+  % ---------------- (a) current ----------------
+  \node[font=\figfont\bfseries, text=cRed, anchor=west] (ta) at (0,0)
+    {(a) Current: every plate is checked by hand};
+  \node[ext, text width=16mm, below=3mm of ta.south west, anchor=north west] (a1)
+    {Footage /\\plate crops};
+  \node[ext, text width=18mm, right=5mm of a1] (a2) {Single-frame\\OCR (if any)};
+  \node[bad, text width=25mm, right=10mm of a2] (a3)
+    {Operator checks\\\textbf{every} plate,\\re-types errors};
+  \node[ext, text width=17mm, right=5mm of a3] (a4) {Spreadsheet\\or case file};
+  \draw[arr] (a1) -- (a2);
+  \draw[arr] (a2) -- node[lbl, above] {text} (a3);
+  \draw[arr] (a3) -- (a4);
+
+  % ---------------- (b) proposed ----------------
+  \node[font=\figfont\bfseries, text=cBlue, anchor=north west] (tb)
+    at ([yshift=-6mm]a1.south west)
+    {(b) Proposed: only low-confidence tracks reach a human};
+  \node[app, text width=17mm, below=8mm of tb.south west, anchor=north west] (b1)
+    {Track of 1--5\\LR crops or\\a ZIP batch};
+  \node[app, text width=19mm, right=4mm of b1] (b2)
+    {MF-SR-OCR\\+ constrained\\decoding};
+  \node[decision, aspect=2, right=4mm of b2] (b3) {$c(x)\ge\tau$\,?};
+  \node[ok, text width=22mm, above right=1mm and 4mm of b3.east, anchor=south west] (b4)
+    {\textbf{accepted}\\stored automatically};
+  \node[bad, text width=22mm, below right=1mm and 4mm of b3.east, anchor=north west] (b5)
+    {\textbf{needs\_review}\\SR frames,\\char confidence,\\top-5 picks};
+  \node[ext, text width=16mm, anchor=west] (b6) at ([xshift=4mm]b4.east |- b3)
+    {PostgreSQL\\+ CSV};
+  \draw[arr] (b1) -- (b2);
+  \draw[arr] (b2) -- (b3);
+  \draw[arr] (b3.north) |- node[lbl, pos=0.25, left] {yes} (b4.west);
+  \draw[arr] (b3.south) |- node[lbl, pos=0.25, left] {no} (b5.west);
+  \draw[arr] (b4.east) -| ([xshift=-3mm]b6.north);
+  \draw[arr] (b5.east) -| node[lbl, pos=0.22, above] {reviewed} ([xshift=-3mm]b6.south);
+\end{tikzpicture}
+\end{document}

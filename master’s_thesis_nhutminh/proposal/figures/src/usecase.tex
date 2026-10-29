@@ -1,0 +1,56 @@
+% UML use-case diagram: actors and in-scope use cases (Section 1.4).
+\documentclass[tikz,border=1pt]{standalone}
+\input{figstyle}
+\tikzset{
+  uc/.style={ellipse, draw=cBlue, fill=fBlue, line width=0.6pt, align=center,
+             text=cInk, minimum width=33mm, minimum height=7.5mm, inner sep=1pt, font=\figfont},
+  ucadm/.style={uc, draw=cOrange, fill=fOrange},
+  stereo/.style={->, draw=cGray, dashed, line width=0.5pt},
+  assoc/.style={draw=cInk, line width=0.5pt},
+  pics/stick/.style args={#1}{code={
+    \draw[cInk, line width=0.7pt] (0,0.42) circle (0.13);
+    \draw[cInk, line width=0.7pt] (0,0.29) -- (0,-0.05) (-0.2,0.18) -- (0.2,0.18)
+          (0,-0.05) -- (-0.16,-0.35) (0,-0.05) -- (0.16,-0.35);
+    \node[font=\figfont\bfseries, align=center, below] at (0,-0.38) {#1};
+  }},
+}
+\begin{document}
+\begin{tikzpicture}
+  % system boundary
+  \draw[draw=cGray, line width=0.6pt, rounded corners=3pt, fill=cGray!3] (1.45,0.55) rectangle (9.75,-6.75);
+  \node[layertitle, font=\figfont\bfseries] at (1.5,0.52) {PlateReader LR};
+
+  % operator use cases (left column)
+  \node[uc] (u1) at (3.55,-0.4)  {Recognize one track\\(1--5 crops)};
+  \node[uc] (u2) at (3.55,-1.45) {Upload ZIP batch};
+  \node[uc] (u3) at (3.55,-2.4)  {Monitor batch\\progress};
+  \node[uc] (u4) at (3.55,-3.45) {Export results (CSV)};
+  \node[uc] (u5) at (3.55,-4.5)  {Review flagged\\track};
+  \node[uc] (u6) at (3.55,-5.6)  {Browse and filter\\results};
+  \node[uc] (u7) at (7.65,-4.6)  {Pick a top-5\\suggestion};
+  \node[uc] (u8) at (7.65,-6.1) {View SR frames,\\char confidence};
+
+  % admin / ML use cases (right column)
+  \node[ucadm] (a1) at (7.65,-0.4)  {Check health and\\model version};
+  \node[ucadm] (a2) at (7.65,-1.45) {Deploy or update\\the stack};
+  \node[ucadm] (a3) at (7.65,-2.5)  {Back up and\\restore data};
+  \node[ucadm] (a4) at (7.65,-3.6)  {Swap checkpoint,\\set threshold $\tau$};
+
+  % actors
+  \pic at (0.4,-2.75) {stick={Operator}};
+  \coordinate (op) at (0.62,-2.6);
+  \pic at (10.65,-0.75) {stick={Admin}};
+  \coordinate (ad) at (10.43,-0.6);
+  \pic at (10.65,-3.25) {stick={ML\\engineer}};
+  \coordinate (ml) at (10.43,-3.1);
+
+  \foreach \u in {u1,u2,u3,u4,u5,u6} \draw[assoc] (op) -- (\u.west);
+  \foreach \u in {a1,a2,a3} \draw[assoc] (ad) -- (\u.east);
+  \foreach \u in {a4} \draw[assoc] (ml) -- (\u.east);
+
+  \draw[stereo] (u7.west) -- (u5.east);
+  \node[lblbg, text=cGray] at ($(u7.west)!0.5!(u5.east)+(0,0.2)$) {$\langle\langle$extend$\rangle\rangle$};
+  \draw[stereo] ([xshift=-3mm]u5.south east) -- (u8.north west);
+  \node[lblbg, text=cGray, anchor=west] at ($([xshift=-3mm]u5.south east)!0.5!(u8.north west)$) {$\langle\langle$include$\rangle\rangle$};
+\end{tikzpicture}
+\end{document}
