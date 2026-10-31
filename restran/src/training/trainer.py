@@ -49,8 +49,10 @@ class Trainer:
         
         # Mixed precision: bf16 has no overflow so it needs no loss scaling
         amp_dtype = getattr(config, 'AMP_DTYPE', 'fp16').lower()
-        if amp_dtype not in ('fp16', 'bf16'):
-            raise ValueError(f"AMP_DTYPE must be 'fp16' or 'bf16', got {amp_dtype!r}")
+        if amp_dtype not in ('fp16', 'bf16', 'fp32'):
+            raise ValueError(f"AMP_DTYPE must be 'fp16', 'bf16' or 'fp32', got {amp_dtype!r}")
+        # fp32 = mixed precision off entirely (no autocast, no loss scaling)
+        self.amp_enabled = amp_dtype != 'fp32'
         self.amp_dtype = torch.bfloat16 if amp_dtype == 'bf16' else torch.float16
         self.skip_grad_norm = float(getattr(config, 'SKIP_GRAD_NORM', 0.0))
         self.skip_abort_ratio = float(getattr(config, 'SKIP_ABORT_RATIO', 0.0))
@@ -75,8 +77,23 @@ class Trainer:
         self.aux_frame_ctc = float(getattr(config, 'AUX_FRAME_CTC', 0.0))
         # Early stopping on validation accuracy (0 = off)
         self.patience = int(getattr(config, 'PATIENCE', 0))
-        # Per-frame occlusion masks (probability per frame, 0 = off)
+        # Per-frame occlusion masks (probability per frame, 0 = off), and how the masks of
+        # one track relate across its frames (experiment N1 of the review):
+        #   independent   - every frame draws its own band (the frozen configuration)
+        #   tube          - one band, identical on every frame of the track
+        #   complementary - disjoint vertical bands, so each column stays visible in F-1 frames
+        # All three mask each frame with the same marginal probability.
         self.frame_mask = float(getattr(config, 'FRAME_MASK', 0.0))
+        self.frame_mask_mode = getattr(config, 'FRAME_MASK_MODE', 'independent')
+        self.frame_mask_orient = getattr(config, 'FRAME_MASK_ORIENT', 'mixed')
+        if self.frame_mask_mode not in ('independent', 'tube', 'complementary'):
+            raise ValueError(f"FRAME_MASK_MODE: {self.frame_mask_mode!r}")
+        if self.frame_mask_orient not in ('mixed', 'vertical'):
+            raise ValueError(f"FRAME_MASK_ORIENT: {self.frame_mask_orient!r}")
+        if self.frame_mask_mode == 'complementary' and self.frame_mask_orient != 'vertical':
+            raise ValueError("FRAME_MASK_MODE='complementary' needs FRAME_MASK_ORIENT='vertical'")
+        # Also save the weights of each of the last K epochs (0 = off)
+        self.save_last_k = int(getattr(config, 'SAVE_LAST_K', 0))
         # Accuracy on a subset of val, reported alongside the full number. The default
         # 999-track split (seed 42, ratio 0.9) is regenerated identically by the
         # original code, so this is the split the 78.70% baseline was measured on.
@@ -134,7 +151,7 @@ class Trainer:
         else:
             raise ValueError(f"SCHEDULER must be 'onecycle' or 'cosine', got {scheduler_name!r}")
         # GradScaler is only meaningful for fp16; disabled it passes tensors through
-        self.scaler = GradScaler(enabled=(self.amp_dtype == torch.float16))
+        self.scaler = GradScaler(enabled=(self.amp_enabled and self.amp_dtype == torch.float16))
         
         # Tracking
         self.best_acc = 0.0
@@ -209,7 +226,7 @@ class Trainer:
         return " ".join(parts)
 
     def _mask_frames(self, images: torch.Tensor, skip_rows: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Erase one stripe per selected frame, independently for every frame.
+        """Erase one stripe per selected frame (independently per frame by default).
 
         With --consistent-aug, CoarseDropout is replayed with the same holes on all 5
         frames, so whatever it covers is gone from the whole track. Here each frame
@@ -223,14 +240,38 @@ class Trainer:
         """
         b, f, _, h, w = images.shape
         dev = images.device
-        chosen = torch.rand(b, f, device=dev) < self.frame_mask
+        mode, orient = self.frame_mask_mode, self.frame_mask_orient
+        # The independent/mixed path draws its random numbers in exactly the same order
+        # as before the other modes existed, so the frozen configuration is unchanged.
+        if mode == 'independent':
+            chosen = torch.rand(b, f, device=dev) < self.frame_mask
+        else:
+            # A track is chosen with prob p and then every frame is masked: each frame is
+            # still masked with marginal probability p, only the cross-frame pattern differs
+            chosen = (torch.rand(b, 1, device=dev) < self.frame_mask).expand(b, f)
         if skip_rows is not None:
-            chosen &= skip_rows.to(dev).view(b, 1) < 0.5
-        vertical = torch.rand(b, f, device=dev) < 0.5
+            chosen = chosen & (skip_rows.to(dev).view(b, 1) < 0.5)
+        if orient == 'vertical':
+            vertical = torch.ones(b, f, dtype=torch.bool, device=dev)
+        elif mode == 'tube':
+            vertical = (torch.rand(b, 1, device=dev) < 0.5).expand(b, f)
+        else:
+            vertical = torch.rand(b, f, device=dev) < 0.5
         vw = torch.randint(max(1, w // 16), max(2, w // 8) + 1, (b, f), device=dev)
-        vx = (torch.rand(b, f, device=dev) * (w - vw + 1)).long()
+        if mode == 'complementary':
+            # Frame j gets its band inside slot perm[j] of width W // F: the bands of one
+            # track never overlap, so every column is visible in at least F - 1 frames
+            slot = w // f
+            perm = torch.argsort(torch.rand(b, f, device=dev), dim=1)
+            vw = vw.clamp(max=slot)
+            vx = perm * slot + (torch.rand(b, f, device=dev) * (slot - vw + 1)).long()
+        else:
+            vx = (torch.rand(b, f, device=dev) * (w - vw + 1)).long()
         hh = torch.randint(max(1, h // 8), max(2, h // 4) + 1, (b, f), device=dev)
         hy = (torch.rand(b, f, device=dev) * (h - hh + 1)).long()
+        if mode == 'tube':
+            # One band per track, shared by all of its frames
+            vw, vx, hh, hy = (t[:, :1].expand(b, f) for t in (vw, vx, hh, hy))
         xs = torch.arange(w, device=dev).view(1, 1, 1, w)
         ys = torch.arange(h, device=dev).view(1, 1, h, 1)
         vband = (xs >= vx[..., None, None]) & (xs < (vx + vw)[..., None, None])  # [B,F,1,W]
@@ -276,7 +317,7 @@ class Trainer:
             if self.frame_mask > 0:
                 # Rows supervised against a clean HR target are left untouched
                 images = self._mask_frames(images, syn_mask if use_sr_syn else None)
-            with autocast('cuda', dtype=self.amp_dtype):
+            with autocast('cuda', dtype=self.amp_dtype, enabled=self.amp_enabled):
                 sr_out = None
                 # Extras come back in a fixed order: features, sr, frame logits
                 outs = self.model(images, return_features=use_distill,
@@ -717,6 +758,14 @@ class Trainer:
 
                 if submission_data:
                     self.save_submission(submission_data)
+
+            # Keep the weights of the last K epochs, so a held-out set can later be
+            # scored on the last epoch and on the mean of the last K without any
+            # epoch being chosen on it. Live weights, as they are at the end of epoch.
+            if self.save_last_k > 0 and epoch + 1 > self.config.EPOCHS - self.save_last_k:
+                path = self._get_output_path(f"{self._get_exp_name()}_ep{epoch + 1:02d}.pth")
+                torch.save(self.model.state_dict(), path)
+                print(f"  💾 Saved epoch checkpoint: {path}")
 
             # Circuit breaker: past this point every batch is being skipped, so the
             # remaining epochs would update nothing. Stop instead of burning GPU —

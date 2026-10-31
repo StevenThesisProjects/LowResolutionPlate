@@ -47,7 +47,7 @@ class Config:
     # Logging: per-epoch metrics CSV is always written; per-batch losses are opt-in
     LOG_BATCH_LOSS: bool = False
 
-    # Mixed precision: "fp16" (with GradScaler) or "bf16" (no scaler, no overflow)
+    # Mixed precision: "fp16" (with GradScaler), "bf16" (no scaler) or "fp32" (AMP off)
     AMP_DTYPE: str = "fp16"
     # Skip the optimizer step when the pre-clip grad norm exceeds this (0 = disabled).
     # Guards against a single pathological batch destroying a healthy model.
@@ -155,6 +155,19 @@ class Config:
     GRAYSCALE: bool = False
     # Geometric augmentation with bicubic resampling + replicated borders.
     CLEAN_GEO_AUG: bool = False
+
+    # Lock-box: JSON list of track ids excluded from training and validation ("" = off),
+    # and how many final-epoch checkpoints to keep (0 = only the best one).
+    EXCLUDE_TRACKS_FILE: str = ""
+    SAVE_LAST_K: int = 0
+
+    # Experiment N1: how the per-frame masks of one track relate across frames
+    # ('independent' = frozen configuration, 'tube', 'complementary'), and band
+    # orientation ('mixed' = vertical or horizontal, 'vertical' only).
+    FRAME_MASK_MODE: str = "independent"
+    FRAME_MASK_ORIENT: str = "mixed"
+    # Experiment E4: replace the learned STN by one fixed affine "a,b,tx,c,d,ty" ("" = off).
+    FIXED_STN: str = ""
 
     # Train AND validate on the undegraded HR frames. Not a submittable model —
     # it measures the accuracy ceiling that image enhancement could ever reach.

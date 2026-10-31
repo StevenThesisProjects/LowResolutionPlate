@@ -71,16 +71,18 @@ class AttentionFusion(nn.Module):
             nn.Conv2d(channels // 8, 1, kernel_size=1)
         )
 
-    def forward(self, x: torch.Tensor, log_sharpness: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, log_sharpness: torch.Tensor = None,
+                num_frames: int = 5) -> torch.Tensor:
         """
         Args:
             x: Feature maps from all frames. Shape: [Batch * Frames, C, H, W]
             log_sharpness: [Batch, Frames] log Laplacian variance of the input frames
+            num_frames: frames per track (5 in the dataset; fewer when measuring
+                accuracy as a function of the number of frames)
         Returns:
             Fused feature map. Shape: [Batch, C, H, W]
         """
         total_frames, c, h, w = x.size()
-        num_frames = 5  # Fixed based on dataset
         batch_size = total_frames // num_frames
 
         # Reshape to [Batch, Frames, C, H, W]
@@ -202,6 +204,7 @@ class ResNetFeatureExtractor(nn.Module):
         h_stride = 2 if collapse_height else 1
         self.layer4[0].conv1.stride = (h_stride, 1)
         self.layer4[0].downsample[0].stride = (h_stride, 1)
+        self.collapse_height = collapse_height
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -220,6 +223,12 @@ class ResNetFeatureExtractor(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
+        # Same op as the original code. The height is already 1, so the values do not
+        # change, but the pooled tensor's memory layout does, and keeping the original
+        # op sequence keeps training identical to it down to float rounding (verified
+        # by tools/regression_check.py).
+        if self.collapse_height:
+            x = F.adaptive_avg_pool2d(x, (1, None))
         return x
 
 

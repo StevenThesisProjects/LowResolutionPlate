@@ -1222,6 +1222,8 @@ Lệnh ở mục "Vòng cuối: seed theo giao thức của tác giả". Run `re
 | 3 | `restran_stn_v2` (baseline, chạy lại seed 42) | 42 | 76,68 (27) | 76,29 | 76,68 | — |
 | 54 | `restran_base999_s7` (baseline) | 7 | 77,58 (30) | 76,99 | 77,58 | 82,13 / 60,48 |
 
+> ⚠️ **SUPERSEDED** (MINOR 15 của review): bảng dưới chỉ có 3 run baseline, trong đó 2 run trùng seed 42. Không dùng cho luận văn/bài báo. Bảng thay thế: "Run #58" (val 999, 4 seed khác nhau) và kết quả lock-box "Run #63 → #70".
+
 **Tổng hợp (val 999, cùng giao thức với tác giả):**
 
 | | Phương pháp (3 seed) | Baseline chạy lại (3 run) | Chênh | Welch t-test |
@@ -1269,6 +1271,10 @@ python -u train.py -n restran_base999_s2026 --seed 2026 --num-workers $(( $(npro
 
 **Cấu hình gốc của tác giả nổ 2/2 lần** trên giao thức 999: run #1 (seed 42) nổ ở ep12, run #55 (seed 43) nổ ở ep10. Cả hai đều nổ đúng lúc OneCycle đưa LR lên đỉnh 5e-4, trong khi train loss đã xuống khoảng 0,3. Đây là bằng chứng cho bài báo rằng con số 78,70 không tái lập được ổn định bằng cấu hình đã công bố, và là lý do phải dùng baseline đã ổn định hoá.
 
+> **Sửa theo ISSUE #4 (25/10):** claim trên phải có phạm vi: "Trong môi trường của chúng tôi (V100, PyTorch 2.14.1+cu126, AMP fp16), cấu hình công bố diverge ở 2/2 seed khi LR đạt đỉnh 5e-4." Run #55 có 21 batch inf/nan, nên chưa loại trừ được tràn số fp16. Lệnh chạy cấu hình gốc ở fp32 (E5, `restran_orig999_fp32_s42`) đã có ở mục "Lock-box: lệnh chạy".
+
+> ⚠️ **SUPERSEDED** (MINOR 15 của review): "Baseline ổn định (4 run)" dưới đây có 2 run trùng seed 42 (#3, #6). Không dùng cho luận văn/bài báo. Bảng thay thế: "Run #58" (4 seed khác nhau) và kết quả lock-box "Run #63 → #70".
+
 **Bảng tổng hợp cập nhật (val 999, giao thức của tác giả):**
 
 | | Phương pháp (4 seed: 42, 43, 7, 2026) | Baseline ổn định (4 run) | Chênh | Welch t-test |
@@ -1286,6 +1292,8 @@ python -u train.py -n restran_base999_s2026 --seed 2026 --num-workers $(( $(npro
 ## Run #58 — baseline seed 43; bảng chính 4 seed vs 4 seed (18/10/2026)
 
 `restran_base999_s43` (lệnh ở mục "Vòng cuối: seed theo giao thức của tác giả"): best 77,78 (ep29), TB6 77,21, epoch cuối 77,38, M/B 83,02 / 58,10.
+
+> Cập nhật 25/10: kết quả chính cho bài báo nay là **lock-box** ("Run #63 → #70"). Bảng dưới vẫn đúng, nhưng là kết quả trên val 999, tập đã dùng để chọn cấu hình.
 
 **Bảng chính cho bài báo (val 999, giao thức của tác giả, 4 seed khác nhau mỗi bên: 42, 43, 7, 2026):**
 
@@ -1345,12 +1353,781 @@ Report tổng hợp gửi thầy: [`documents/REPORT.md`](REPORT.md).
 
 ---
 
+## Kế hoạch theo review của thầy (`documents/Teacher_Review.md`, 23/10/2026)
+
+**Đóng băng cấu hình:** #50 (combo3) giữ nguyên làm cấu hình chốt, theo ISSUE #3. Mọi thí nghiệm sau đây chỉ để mô tả, không dùng để đổi cấu hình.
+
+**Đã kiểm tra ngay (mục 3 của review):**
+
+| Mục | Kết quả |
+|---|---|
+| A1 frame dropout | Chỉ chạy khi `self.training` (`restran.py:173–174`); đã có test eval cho kết quả y hệt model không dropout |
+| A2 frame mask | Chỉ gọi trong vòng train (`trainer.py:278`); `validate()` không gọi |
+| A3 skip guard | backward → `unscale_` → norm trên gradient đã unscale → bỏ batch → `zero_grad` + `scaler.update()` (`trainer.py:359–396`) |
+| A4 grayscale | Luma BT.601 lặp 3 kênh, chuyển ở bước cuối. Normalize(0,5; 0,5) như nhau cho mọi kênh và trọng số luma cộng bằng 1, nên không cần tính lại mean/std |
+| A6 split | SHA-256 `val_tracks.json` = `8a560294…927b`; `val_tracks_2000.json` = `8de23c86…53de` |
+| A7 aux CTC | Đo trên CPU (batch 16): train +8% mỗi batch (1.509 → 1.626 ms); suy luận không đổi |
+| ISSUE #4 cấu hình | Transformer 3 layer, 8 head, FFN 2048, dropout 0,1; batch 64, wd 1e-4: khớp cấu hình tác giả |
+| A5 regression test | Chưa làm. Thư mục local không phải git repo; cần chạy trong bản clone có nhánh `main` |
+
+**Thứ tự việc:**
+1. (Hôm nay, người dùng) Gửi đơn xin nhãn test LRLPR-26. Bản đang có (`Pa7a3Hin-test-public`, `TKzFBtn7-test-blind`) không có `annotations.json`. Xuất diff 5 file cho thầy. Báo trạng thái prototype API (ISSUE #11).
+2. (Trước 31/10) Lock-box: `lockbox_protocol.md`, tạo split 1.000 track Scenario-B chưa từng dùng để chọn, 8 run (4 baseline + 4 #50) train không có các track này, chấm một lần. Freeze manifest SHA-256.
+3. Test xác định ở chế độ eval + regression test không cờ so với `main` (ISSUE #9).
+4. E3 (accuracy theo số frame N = 1..5, chỉ suy luận) và N1 (kiểu che: không che / tube / độc lập / bổ sung, 3 seed): quyết định độ mạnh của hướng (b).
+5. E2 leave-one-out (7 thành phần × 3 seed), E4 (`--no-stn` và crop cố định ~1,3×), E5 (cấu hình gốc fp32), E6 (#39/#40 thêm 2 seed), N3 (hiệu chỉnh độ tin cậy, risk–coverage).
+6. Sửa REPORT theo ISSUE #2, #4–#7 và MINOR 12–19.
+
+---
+
+## Code cho lock-box và kiểm chứng (23/10/2026)
+
+**Cờ mới, đều mặc định tắt:**
+
+| Cờ | Tác dụng |
+|---|---|
+| `--exclude-tracks FILE` | Loại các track trong FILE khỏi cả train lẫn val. Phép chia train/val được tính trước khi loại, nên tập val không bị đổi. Log in SHA-256 của FILE |
+| `--save-last-k K` | Lưu thêm trọng số của K epoch cuối: `{tên}_epNN.pth` |
+| `--amp-dtype fp32` | Tắt hẳn mixed precision (không autocast, không scale loss), dùng cho E5 |
+
+**Script và tài liệu mới:**
+- `tools/make_lockbox.py`: tạo và kiểm chứng (`--verify`) lock-box.
+- `tools/eval_lockbox.py`: chấm một lần. Tính 3 thước đo, Welch / Cohen's d, paired bootstrap, McNemar, E3 theo số frame, rồi áp quy tắc (a)/(b).
+- `tools/freeze_manifest.py`: ghi SHA-256 của code, split, checkpoint và môi trường.
+- `tools/regression_check.py`: so cách train khi không bật cờ với code gốc.
+- `tests/test_eval_determinism.py`: 7 test.
+- `documents/lockbox_protocol.md`: protocol đăng ký trước.
+
+**Sửa trong code:**
+- `AttentionFusion` nhận số frame tuỳ ý (mặc định 5), để chạy E3.
+- Backbone gộp chiều cao bằng `adaptive_avg_pool2d` ở cuối, giống code gốc; `_sequence_head` chỉ gộp khi chiều cao khác 1. Về giá trị thì không đổi gì, nhưng thứ tự phép toán giờ trùng code gốc nên train giống từng bit. Trước đó lệch ở mức làm tròn số thực 32-bit (3,7e-9 sau 1 batch), không ảnh hưởng kết quả các run cũ.
+
+**Phát hiện:** albumentations 2.0.8 không tuân theo seed toàn cục; augment ngẫu nhiên dùng bộ sinh riêng. Đây là nguồn dao động giữa các lần chạy cùng seed, bên cạnh GPU không tất định.
+
+## Lock-box: lệnh chạy (theo `documents/lockbox_protocol.md`)
+
+**Trước khi chạy:** đồng bộ code và file `splits/lockbox_tracks.json` lên server, rồi kiểm tra:
+
+```bash
+python tools/make_lockbox.py --verify            # phải in: ✅ Khớp ... sha256 09f90d2b...
+python tests/test_eval_determinism.py            # phải in 7 dòng OK
+```
+
+Đầu log mỗi run phải có `🔒 Loại 1000 track khỏi train, 0 khỏi val` và `[TRAIN] Loaded 18001 tracks.`
+
+**Baseline, 4 seed:**
+
+```bash
+python -u train.py -n restran_lockbox_base_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    2>&1 | tee results/restran_lockbox_base_s42_train.log
+
+python -u train.py -n restran_lockbox_base_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    2>&1 | tee results/restran_lockbox_base_s43_train.log
+
+python -u train.py -n restran_lockbox_base_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    2>&1 | tee results/restran_lockbox_base_s7_train.log
+
+python -u train.py -n restran_lockbox_base_s2026 --seed 2026 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    2>&1 | tee results/restran_lockbox_base_s2026_train.log
+```
+
+**Phương pháp (#50), 4 seed:**
+
+```bash
+python -u train.py -n restran_lockbox_combo3_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_s42_train.log
+
+python -u train.py -n restran_lockbox_combo3_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_s43_train.log
+
+python -u train.py -n restran_lockbox_combo3_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_s7_train.log
+
+python -u train.py -n restran_lockbox_combo3_s2026 --seed 2026 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_s2026_train.log
+```
+
+**Sau khi cả 8 run xong** (không chấm lock-box trước bước này):
+
+```bash
+python tools/make_lockbox.py --verify
+python tools/freeze_manifest.py --out results/freeze_manifest.json \
+    --checkpoints "results/restran_lockbox_*_s*_ep*.pth" "results/restran_lockbox_*_best.pth"
+python tools/eval_lockbox.py --frames-analysis --out results/lockbox_eval.json
+```
+
+**E5: cấu hình gốc của tác giả ở fp32** (ISSUE #4). Chạy kèm được; không dùng lock-box. Fp32 trên V100 chậm hơn fp16 khoảng 2–3 lần.
+
+```bash
+python -u train.py -n restran_orig999_fp32_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 5e-4 --grad-clip 5.0 --amp-dtype fp32 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    2>&1 | tee results/restran_orig999_fp32_s42_train.log
+```
+
+---
+
+## Run #63 → #70 — LOCK-BOX: kết quả chấm một lần (25/10/2026, server `fierce-ibex`)
+
+Theo `documents/lockbox_protocol.md`. Kiểm tra trước khi chấm:
+- `make_lockbox.py --verify`: khớp `09f90d2b…`.
+- 8/8 run có đủ 6 checkpoint epoch và 1 checkpoint best.
+- 7/7 test đạt.
+- Không run nào bị dừng giữa chừng.
+- Freeze manifest: 24 file code, 3 split, 56 checkpoint, digest `39c39dfceb86a2d5b9d338ade096c5a00a85bebe88ad0127e049d318b7117824`.
+- Không có file `restran_lockbox_base_s42_train.log`, nhưng `summary.txt` của cả 8 run đều ghi `Train samples : 36002` (đã loại lock-box). Bốn run phương pháp có cấu hình giống hệt nhau trong log.
+
+**Theo từng seed** (accuracy trên 1.000 track lock-box):
+
+| Seed | Baseline: cuối / Last-6 / best | Phương pháp: cuối / Last-6 / best |
+|---|---|---|
+| 42 | 77,40 / 76,50 / 77,60 | **79,90** / 79,28 / 80,00 |
+| 43 | 77,40 / 77,40 / 77,80 | **80,30** / 80,05 / 80,60 |
+| 7 | 77,90 / 77,17 / 77,90 | 78,10 / 77,88 / 78,00 |
+| 2026 | 77,70 / 77,23 / 77,20 | 78,20 / 77,63 / 78,20 |
+
+**So sánh:**
+
+| Thước đo | Baseline | Phương pháp | Chênh | CI 95% bootstrap (theo track) | Welch (theo seed) | Cohen's d |
+|---|---|---|---|---|---|---|
+| **Epoch cuối** (chính) | 77,60 ± 0,24 | 79,12 ± 1,14 | **+1,52** | [+0,53; +2,52] | p = 0,072 | 1,85 |
+| **Last-6** (quyết định) | 77,07 ± 0,40 | 78,71 ± 1,15 | **+1,64** | [+0,78; +2,48] | p = 0,059 | 1,90 |
+| Best theo val 999 | 77,62 ± 0,31 | 79,20 ± 1,30 | +1,57 | [+0,57; +2,55] | p = 0,090 | 1,67 |
+
+McNemar ở epoch cuối, từng cặp seed: 42: +60/−35 (p = 0,013); 43: +59/−30 (p = 0,003); 7: +49/−47 (p = 0,92); 2026: +51/−46 (p = 0,68).
+
+**E3: accuracy theo số frame** (epoch cuối, trung bình mọi tập con N frame):
+
+| N | Baseline | Phương pháp | Chênh [CI 95%] |
+|---|---|---|---|
+| 1 | 50,59 | 55,59 | **+5,00** [+4,32; +5,69] |
+| 2 | 66,14 | 69,02 | +2,88 [+2,29; +3,48] |
+| 3 | 72,18 | 74,13 | +1,95 [+1,27; +2,63] |
+| 4 | 75,31 | 77,00 | +1,69 [+0,94; +2,43] |
+| 5 | 77,60 | 79,12 | +1,52 [+0,53; +2,52] |
+
+**Quy tắc đăng ký trước** (chênh Last-6 ≥ +1,0 và cận dưới CI > 0): **→ hướng (b).**
+
+Rút ra:
+- **Mức lợi không bị thổi phồng bởi việc chọn cấu hình trên val** (H2 của review không được ủng hộ). Trên val 999: +1,38 / +1,54 / +1,48 (best / TB6 / cuối). Trên lock-box chưa từng dùng: +1,57 / +1,64 / +1,52. Baseline trên lock-box (77,6) cũng ngang trên val 999 (77,58), tức hai tập khó tương đương.
+- **Hai tầng thống kê cho kết luận khác nhau, phải báo cáo cả hai.** Theo track, CI không chứa 0 ở cả 3 thước đo. Theo seed, Welch p = 0,06–0,09: chưa đạt 0,05, vì độ lệch giữa các seed của phương pháp lớn (std 1,1–1,3; seed 42, 43 tăng +2,5 đến +2,9, seed 7, 2026 chỉ tăng +0,2 đến +0,5). Dù vậy, cả 4 seed phương pháp đều cao hơn cả 4 seed baseline ở mọi thước đo. *Phân tích bổ sung, không đăng ký trước:* kiểm định hoán vị chính xác với phân tách hoàn toàn 4 so với 4 cho p hai phía = 2/70 = 0,029.
+- **E3 rơi vào dạng B đã đăng ký trước**: mức lợi lớn nhất khi chỉ có 1 frame (+5,0) và giảm dần tới 5 frame (+1,5). Mọi CI đều không chứa 0. Diễn giải theo protocol: phương pháp làm model **bền hơn khi thiếu frame hoặc frame kém**, đúng với thiết kế frame dropout và che frame. Đây không phải dạng A (khai thác thông tin bổ sung giữa các frame). N1 (các kiểu che) sẽ kiểm tra riêng cơ chế đó.
+- Phương pháp trên lock-box: epoch cuối 79,12, best 79,20. Đây là tập khác với tập val của số công bố 78,70, nên chỉ đặt cạnh nhau để tham khảo.
+
+**Phân tích thêm từ `results_new/`** (25/10/2026):
+- **Kiểm chứng:** 56/56 checkpoint, 24/24 file code, 3/3 split khớp SHA-256 với manifest. Môi trường: V100-SXM2-32GB, PyTorch 2.14.1+cu126, CUDA 12.6, cuDNN 9.10.2 (`cudnn.version()` = 91002; bản trước ghi nhầm 9.1.2). Tính lại CI với seed bootstrap khác ra gần như y hệt. Chấm lại `base_s42_ep30` và `combo3_s43_ep30` trên Apple GPU: 77,40% và 80,30%, trùng server.
+- **Theo loại biển** (lock-box, epoch cuối, trung bình 4 seed): Brazilian (n = 192) 60,68 → 61,85 (+1,17); Mercosur (n = 808) 81,62 → 83,23 (+1,61). Brazilian chưa đủ lực thống kê.
+- **Confidence Gap** (lock-box, epoch cuối): baseline 0,1060 (0,103–0,108), phương pháp **0,1135** (0,112–0,116), cao hơn ở cả 4 seed. Với cấu hình chốt, đây không phải đánh đổi (trả lời MINOR 12).
+- **Batch bị bỏ qua:** baseline 8–11, phương pháp 8–9 trên khoảng 16.900 batch mỗi run, tương đương nhau (trả lời MINOR 13).
+- **Val 999 của chính 8 run này** (train 18.001 track): baseline best 76,78–77,08, TB6 76,03–76,46; phương pháp best 76,88–79,48, TB6 76,23–78,33. Seed yếu trên val (42, 2026) khác seed yếu trên lock-box (7, 2026): đây là nhiễu ngẫu nhiên quanh mức lợi trung bình, không phải seed kém cố định. So với các run train 19.001 track, val 999 thấp hơn khoảng 0,7 (baseline) và 0,9 (phương pháp): thêm 1.000 track Scenario-B giúp đáng kể.
+- **Thời gian mỗi epoch:** baseline 105–205 s, phương pháp 326–401 s, nhưng đo khi 4 run chạy song song nên không so được. Nếu cần số cho luận văn, đo bằng một run chạy riêng.
+
+## Thay đổi code 25/10/2026: N1 (kiểu che frame) và E4 (STN so với crop cố định), mặc định TẮT
+
+Theo review của thầy: N1 (xếp hạng cao nhất trong các đề xuất) và E4/N4 (ISSUE #10). Không bật cờ mới thì code chạy y như cũ.
+
+**Cờ mới:**
+
+| Cờ | Giá trị | Mặc định |
+|---|---|---|
+| `--frame-mask-mode` | `independent` / `tube` / `complementary` | `independent` (cấu hình chốt) |
+| `--frame-mask-orient` | `mixed` (dải dọc hoặc ngang) / `vertical` (chỉ dải dọc) | `mixed` (cấu hình chốt) |
+| `--fixed-stn` | 6 số `a,b,tx,c,d,ty` | tắt |
+
+**Thiết kế N1.** Ở cả ba kiểu, mỗi frame bị che với xác suất biên 0,2, và bề rộng dải che có cùng phân bố (1/16 đến 1/8 bề ngang). Các kiểu chỉ khác nhau ở quan hệ giữa các frame của cùng một track:
+- **Độc lập** (`independent`): mỗi frame tự bốc có bị che hay không và che ở đâu. Đây là cấu hình chốt.
+- **Tube** (`tube`): bốc track với xác suất 0,2, rồi che **cùng một dải** trên cả 5 frame. Vùng bị che mất hẳn khỏi track, model phải đoán từ ngữ cảnh. VideoMAE dùng kiểu che này để ngăn rò rỉ thông tin giữa các frame.
+- **Bổ sung** (`complementary`): bốc track với xác suất 0,2. Bề ngang ảnh chia thành 5 ô, mỗi frame che một dải dọc trong một ô riêng. Các dải không chồng nhau, nên cột nào cũng còn thấy ở ít nhất 4 frame.
+- Trong N1 cả ba kiểu đều chỉ dùng dải dọc (`--frame-mask-orient vertical`), vì kiểu bổ sung chỉ định nghĩa được với dải dọc. Cấu hình chốt (độc lập, dải dọc hoặc ngang) đã có sẵn 4 run lock-box combo3 để đối chiếu.
+- Cặp so sánh sạch nhất là **tube với bổ sung**: cùng tỷ lệ track bị che, cùng số frame, cùng kích thước dải, chỉ khác vị trí tương đối giữa các frame. Kiểu độc lập còn khác ở chỗ số frame bị che trong một track dao động từ 0 đến 5 (trung bình 1).
+
+**Thiết kế E4.** Crop cố định là **trung bình phép biến đổi mà STN đã học**, đo trên val 999 từ 4 model phương pháp (lock-box, epoch 30): θ = [[0,782; 0,025; 0,005], [0,062; 0,606; 0,169]]. Tức là phóng ngang 1,28×, phóng dọc 1,65×, dịch xuống một chút. Mọi điểm lấy mẫu đều nằm trong ảnh nên không sinh viền đen. Theo từng mẫu, STN học được chỉ dao động quanh giá trị này với độ lệch chuẩn 0,04 (a, d, tx) và 0,11 (ty). So với "crop 1,3× ở tâm" mà review gợi ý, đây là phép thử mạnh hơn cho giả thuyết "STN chỉ là một crop cố định". Phép biến đổi được lưu trong checkpoint (buffer `fixed_theta`). Model có 30.793.702 tham số, ít hơn bản có STN 283.974 tham số (bằng đúng số tham số của bản `--no-stn`).
+
+**Kiểm tra (25/10/2026):**
+- `tests/test_eval_determinism.py`: **14/14** test đạt. 7 test mới kiểm tra:
+  - kiểu độc lập cho kết quả **giống từng bit** code cũ, tức code đã train các checkpoint lock-box;
+  - tube che giống nhau trên mọi frame;
+  - các dải của kiểu bổ sung không chồng nhau;
+  - cả ba kiểu có cùng tỷ lệ che biên 0,2;
+  - giá trị cờ không hợp lệ bị từ chối;
+  - crop cố định áp đúng phép biến đổi đã cho;
+  - `eval_arms.py` dựng đúng kiến trúc từ checkpoint.
+- `tools/regression_check.py`: vẫn **PASS** so với code gốc (train loss 4,1085 → 2,8737; val loss 3,3356 → 2,7804).
+- Chạy thử trên dữ liệu nhỏ: 6 cấu hình đều train được. Cờ sai (`complementary` mà không có `vertical`; đặt kiểu che nhưng không có `--frame-mask`; `--fixed-stn` không đủ 6 số; `--fixed-stn` đi cùng `--no-stn`) thì dừng trong 2–4 giây, trước khi quét dữ liệu.
+- **Chấm lại checkpoint lock-box bằng code mới** (seed 42, 43 của cả hai nhánh, 14 checkpoint, trên máy local): combo3 trùng số cũ ở cả 3 thước đo. Có 3/28.000 dự đoán khác server, đều là các trường hợp hai ký tự gần hoà (chênh log-prob giữa lớp nhất và nhì ≤ 0,008, ví dụ T/Y của `track_13651`). CPU và Apple GPU cho cùng kết quả với nhau. Lệch lớn nhất là 0,1 điểm trên một checkpoint (`base_s43_ep30`: 77,3 so với 77,4 trên server). Đây là sai số số học giữa các phần cứng, không phải do code. **Vì vậy phải chấm N1/E4 trên chính server đã chấm lock-box.**
+
+## N1 + E4: lệnh chạy (giao thức lock-box, 21 run trên server mới)
+
+> **Cập nhật 25/10: server `fierce-ibex` đã trả trước khi chạy N1/E4.**
+> - **Kết quả lock-box không bị ảnh hưởng.** Mọi file (56 checkpoint, log, CSV, `lockbox_eval.*`, manifest) đã có trong `results_new/`.
+> - **Code đóng băng được dựng lại** ở `results_new/code_lockbox_frozen.tgz`, từ bản sao lưu tự động của Claude Code. Giải nén ra và kiểm tra: 27/27 file (24 code + 3 split) khớp SHA-256 trong `freeze_manifest.json`. Gói này thay cho bước "lưu code trên server" đã không làm được.
+> - **N1/E4 chạy trên server khác**, nên thêm nhánh `restran_lockbox_combo3_rerun` (cấu hình chốt, 3 seed) chạy trên **cùng máy** làm nhánh tham chiếu. Nhánh "STN học được" của E4 và nhánh "che độc lập dọc + ngang" của N1 đều chính là cấu hình chốt. Nếu so với 4 run cũ thì mọi so sánh đó lẫn cả khác biệt về máy (GPU, phiên bản PyTorch và albumentations; server cũ không ghi phiên bản albumentations). Nhánh này còn cho biết mức lợi của phương pháp có lặp lại trên máy khác không. Nếu cần tiết kiệm GPU thì bỏ 3 lệnh `combo3_rerun` (xem cách chấm ở cuối mục).
+> - Chạy cả 21 run trên **cùng một server**, rồi chấm mọi nhánh trên server đó.
+
+Giao thức giống 8 run lock-box: train 18.001 track, val 999, loại lock-box, lưu 6 epoch cuối. Cấu hình nền là combo3; mỗi nhánh chỉ khác combo3 ở đúng một điểm. Seed 42, 43, 7. Nhánh tham chiếu cho mọi so sánh là `combo3_rerun`; 8 run lock-box cũ (baseline, combo3, 4 seed) vẫn được chấm cùng để đối chiếu.
+
+| Tên run | Khác combo3 ở | Để trả lời |
+|---|---|---|
+| `restran_lockbox_combo3_rerun` | không khác | Nhánh tham chiếu trên cùng máy; lặp lại combo3 trên máy khác |
+| `restran_lockbox_n1_nomask` | bỏ `--frame-mask` | Che frame có tác dụng không (cũng là 1 dòng của E2 leave-one-out) |
+| `restran_lockbox_n1_tube` | che tube, dải dọc | |
+| `restran_lockbox_n1_indepv` | che độc lập, chỉ dải dọc | Độc lập so với tube/bổ sung; so với combo3 thì thấy vai trò của dải ngang |
+| `restran_lockbox_n1_comp` | che bổ sung, dải dọc | |
+| `restran_lockbox_e4_nostn` | `--no-stn` | STN có cần không |
+| `restran_lockbox_e4_fixstn` | `--fixed-stn` (θ trung bình) | STN có hơn một crop cố định không |
+
+**Đăng ký trước cách đọc kết quả** (viết trước khi chạy, để tránh kể chuyện sau khi thấy số liệu). Thước đo chính là Last-6 trên lock-box, CI 95% bootstrap theo track. Kết quả N1/E4 **không** làm thay đổi cấu hình chốt, chỉ dùng để mô tả cơ chế:
+- **N1, so sánh chính: bổ sung − tube.**
+  - Dương, CI không chứa 0, và bổ sung/độc lập hơn nomask nhiều hơn tube hơn nomask: che frame có tác dụng vì **buộc fusion lấy phần bị che từ frame khác**. Đây là cơ chế của hướng (b).
+  - Tube ≈ độc lập ≈ bổ sung > nomask: chỉ là điều chuẩn kiểu Random Erasing; cơ chế "giữa các frame" không được ủng hộ.
+  - Tube > bổ sung: che có tác dụng vì buộc model **suy luận từ ngữ cảnh** (như MAE), không phải nhờ thông tin bổ sung giữa các frame.
+- **E4** (so với `combo3_rerun`, tức STN học được):
+  - Crop cố định ≈ STN (CI chứa 0): chưa thấy tính thích nghi theo từng ảnh của STN đóng góp gì. STN thực chất hoạt động như một phép zoom cố định.
+  - Crop cố định < STN: tính thích nghi theo từng ảnh có ích.
+  - Không STN < crop cố định ≈ STN: phần có ích là **phóng to vùng ký tự**, không phải căn chỉnh.
+  - Không STN ≈ STN: STN không cần thiết.
+- **Giới hạn:** 3 seed mỗi nhánh chỉ đủ phát hiện chênh lệch lớn ở tầng seed (độ lệch giữa các seed của combo3 khoảng 1,1). Chênh dưới khoảng 1 điểm chỉ nên đọc như xu hướng. Nếu kết quả nằm sát ranh giới thì thêm seed 2026.
+
+### Chuẩn bị server mới
+
+Máy mới chưa có gì, nên phải đưa lên toàn bộ code, các file split và dữ liệu (không chỉ 6 file đã sửa). Nên thuê đúng loại GPU cũ (Tesla V100 32 GB) nếu có.
+
+**1. Trên máy local** (nén code + split, và dữ liệu nếu server chưa có; dữ liệu khoảng 1,1 GB):
+
+```bash
+cd /Users/nguyentienphat/Learning/Paper/NewClaude/restran
+COPYFILE_DISABLE=1 tar czf restran_code.tgz --exclude __pycache__ train.py configs src tools tests splits
+COPYFILE_DISABLE=1 tar czf restran_data.tgz dataset/data/train
+scp -P <PORT> restran_code.tgz restran_data.tgz root@<IP>:/workspace/
+```
+
+**2. Trên server:**
+
+```bash
+mkdir -p /workspace/restran && cd /workspace/restran
+tar xzf /workspace/restran_code.tgz
+tar xzf /workspace/restran_data.tgz
+mkdir -p results
+python -m pip uninstall -y opencv-python opencv-python-headless
+python -m pip install opencv-python-headless albumentations==2.0.8 scipy
+python -c "import sys, torch, albumentations, cv2, numpy; print('python', sys.version.split()[0], '| torch', torch.__version__, '| cuda', torch.version.cuda, '| cudnn', torch.backends.cudnn.version(), '| gpu', torch.cuda.get_device_name(0), '| albumentations', albumentations.__version__, '| cv2', cv2.__version__, '| numpy', numpy.__version__)" | tee results/env_n1e4.txt
+```
+
+`albumentations==2.0.8` là bản trên máy local, nơi đã chạy mọi test. Dòng cuối ghi lại môi trường vào `results/env_n1e4.txt`; nhớ gửi file này cùng kết quả.
+
+**3. Kiểm tra trên server:**
+
+```bash
+md5sum train.py configs/config.py src/data/dataset.py src/data/transforms.py src/training/trainer.py src/models/restran.py src/models/components.py tools/eval_arms.py tests/test_eval_determinism.py
+python tools/make_lockbox.py --verify            # phải in: ✅ Khớp ... sha256 09f90d2b...
+python tests/test_eval_determinism.py            # phải in 14 dòng OK
+```
+
+md5 phải trùng bảng ở mục "Các file code đã sửa" bên dưới. Đầu log mỗi run phải có `🔒 Loại 1000 track khỏi train, 0 khỏi val`, và dòng `FRAME_MASK_MODE: ... | FRAME_MASK_ORIENT: ... | FIXED_STN: ...` đúng như tên run.
+
+**4. Trên máy local, đưa checkpoint tham chiếu lên** (56 file, khoảng 7,4 GB; chỉ cần cho bước chấm, nên chạy song song với đợt 1):
+
+```bash
+cd /Users/nguyentienphat/Learning/Paper/NewClaude/restran
+scp -P <PORT> results_new/restran_lockbox_base_s*.pth results_new/restran_lockbox_combo3_s*.pth root@<IP>:/workspace/restran/results/
+```
+
+### Phần A: E4 (9 run, chạy trước)
+
+3 nhánh × 3 seed. Mỗi đợt là một seed, gồm 3 run song song: STN học được (`combo3_rerun`, tức cấu hình chốt chạy lại trên máy này), không STN, crop cố định. Xong đợt nào là có ngay một bộ so sánh trọn vẹn cho seed đó. Mỗi run chỉ dùng khoảng 1,8 GB bộ nhớ GPU.
+
+Kiểm tra đầu log:
+- Mọi run: `🔒 Loại 1000 track khỏi train, 0 khỏi val`.
+- `combo3_rerun`: `USE_STN: True`, `31,077,676 total params`.
+- `e4_nostn`: `USE_STN: False`, `30,793,702 total params`.
+- `e4_fixstn`: `USE_STN: fixed affine (--fixed-stn)`, `FIXED_STN: 0.782,0.025,0.005,0.062,0.606,0.169`, `30,793,702 total params`.
+
+**Đợt E4-1** (seed 42, 3 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_combo3_rerun_s42 --seed 42 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_rerun_s42_train.log
+
+python -u train.py -n restran_lockbox_e4_nostn_s42 --seed 42 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale --no-stn \
+    2>&1 | tee results/restran_lockbox_e4_nostn_s42_train.log
+
+python -u train.py -n restran_lockbox_e4_fixstn_s42 --seed 42 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --fixed-stn 0.782,0.025,0.005,0.062,0.606,0.169 \
+    2>&1 | tee results/restran_lockbox_e4_fixstn_s42_train.log
+```
+
+**Đợt E4-2** (seed 43, 3 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_combo3_rerun_s43 --seed 43 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_rerun_s43_train.log
+
+python -u train.py -n restran_lockbox_e4_nostn_s43 --seed 43 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale --no-stn \
+    2>&1 | tee results/restran_lockbox_e4_nostn_s43_train.log
+
+python -u train.py -n restran_lockbox_e4_fixstn_s43 --seed 43 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --fixed-stn 0.782,0.025,0.005,0.062,0.606,0.169 \
+    2>&1 | tee results/restran_lockbox_e4_fixstn_s43_train.log
+```
+
+**Đợt E4-3** (seed 7, 3 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_combo3_rerun_s7 --seed 7 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_combo3_rerun_s7_train.log
+
+python -u train.py -n restran_lockbox_e4_nostn_s7 --seed 7 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale --no-stn \
+    2>&1 | tee results/restran_lockbox_e4_nostn_s7_train.log
+
+python -u train.py -n restran_lockbox_e4_fixstn_s7 --seed 7 --num-workers $(( $(nproc) / 3 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --fixed-stn 0.782,0.025,0.005,0.062,0.606,0.169 \
+    2>&1 | tee results/restran_lockbox_e4_fixstn_s7_train.log
+```
+
+### Phần B: N1 (12 run)
+
+4 nhánh × 3 seed. Mỗi đợt là một seed, gồm 4 run song song.
+
+**Đợt N1-1** (seed 42, 4 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_n1_nomask_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_nomask_s42_train.log
+
+python -u train.py -n restran_lockbox_n1_tube_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode tube --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_tube_s42_train.log
+
+python -u train.py -n restran_lockbox_n1_indepv_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_indepv_s42_train.log
+
+python -u train.py -n restran_lockbox_n1_comp_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode complementary --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_comp_s42_train.log
+```
+
+**Đợt N1-2** (seed 43, 4 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_n1_nomask_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_nomask_s43_train.log
+
+python -u train.py -n restran_lockbox_n1_tube_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode tube --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_tube_s43_train.log
+
+python -u train.py -n restran_lockbox_n1_indepv_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_indepv_s43_train.log
+
+python -u train.py -n restran_lockbox_n1_comp_s43 --seed 43 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode complementary --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_comp_s43_train.log
+```
+
+**Đợt N1-3** (seed 7, 4 terminal)
+
+```bash
+python -u train.py -n restran_lockbox_n1_nomask_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_nomask_s7_train.log
+
+python -u train.py -n restran_lockbox_n1_tube_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode tube --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_tube_s7_train.log
+
+python -u train.py -n restran_lockbox_n1_indepv_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_indepv_s7_train.log
+
+python -u train.py -n restran_lockbox_n1_comp_s7 --seed 7 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-mask-mode complementary --frame-mask-orient vertical \
+    --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_lockbox_n1_comp_s7_train.log
+```
+
+### Phần C: E5 (tuỳ chọn, 1 run)
+
+Cấu hình gốc của tác giả ở fp32 (ISSUE #4), giao thức val 999, không dùng lock-box. Chậm hơn fp16 khoảng 2–3 lần. Chạy kèm vào đợt nào còn chỗ trống.
+
+```bash
+python -u train.py -n restran_orig999_fp32_s42 --seed 42 --num-workers $(( $(nproc) / 4 )) \
+    --epochs 30 --lr 5e-4 --grad-clip 5.0 --amp-dtype fp32 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    2>&1 | tee results/restran_orig999_fp32_s42_train.log
+```
+
+### Chấm E4 (sau Phần A)
+
+Chạy trên chính server đã train. Hai nhánh `base`, `combo3` (8 run lock-box cũ) cần 56 checkpoint từ bước 4 ở trên. Nếu chưa đưa lên thì xoá hai dòng `--arm base:...` và `--arm combo3:...`.
+
+```bash
+python tools/eval_arms.py --seeds 42 43 7 --frames-analysis \
+    --splits splits/lockbox_tracks.json splits/val_tracks.json \
+    --arm base:restran_lockbox_base:42,43,7,2026 \
+    --arm combo3:restran_lockbox_combo3:gray:42,43,7,2026 \
+    --arm combo3new:restran_lockbox_combo3_rerun:gray \
+    --arm nostn:restran_lockbox_e4_nostn:gray \
+    --arm fixstn:restran_lockbox_e4_fixstn:gray \
+    --ref combo3new --pairs nostn:fixstn --out results/arms_eval_e4.json \
+    2>&1 | tee results/arms_eval_e4.log
+```
+
+Kết quả lưu ở `results/arms_eval_e4.json` và `results/arms_eval_e4_per_track.npz`.
+
+- **Kiểm tra nhanh:** hai dòng `base` và `combo3` trên lock-box phải gần đúng các số trong `results_new/lockbox_eval.json` (epoch cuối 77,60 và 79,12; Last-6 77,07 và 78,71). Do khác phần cứng, mỗi checkpoint có thể lệch tối đa khoảng 0,1 (vài dự đoán gần hoà bị lật). Lệch nhiều hơn thì dừng lại kiểm tra.
+- Dòng `combo3 − combo3new` cho biết cấu hình chốt trên máy mới khác máy cũ bao nhiêu.
+- **Muốn xem sớm sau đợt E4-1:** chạy cùng lệnh với `--seeds 42`, đổi `:42,43,7,2026` của hai nhánh `base`, `combo3` thành `:42`, và đổi `--out` thành `results/arms_eval_e4_s42.json`.
+
+### Chấm toàn bộ (sau Phần A và Phần B)
+
+Chạy trên chính server mới, sau khi đã đưa 56 checkpoint tham chiếu lên (bước 4). Lệnh in bảng cho lock-box và val 999, rồi lưu `results/arms_eval.json` và `results/arms_eval_per_track.npz`:
+
+```bash
+python tools/eval_arms.py --seeds 42 43 7 --frames-analysis \
+    --splits splits/lockbox_tracks.json splits/val_tracks.json \
+    --arm base:restran_lockbox_base:42,43,7,2026 \
+    --arm combo3:restran_lockbox_combo3:gray:42,43,7,2026 \
+    --arm combo3new:restran_lockbox_combo3_rerun:gray \
+    --arm nomask:restran_lockbox_n1_nomask:gray \
+    --arm tube:restran_lockbox_n1_tube:gray \
+    --arm indepv:restran_lockbox_n1_indepv:gray \
+    --arm comp:restran_lockbox_n1_comp:gray \
+    --arm nostn:restran_lockbox_e4_nostn:gray \
+    --arm fixstn:restran_lockbox_e4_fixstn:gray \
+    --ref combo3new --pairs tube:comp indepv:comp tube:indepv nomask:tube nomask:indepv nomask:comp nostn:fixstn \
+    2>&1 | tee results/arms_eval.log
+```
+
+Kiểm tra nhanh như ở mục "Chấm E4": hai dòng `base` và `combo3` gần đúng `results_new/lockbox_eval.json`, lệch tối đa khoảng 0,1 mỗi checkpoint.
+
+> **Cập nhật 31/10: N1 chạy trên server khác server E4** (đã upload lại source). Server mới không có 21 checkpoint `combo3_rerun` (máy local cũng không có, vì E4 chỉ tải log về), nên lệnh "Chấm toàn bộ" ở trên báo `Nhánh combo3new: thiếu 21 checkpoint`. Chấm N1 bằng lệnh dưới, chỉ dùng 4 nhánh N1. Mọi so sánh đăng ký trước của N1 (bổ sung − tube; độc lập so với tube và bổ sung; che so với không che) đều nằm trong 4 nhánh này và cùng một server. Chỉ còn mất một so sánh phụ: `indepv` so với cấu hình chốt (vai trò của dải ngang). So sánh này sẽ đặt cạnh số của `combo3new` trong `arms_eval_e4.json` (Last-6 78,29) để tham khảo, không có CI.
+>
+> ```bash
+> cd /workspace/restran
+> python tools/eval_arms.py --seeds 42 43 7 --frames-analysis \
+>     --splits splits/lockbox_tracks.json splits/val_tracks.json \
+>     --arm nomask:restran_lockbox_n1_nomask:gray \
+>     --arm tube:restran_lockbox_n1_tube:gray \
+>     --arm indepv:restran_lockbox_n1_indepv:gray \
+>     --arm comp:restran_lockbox_n1_comp:gray \
+>     --ref nomask --pairs tube:comp indepv:comp tube:indepv \
+>     --out results/arms_eval_n1.json \
+>     2>&1 | tee results/arms_eval_n1.log
+> ```
+
+---
+
+## Run #71 → #79 — E4: STN học được, crop cố định, không STN (28/10/2026, server mới)
+
+Lệnh train: mục "Phần A: E4". Lệnh chấm: mục "Chấm E4", **bỏ hai nhánh cũ** `base`, `combo3` (không đưa 56 checkpoint cũ lên):
+
+```bash
+python tools/eval_arms.py --seeds 42 43 7 --frames-analysis \
+    --splits splits/lockbox_tracks.json splits/val_tracks.json \
+    --arm combo3new:restran_lockbox_combo3_rerun:gray \
+    --arm nostn:restran_lockbox_e4_nostn:gray \
+    --arm fixstn:restran_lockbox_e4_fixstn:gray \
+    --ref combo3new --pairs nostn:fixstn --out results/arms_eval_e4.json \
+    2>&1 | tee results/arms_eval_e4.log
+```
+
+| Run | Tên | Seed |
+|---|---|---|
+| #71–#73 | `restran_lockbox_combo3_rerun` (STN học được = cấu hình chốt) | 42, 43, 7 |
+| #74–#76 | `restran_lockbox_e4_nostn` | 42, 43, 7 |
+| #77–#79 | `restran_lockbox_e4_fixstn` | 42, 43, 7 |
+
+Kết quả: `results_new/arms_eval_e4.json` (md5 `621b292f4bc77b53cb00f89e1d3325b9`).
+
+**Kiểm tra:**
+- sha256 của split lock-box trong kết quả là `09f90d2b…`, khớp `make_lockbox.py --verify`.
+- `eval_arms.py` nhận kiến trúc từ checkpoint: `stn`, `none`, `fixed` đúng cho 3 nhánh. Vậy checkpoint `fixstn` có buffer `fixed_theta`, checkpoint `nostn` không có STN.
+- `arms_eval_e4.log` khớp JSON. Đã có `arms_eval_e4_per_track.npz`.
+- **`combo3_rerun_s42` không có log train** (server không có file; chỉ có `summary.txt` và `metrics.csv`, đã tải về). Từ hai file này: `Train samples : 36002` (đã loại lock-box), val 999, 30/30 epoch, Use STN True. `aux_ctc_loss` khác 0 ở mọi epoch (CTC phụ đang bật). Val Acc epoch 30 là 78,08, khớp `eval_arms.py`. Batch bị bỏ 9 (9 do inf/nan), GradNorm lớn nhất 58,2, bộ nhớ GPU đỉnh 1.835 MB. Khối cấu hình in ra lúc bắt đầu không xem được, nhưng mọi số trên đều giống `s43`, `s7`.
+- **8 log train còn lại:**
+  - Cả 8 run đều có `🔒 Loại 1000 track khỏi train, 0 khỏi val`, `Loaded 18001 tracks`, `Total: 36002 samples`, val 999 track.
+  - So toàn bộ khối cấu hình với `combo3_rerun_s43`: `nostn` chỉ khác ở `USE_STN: False`; `fixstn` chỉ khác ở `USE_STN: fixed affine` và `FIXED_STN: 0.782,0.025,0.005,0.062,0.606,0.169`. Số tham số: 31.077.676 (STN) và 30.793.702 (`nostn`, `fixstn`). Chênh 283.974, đúng bằng số tham số của STN.
+  - Cả 8 run chạy đủ 30 epoch. Val Acc ở epoch 30 trong log khớp với số `eval_arms.py` chấm lại trên val 999 ở cả 8 run.
+- **Batch bị bỏ qua:** STN 9, 9, 9; crop cố định 7, 6, 6; không STN 6, 7, 6 (trên 16.890 batch). Mọi batch bị bỏ đều do gradient inf/nan ở fp16; ngưỡng 100 không lần nào kích hoạt. GradNorm lớn nhất: khoảng 57 ở nhánh STN, 29–32 ở hai nhánh không có STN học được.
+- **Thời gian:** khoảng 240 s mỗi epoch, 2,0 giờ mỗi run (3 run song song).
+- **Môi trường** (server `frosty-tanager`, ghi 28/10 sau khi chạy E4; lệnh `tee` báo lỗi vì chạy từ trong `results/`, nên chép từ terminal vào `results_new/env_n1e4.txt`): Python 3.10.13, PyTorch 2.14.1+cu126, CUDA 12.6, cuDNN 9.10.2 (91002), Tesla V100-SXM2-32GB, albumentations 2.0.8, cv2 5.0.0, numpy 2.2.6. **Giống hệt `fierce-ibex`** ở GPU, Python, PyTorch, CUDA, cuDNN; albumentations của `fierce-ibex` không được ghi lại.
+
+**Theo từng seed** (lock-box 1.000 track; cuối / Last-6 / best):
+
+| Seed | STN học được | Crop cố định | Không STN |
+|---|---|---|---|
+| 42 | 79,10 / 78,25 / 78,80 | 77,40 / 76,50 / 77,30 | 74,90 / 74,22 / 74,10 |
+| 43 | 79,10 / 78,57 / 79,10 | 77,30 / 76,78 / 77,10 | 75,30 / 74,90 / 75,30 |
+| 7 | 78,50 / 78,05 / 78,70 | 76,90 / 76,53 / 77,20 | 76,80 / 75,70 / 76,90 |
+| **TB ± std** | 78,90 ± 0,35 / **78,29 ± 0,26** / 78,87 ± 0,21 | 77,20 ± 0,26 / **76,60 ± 0,15** / 77,20 ± 0,10 | 75,67 ± 1,00 / **74,94 ± 0,74** / 75,43 ± 1,40 |
+
+**So sánh trên lock-box** (thước đo chính đăng ký trước: Last-6, CI 95% bootstrap theo track):
+
+| So sánh | Thước đo | Chênh | CI 95% (theo track) | Welch (theo seed) |
+|---|---|---|---|---|
+| Crop cố định − STN | **Last-6** | **−1,68** | [−2,78; −0,59] | p = 0,002 |
+| | Cuối | −1,70 | [−2,97; −0,43] | p = 0,003 |
+| | Best | −1,67 | [−2,93; −0,43] | p = 0,001 |
+| Không STN − STN | **Last-6** | **−3,35** | [−4,69; −2,02] | p = 0,010 |
+| | Cuối | −3,23 | [−4,67; −1,80] | p = 0,021 |
+| | Best | −3,43 | [−4,93; −1,97] | p = 0,049 |
+| Crop cố định − Không STN | **Last-6** | **+1,67** | [+0,39; +2,96] | p = 0,055 |
+| | Cuối | +1,53 | [+0,10; +2,93] | p = 0,109 |
+| | Best | +1,77 | [+0,37; +3,17] | p = 0,161 |
+
+Cohen's d trong JSON rất lớn (−3 đến −10) vì std giữa 3 seed nhỏ; không nên dùng d để nói về độ lớn hiệu ứng.
+
+**Val 999** (Last-6, cùng chiều với lock-box): STN 77,67 ± 0,36; crop cố định 74,64 ± 0,94; không STN 73,01 ± 0,18. Crop − STN −3,03 [−4,21; −1,92]; không STN − STN −4,66 [−6,04; −3,33]; crop − không STN +1,63 [+0,31; +2,94].
+
+**Đọc theo đăng ký trước: "Crop cố định < STN" → tính thích nghi theo từng ảnh của STN có ích.**
+- CI không chứa 0 ở cả 3 thước đo, và Welch p ≤ 0,003. Chênh 1,7 điểm, không nằm sát ranh giới, nên **không cần thêm seed 2026** cho so sánh này.
+- Thêm vào đó, crop cố định > không STN (+1,67, CI không chứa 0; theo seed p = 0,055, mới là xu hướng). Vậy **lợi ích của STN (+3,35 Last-6) chia gần đều làm hai phần**: phóng to vùng ký tự (+1,67) và điều chỉnh theo từng ảnh (+1,68).
+- Mức lợi của STN so với không STN (+3,35 Last-6, +3,23 epoch cuối) cùng cỡ với +2,90 mà slide của tác giả báo cáo.
+
+**Theo số frame** (lock-box, epoch cuối; *phân tích thêm, không đăng ký trước*):
+
+| N | STN | Crop cố định | Không STN | STN − crop [CI] | Crop − không STN [CI] |
+|---|---|---|---|---|---|
+| 1 | 55,48 | 51,28 | 50,23 | +4,20 [+3,39; +5,01] | +1,05 [+0,23; +1,87] |
+| 2 | 68,86 | 65,52 | 64,40 | +3,34 [+2,55; +4,12] | +1,12 [+0,25; +2,01] |
+| 3 | 74,33 | 71,46 | 70,30 | +2,87 [+2,00; +3,76] | +1,17 [+0,17; +2,14] |
+| 4 | 77,17 | 74,84 | 73,57 | +2,33 [+1,34; +3,32] | +1,27 [+0,14; +2,43] |
+| 5 | 78,90 | 77,20 | 75,67 | +1,70 [+0,43; +2,97] | +1,53 [+0,10; +2,93] |
+
+- Phần "điều chỉnh theo từng ảnh" lớn nhất khi chỉ có 1 frame (+4,2) và giảm dần tới 5 frame (+1,7). Phần "phóng to" gần như không đổi (+1,1 đến +1,5).
+- Cách hiểu hợp lý: khi có nhiều frame, fusion bù được một phần cho việc từng frame không được căn chỉnh riêng. Đây là quan sát sau khi thấy số liệu, chỉ nên viết như giả thuyết.
+- Val 999 cho cùng dạng: STN − crop từ +4,40 (N = 1) giảm còn +2,77 (N = 5).
+
+**Lặp lại cấu hình chốt trên máy mới** (so với `results_new/lockbox_eval.json`; khác máy vật lý nhưng cùng loại GPU và cùng phiên bản PyTorch/CUDA/cuDNN; chỉ để tham khảo, không có CI):
+
+| | Máy cũ (4 seed) | Máy cũ (seed 42, 43, 7) | Máy mới (seed 42, 43, 7) |
+|---|---|---|---|
+| Cuối | 79,12 ± 1,14 | 79,43 | 78,90 ± 0,35 |
+| Last-6 | 78,71 ± 1,15 | 79,07 | 78,29 ± 0,26 |
+| 1 frame (E3) | 55,59 | — | 55,48 |
+
+- Thấp hơn trung bình 4 seed cũ 0,2 (cuối) và 0,4 (Last-6). Mức này nhỏ hơn độ lệch giữa các seed trên máy cũ (1,1). Train không tất định nên cùng seed vẫn cho model khác nhau; so theo từng seed không có ý nghĩa.
+- So với baseline của máy cũ (77,60 / 77,07): +1,30 (cuối), +1,22 (Last-6). Cả 3 seed mới (Last-6 thấp nhất 78,05) đều cao hơn cả 4 seed baseline cũ (Last-6 cao nhất 77,40). **Chiều của mức lợi lặp lại trên máy khác**, độ lớn nhỏ hơn một chút. Muốn nói chính thức "lặp lại trên máy thứ hai" thì phải chạy lại baseline trên máy mới (3 run nữa).
+- Độ lệch giữa các seed trên máy mới nhỏ hơn hẳn (0,26 so với 1,15 trên máy cũ). Với 3–4 seed, std còn dao động nhiều, nên chưa kết luận được gì từ điểm này.
+
+**Giới hạn:**
+1. **"Thích nghi" gồm hai thứ chưa tách được:** (i) θ khác nhau cho từng ảnh lúc suy luận; (ii) STN được khởi tạo bằng phép đồng nhất và đổi dần trong lúc train, còn crop cố định áp mức zoom cuối ngay từ epoch 1. Phép thử rẻ để tách hai thứ này, không cần train lại: lấy checkpoint `combo3_rerun`, lúc chấm thay θ của từng ảnh bằng θ trung bình. Nếu accuracy giảm khoảng 1,7 điểm thì lợi ích đến từ (i); nếu gần như không đổi thì đến từ (ii). Cần thêm một cờ cho lúc chấm, chưa code.
+2. Crop cố định là trung bình θ của chính STN (đo trên val 999 bằng 4 model lock-box cũ, không dùng lock-box). Chưa thử các crop cố định khác, nên kết luận đúng là "STN hơn crop cố định bằng trung bình của chính nó".
+3. Không có log train của `combo3_rerun_s42`; đã kiểm bằng `summary.txt` và `metrics.csv` (xem phần Kiểm tra).
+
+## Run #80 → #91 — N1: các kiểu che frame (30/10/2026, server thứ ba, khác server E4)
+
+Lệnh train: mục "Phần B: N1". Mỗi đợt 4 run song song (`nproc/4`). Lệnh chấm: bản chỉ có 4 nhánh N1 (xem "Cập nhật 31/10" ở mục "Chấm toàn bộ"), `--ref nomask`. Kết quả ở `results_n1/`: `arms_eval_n1.json` (md5 `ce6d12c55bd1e41e7525ad07a9a2d52f`), `arms_eval_n1.log`, `arms_eval_n1_per_track.npz`, 84 checkpoint (12 GB). `arms_eval.log` trong thư mục đó là lần chấm đầu bị lỗi `Nhánh combo3new: thiếu 21 checkpoint`.
+
+| Run | Tên | Seed | Khác cấu hình chốt ở |
+|---|---|---|---|
+| #80–#82 | `restran_lockbox_n1_nomask` | 42, 43, 7 | bỏ `--frame-mask` |
+| #83–#85 | `restran_lockbox_n1_tube` | 42, 43, 7 | che tube, dải dọc |
+| #86–#88 | `restran_lockbox_n1_indepv` | 42, 43, 7 | che độc lập, chỉ dải dọc |
+| #89–#91 | `restran_lockbox_n1_comp` | 42, 43, 7 | che bổ sung, dải dọc |
+
+**Kiểm tra:**
+- 12/12 run đủ 30 epoch, 7 checkpoint mỗi run. `eval_arms.py` nhận cả 4 nhánh là `stn`.
+- **11/12 log train** (thiếu `restran_lockbox_n1_nomask_s42_train.log`; run này có `summary.txt` ghi `Train samples : 36002`, 30/30 epoch, và `metrics.csv`). Cả 11 log có `🔒 Loại 1000 track khỏi train, 0 khỏi val`, 18.001 track train, 999 val, 31.077.676 tham số. So toàn bộ khối cấu hình với `indepv_s43`: `tube`, `comp` chỉ khác ở `FRAME_MASK_MODE`; `nomask` chỉ khác ở `FRAME_MASK: off` (orient về mặc định `mixed`, không dùng tới).
+- Val Acc epoch 30 trong `metrics.csv` khớp số `eval_arms.py` chấm lại ở cả 12 run.
+- **Batch bị bỏ:** 8–10 mỗi run, đều do inf/nan, trừ `tube_s7`: 14 batch, trong đó **4 batch vượt ngưỡng 100** (GradNorm lớn nhất 145,5). Đây là lần đầu ngưỡng 100 kích hoạt trong các run lock-box. GradNorm lớn nhất các run khác: 46–86.
+- Thời gian: 304–359 s mỗi epoch (4 run song song), bộ nhớ GPU đỉnh 1.832–1.835 MB.
+- **Thiếu `env_n1.txt`** và server đã trả, nên không biết GPU và phiên bản thư viện của server này. Không ảnh hưởng các so sánh giữa 4 nhánh N1 (cùng server), nhưng so với `combo3new` của E4 là so khác máy chưa rõ cấu hình.
+- Các file `submission_restran_lockbox_n1_*.txt` là dự đoán trên val 999 do `train.py` tự ghi khi kết thúc (`SUBMISSION_MODE: False`), không phải tập test.
+
+**Theo nhánh** (lock-box 1.000 track, 3 seed; TB ± std):
+
+| Nhánh | Cuối | **Last-6** | Best | Cuối theo seed 42 / 43 / 7 |
+|---|---|---|---|---|
+| Không che | 78,60 ± 0,89 | **78,38 ± 0,42** | 78,23 ± 0,57 | 78,9 / 77,6 / 79,3 |
+| Tube | 79,10 ± 0,26 | **78,71 ± 0,44** | 78,90 ± 1,04 | 79,0 / 79,4 / 78,9 |
+| Độc lập (dọc) | 78,70 ± 0,95 | **78,49 ± 0,97** | 78,67 ± 1,10 | 78,8 / 79,6 / 77,7 |
+| Bổ sung | 78,40 ± 0,46 | **78,19 ± 0,05** | 77,93 ± 0,38 | 78,5 / 77,9 / 78,8 |
+
+**So sánh trên lock-box** (Last-6, thước đo chính; CI 95% bootstrap theo track; Welch theo seed):
+
+| So sánh | Last-6 | Cuối | Best |
+|---|---|---|---|
+| **Bổ sung − tube** (so sánh chính) | **−0,52 [−1,39; +0,36]**, p = 0,18 | −0,70 [−1,73; +0,33], p = 0,10 | −0,97 [−2,10; +0,13], p = 0,25 |
+| Tube − không che | +0,33 [−0,51; +1,16], p = 0,40 | +0,50 [−0,43; +1,47] | +0,67 [−0,33; +1,67] |
+| Độc lập − không che | +0,11 [−0,75; +0,93], p = 0,87 | +0,10 [−0,90; +1,10] | +0,43 [−0,63; +1,47] |
+| Bổ sung − không che | −0,19 [−0,96; +0,57], p = 0,52 | −0,20 [−1,20; +0,77] | −0,30 [−1,30; +0,67] |
+| Bổ sung − độc lập | −0,30 [−1,17; +0,54], p = 0,65 | −0,30 [−1,37; +0,77] | −0,73 [−1,80; +0,33] |
+| Độc lập − tube | −0,22 [−1,06; +0,63], p = 0,75 | −0,40 [−1,43; +0,63] | −0,23 [−1,33; +0,87] |
+
+**Val 999** cho cùng hình ảnh (Last-6): không che 78,02; tube 78,26; độc lập 77,97; bổ sung 77,70. Mọi chênh lệch nằm trong ±0,6 và mọi CI đều chứa 0.
+
+**Theo số frame** (lock-box, epoch cuối): N = 1: 55,75 / 55,09 / 55,34 / 55,35 (không che / tube / độc lập / bổ sung); N = 5: 78,60 / 79,10 / 78,70 / 78,40. Không nhánh nào khác nhánh nào ở bất kỳ N nào quá 0,9 điểm.
+
+**Đọc theo đăng ký trước: không rơi vào trường hợp nào trong ba trường hợp đã viết.**
+- *Bổ sung > tube:* không. Ước lượng còn ngược chiều (−0,52) và CI chứa 0. **Cơ chế "che buộc fusion lấy phần bị che từ frame khác" không được ủng hộ.**
+- *Tube ≈ độc lập ≈ bổ sung > không che:* vế đầu đúng, nhưng không kiểu che nào hơn không che (cả ba CI chứa 0, ước lượng từ −0,19 đến +0,33). Vậy cũng không thấy tác dụng điều chuẩn kiểu Random Erasing.
+- *Tube > bổ sung:* ước lượng cùng chiều, nhưng CI chứa 0; chỉ là xu hướng nhỏ hơn ngưỡng 1 điểm đã ghi trong phần giới hạn.
+- **Kết luận: trong cấu hình chốt, che frame dải dọc không có tác dụng đo được trên lock-box, dù che kiểu nào.** CI theo track loại được tác dụng lớn hơn khoảng +1,2 điểm (cận trên cao nhất +1,16 cho tube − không che). Kết quả không nằm sát ranh giới, nên không cần thêm seed 2026.
+
+**Đối chiếu với cấu hình chốt** (`combo3new` từ E4; **khác server**, không có CI, chỉ để tham khảo):
+
+| | Cuối | Last-6 | Best | N = 1 |
+|---|---|---|---|---|
+| Cấu hình chốt (`combo3new`, server E4) | 78,90 | 78,29 | 78,87 | 55,48 |
+| Không che (N1) | 78,60 | 78,38 | 78,23 | 55,75 |
+| Độc lập, chỉ dải dọc (N1) | 78,70 | 78,49 | 78,67 | 55,34 |
+
+- **Bỏ che frame khỏi cấu hình chốt không làm giảm accuracy** (78,38 so với 78,29 Last-6). Đây chính là dòng "bỏ che frame" của E2 (leave-one-out): đóng góp ước lượng gần 0.
+- Bỏ dải ngang (độc lập, chỉ dải dọc) cũng không đổi gì (78,49 so với 78,29).
+- **Độ bền khi chỉ có 1 frame (E3, +5,0 so với baseline) không đến từ che frame:** không che vẫn đạt 55,75 ở N = 1, ngang cấu hình chốt (55,48). Nếu là do huấn luyện, ứng viên còn lại là frame dropout và CTC phụ từng frame; E2 cần đo hai thành phần này.
+- Kết quả này khớp với ablation phát triển (REPORT mục 5): che frame một mình giúp #42 (#46, +0,9 Last-6, 1 seed), nhưng ghép với frame dropout thì không cộng thêm (#49, #50 ngang #45). Tức là khi đã có frame dropout, che frame thành thừa.
+
+**Hệ quả cho bài báo:**
+- Cấu hình chốt giữ nguyên (theo đăng ký trước, N1 không đổi cấu hình). Nhưng **không được viết** rằng che độc lập từng frame là lý do phương pháp tốt hơn, hay rằng nó buộc fusion khai thác thông tin bổ sung giữa các frame.
+- ISSUE #8 (novelty, đặc thù đa khung hình): N1 không cung cấp được bằng chứng cho cơ chế đặc thù đa khung hình. Claim chính vẫn là E3 dạng B ("bền hơn khi thiếu frame"), cộng với phân tích STN của E4.
+- E2 trở nên quan trọng hơn: cần biết +1,6 điểm và độ bền ở N = 1 đến từ thành phần nào (frame dropout, CTC phụ, augment nhất quán, ảnh xám, sửa degradation).
+
+---
+
 ## Việc chưa làm
 
 - [x] ~~Constrained decoding theo pattern biển số~~ → đo được +0,00–0,05 (mục Phân tích 01/10, §1)
 - [x] ~~Bỏ `ChannelShuffle` + augment nhất quán~~ → run #13
 - [x] ~~Vòng E1–E4~~ → run #39–#42
-- [ ] Xin bản LRLPR-26 chính thức có nhãn test (license, email trường)
+- [ ] Xin bản LRLPR-26 chính thức có nhãn test: ký `license-agreement.pdf` (repo `github.com/raysonlaroca/lrlpr-26-dataset`), gửi tới `rayson@ppgia.pucpr.br` với tiêu đề `[LRLPR-26] Signed License Agreement`, **từ email trường** (.edu hoặc tương tự, không dùng Gmail). Phản hồi trong khoảng 5 ngày làm việc. Bản chính thức có 20.000 track train + 3.000 track test có nhãn
 - [x] ~~Vòng hires, fusion temporal~~ → run #43, #44: không cải thiện
 - [x] ~~3 seed `degcal` + 3 seed `degcal + aux` theo giao thức 999~~ → thay bằng seed của combo3 (cấu hình chốt sau run #51)
 - [ ] Chấm mọi checkpoint giao thức 999 trên test 3.000 track khi có nhãn
@@ -1363,7 +2140,24 @@ Report tổng hợp gửi thầy: [`documents/REPORT.md`](REPORT.md).
 - [x] ~~Kết quả `restran_base999_s43`~~ → run #58; bảng chính 4 vs 4 seed
 - [x] ~~Thí nghiệm 40 epoch, 4 seed~~ → run #59–#62: +0,24 TB6, p = 0,46 → giữ 30 epoch
 - [x] ~~Report tổng hợp gửi thầy~~ → `documents/REPORT.md`
-- [ ] Ablation `--no-stn` để đối chiếu +2,90 điểm mà slide báo
+- [x] ~~Ablation `--no-stn` để đối chiếu +2,90 điểm mà slide báo~~ → run #74–#76: STN hơn không STN +3,35 Last-6 trên lock-box, cùng cỡ với slide
+- [x] ~~Code lock-box + test + regression check~~ (23/10): 7/7 test OK, regression PASS so với code gốc
+- [x] ~~8 run lock-box, đóng băng, chấm~~ → run #63–#70: hướng (b), E3 dạng B
+- [x] ~~Xác nhận base_s42 loại lock-box; cấu hình 4 run combo3~~ → cả 8 run: Train samples 36002; 4 run combo3 cùng cấu hình
+- [ ] E5 (cấu hình gốc fp32): không có kết quả trong `results_new/`; lệnh đã đưa vào đợt 6 của N1/E4
+- [x] ~~Code N1 (kiểu che) + E4 (crop cố định)~~ (25/10): 14/14 test, regression PASS
+- [x] ~~Trả server `fierce-ibex`~~ (25/10): kết quả lock-box đã ở `results_new/`; code đóng băng dựng lại ở `results_new/code_lockbox_frozen.tgz` (27/27 khớp manifest)
+- [x] ~~Thuê server mới, chạy E4, chấm E4~~ → run #71–#79 (28/10): crop cố định < STN → thích nghi theo từng ảnh có ích; phóng to và thích nghi mỗi phần khoảng +1,7
+- [x] ~~Gửi file E4 còn thiếu~~ (28/10): log chấm, npz, 8/9 log train, summary + metrics của `combo3_rerun_s42` (không có log), môi trường (chép từ terminal)
+- [x] ~~Chạy N1~~ → run #80–#91 (30/10, server khác E4): che frame dải dọc không có tác dụng đo được ở cả 3 kiểu; bổ sung − tube −0,52 [−1,39; +0,36]. Không còn `env_n1.txt` và log `nomask_s42` (server đã trả)
+- [ ] **E2 (leave-one-out, 3 seed)**, ưu tiên bỏ frame dropout và bỏ CTC phụ: N1 cho thấy độ bền ở N = 1 không đến từ che frame
+- [ ] (Tuỳ chọn) E4b: chấm model STN với θ trung bình thay cho θ từng ảnh, để tách "thích nghi lúc suy luận" với "STN đổi dần lúc train" (cần thêm cờ lúc chấm). Checkpoint `combo3_rerun` chỉ nằm trên server E4 (mất nếu đã trả server), nhưng làm được trên máy local với 4 model combo3 lock-box trong `results_new/`
+- [ ] (Tuỳ chọn) Chạy lại baseline 3 seed trên máy mới nếu bài báo cần claim "lặp lại trên máy thứ hai"
+- [x] ~~Sửa REPORT theo review~~ (25/10): lock-box là kết quả chính; ISSUE #2, #4–#10 và MINOR 12–19 đã xử lý (bảng đối chiếu ở mục 10 của REPORT)
+- [x] ~~Báo cáo riêng phần lock-box gửi thầy~~ (25/10): `documents/REPORT_lockbox.md`
+- [ ] Điền 1 chỗ còn trống trong REPORT mục 10: ISSUE #9 (đã gửi diff 5 file chưa). ISSUE #11 đã điền: API chưa xong, đang ưu tiên train model
+- [ ] Prototype API `/predict` (ISSUE #11): chưa xong, báo cáo thầy sau
+- [ ] Các việc còn lại theo review của thầy: E2 (leave-one-out; dòng bỏ che frame đã nằm trong N1), E6, N3
 
 ---
 
@@ -1372,26 +2166,37 @@ Report tổng hợp gửi thầy: [`documents/REPORT.md`](REPORT.md).
 Sau mỗi lần sửa phải upload lại, nếu không sẽ gặp `train.py: error: unrecognized arguments`:
 
 ```bash
-scp -P <PORT> train.py root@<IP>:~/restran/
-scp -P <PORT> configs/config.py root@<IP>:~/restran/configs/
-scp -P <PORT> src/data/dataset.py src/data/transforms.py root@<IP>:~/restran/src/data/
-scp -P <PORT> src/training/trainer.py root@<IP>:~/restran/src/training/
-scp -P <PORT> src/models/restran.py src/models/components.py src/models/sr.py src/models/edvr.py root@<IP>:~/restran/src/models/
+scp -P <PORT> train.py root@<IP>:/workspace/restran/
+scp -P <PORT> configs/config.py root@<IP>:/workspace/restran/configs/
+scp -P <PORT> src/data/dataset.py src/data/transforms.py root@<IP>:/workspace/restran/src/data/
+scp -P <PORT> src/training/trainer.py root@<IP>:/workspace/restran/src/training/
+scp -P <PORT> src/models/restran.py src/models/components.py src/models/sr.py src/models/edvr.py root@<IP>:/workspace/restran/src/models/
+scp -P <PORT> tools/make_lockbox.py tools/eval_lockbox.py tools/freeze_manifest.py tools/regression_check.py tools/eval_arms.py root@<IP>:/workspace/restran/tools/
+ssh -p <PORT> root@<IP> "mkdir -p /workspace/restran/tests"
+scp -P <PORT> tests/test_eval_determinism.py root@<IP>:/workspace/restran/tests/
+scp -P <PORT> splits/lockbox_tracks.json root@<IP>:/workspace/restran/splits/
 ```
 
 Đối chiếu bằng md5 (`md5sum` trên Linux, `md5 -q` trên macOS) — hai bên phải trùng:
 
-| File | md5 (07/10/2026) |
+| File | md5 (25/10/2026) |
 |---|---|
-| `train.py` | `a39433f1e699f1b4033e35ece41fddf8` |
-| `configs/config.py` | `0dc3e1983695f77d3a648da07310bb5b` |
-| `src/data/dataset.py` | `63f833a32723146d4c4471b0bb92a0f0` |
+| `train.py` | `d9aec99ca097d2411189e2a58e727dd9` |
+| `configs/config.py` | `652c96987d42128437b6467b824454f7` |
+| `src/data/dataset.py` | `ffe6bac426de63cd6138bb3e5ae02bf6` |
 | `src/data/transforms.py` | `7efed8c09cd5e413c3451e4e26d7a4db` |
-| `src/training/trainer.py` | `dd57f2820c70f89b57fe406f615e6859` |
-| `src/models/restran.py` | `98bf8a84796701da80cd42eb22f68e2a` |
-| `src/models/components.py` | `09df74648ed078aec7c0d0503d71a569` |
-| `src/models/sr.py` | `53836e20f56b1c423e2da07a3cd890b5` (không đổi) |
-| `src/models/edvr.py` | `4cdb1b931be313f331b0d9e29c07c22e` (không đổi) |
+| `src/training/trainer.py` | `28631499578a575db1d7d34555d871f7` |
+| `src/models/restran.py` | `ec0e0d21ce95ccd25235b64d5b0ed846` |
+| `src/models/components.py` | `c43c5cd401db63959871d478d673d5af` |
+| `src/models/sr.py` | `53836e20f56b1c423e2da07a3cd890b5` |
+| `src/models/edvr.py` | `4cdb1b931be313f331b0d9e29c07c22e` |
+| `tools/make_lockbox.py` | `cdbb070eccbac8da359e9b28a6e1c7c8` |
+| `tools/eval_lockbox.py` | `373702560b55b1a422993137bedf06e2` |
+| `tools/freeze_manifest.py` | `4f79914a31731d06d9f92cc10f7c5a3b` |
+| `tools/regression_check.py` | `bbb9f022524c804e200efeb7cae4c4b1` |
+| `tools/eval_arms.py` (mới) | `fb1685502c29efdaabb6cfbe3a1d3300` |
+| `tests/test_eval_determinism.py` | `d5d8ca4f64067d09880058571d76ad0c` |
+| `splits/lockbox_tracks.json` | `3e6014aa7fc254409eeaff57e779c70a` |
 
 ---
 

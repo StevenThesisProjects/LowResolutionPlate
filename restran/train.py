@@ -100,7 +100,7 @@ def parse_args() -> argparse.Namespace:
         help="Max gradient norm (default: from config, 5.0). Use 1.0 for CTC stability"
     )
     parser.add_argument(
-        "--amp-dtype", type=str, choices=["fp16", "bf16"], default=None,
+        "--amp-dtype", type=str, choices=["fp16", "bf16", "fp32"], default=None,
         help="Mixed precision dtype. bf16 cannot overflow (needs Ampere+); default fp16"
     )
     parser.add_argument(
@@ -316,6 +316,28 @@ def parse_args() -> argparse.Namespace:
              "frames are 4:2:0 JPEGs whose chroma is half resolution. Pass it again at predict time",
     )
     parser.add_argument(
+        "--frame-mask-mode", choices=["independent", "tube", "complementary"], default=None,
+        help="How the masks of one track relate across frames (N1): independent (default), "
+             "tube (same band on every frame), complementary (disjoint vertical bands)",
+    )
+    parser.add_argument(
+        "--frame-mask-orient", choices=["mixed", "vertical"], default=None,
+        help="Mask bands: mixed vertical/horizontal (default) or vertical only",
+    )
+    parser.add_argument(
+        "--fixed-stn", type=str, default=None,
+        help="Replace the learned STN by one fixed affine 'a,b,tx,c,d,ty' (E4)",
+    )
+    parser.add_argument(
+        "--exclude-tracks", type=str, default=None,
+        help="JSON list of track ids kept out of training AND validation (the lock-box, "
+             "see documents/lockbox_protocol.md)",
+    )
+    parser.add_argument(
+        "--save-last-k", type=int, default=None,
+        help="Also save the weights of each of the last K epochs as {name}_epNN.pth (0 = off)",
+    )
+    parser.add_argument(
         "--clean-geo-aug",
         action="store_true",
         help="Geometric augmentation with bicubic resampling and replicated borders instead "
@@ -388,6 +410,11 @@ def main():
         'fusion_layers': 'FUSION_LAYERS',
         'frame_dropout': 'FRAME_DROPOUT',
         'frame_mask': 'FRAME_MASK',
+        'exclude_tracks': 'EXCLUDE_TRACKS_FILE',
+        'frame_mask_mode': 'FRAME_MASK_MODE',
+        'frame_mask_orient': 'FRAME_MASK_ORIENT',
+        'fixed_stn': 'FIXED_STN',
+        'save_last_k': 'SAVE_LAST_K',
     }
 
     for arg_name, config_name in arg_to_config.items():
@@ -401,6 +428,19 @@ def main():
 
     if args.no_stn:
         config.USE_STN = False
+    # Checked here, before the dataset scan, so a bad value fails in seconds
+    fixed_stn = None
+    if config.FIXED_STN:
+        fixed_stn = [float(v) for v in config.FIXED_STN.split(',')]
+        if len(fixed_stn) != 6:
+            print("❌ ERROR: --fixed-stn cần đúng 6 số a,b,tx,c,d,ty"); sys.exit(1)
+        if not config.USE_STN:
+            print("❌ ERROR: --fixed-stn và --no-stn không dùng cùng nhau"); sys.exit(1)
+    if config.FRAME_MASK_MODE == 'complementary' and config.FRAME_MASK_ORIENT != 'vertical':
+        print("❌ ERROR: --frame-mask-mode complementary cần --frame-mask-orient vertical"); sys.exit(1)
+    if (config.FRAME_MASK_MODE != 'independent' or config.FRAME_MASK_ORIENT != 'mixed') \
+            and config.FRAME_MASK <= 0:
+        print("❌ ERROR: --frame-mask-mode/--frame-mask-orient cần --frame-mask > 0"); sys.exit(1)
 
     config.LOG_BATCH_LOSS = args.log_batch_loss
 
@@ -470,7 +510,7 @@ def main():
     print(f"🚀 Configuration:")
     print(f"   EXPERIMENT: {config.EXPERIMENT_NAME}")
     print(f"   MODEL: ResTranOCR (ResNet34 + Transformer)")
-    print(f"   USE_STN: {config.USE_STN}")
+    print(f"   USE_STN: {'fixed affine (--fixed-stn)' if config.FIXED_STN else config.USE_STN}")
     print(f"   PRETRAINED_BACKBONE: {config.PRETRAINED_BACKBONE}")
     print(f"   CONSISTENT_AUG: {config.CONSISTENT_AUG} | CHANNEL_SHUFFLE: {config.CHANNEL_SHUFFLE}")
     print(f"   STN_SHARED: {config.STN_SHARED} | FUSION_2D: {config.FUSION_2D} | NO_SYNTHETIC: {config.NO_SYNTHETIC} | SHARPNESS_PRIOR: {config.SHARPNESS_PRIOR}")
@@ -482,6 +522,8 @@ def main():
           (f" ({config.FUSION_LAYERS} layers)" if config.FUSION == 'temporal' else "") +
           f" | FRAME_DROPOUT: {config.FRAME_DROPOUT or 'off'} | FRAME_MASK: {config.FRAME_MASK or 'off'}")
     print(f"   GRAYSCALE: {config.GRAYSCALE} | CLEAN_GEO_AUG: {config.CLEAN_GEO_AUG}")
+    print(f"   FRAME_MASK_MODE: {config.FRAME_MASK_MODE} | FRAME_MASK_ORIENT: {config.FRAME_MASK_ORIENT} | "
+          f"FIXED_STN: {config.FIXED_STN or 'off'} | SAVE_LAST_K: {config.SAVE_LAST_K or 'off'}")
     print(f"   SCHEDULER: {config.SCHEDULER}" + (
         f" (warmup {config.WARMUP_EPOCHS} ep, floor {config.MIN_LR_RATIO} x lr)"
         if config.SCHEDULER == 'cosine' else "") +
@@ -503,6 +545,18 @@ def main():
     if not os.path.exists(config.DATA_ROOT):
         print(f"❌ ERROR: Data root not found: {config.DATA_ROOT}")
         sys.exit(1)
+
+    # Held-out tracks (lock-box): read once, verified, and kept out of every split
+    excluded_tracks = None
+    if config.EXCLUDE_TRACKS_FILE:
+        import hashlib, json as _json
+        if not os.path.exists(config.EXCLUDE_TRACKS_FILE):
+            print(f"❌ ERROR: Không thấy {config.EXCLUDE_TRACKS_FILE}"); sys.exit(1)
+        with open(config.EXCLUDE_TRACKS_FILE, 'rb') as f:
+            raw = f.read()
+        excluded_tracks = _json.loads(raw)
+        print(f"🔒 EXCLUDE_TRACKS: {config.EXCLUDE_TRACKS_FILE} ({len(excluded_tracks)} track, "
+              f"sha256 {hashlib.sha256(raw).hexdigest()[:16]}…)")
 
     # Common dataset parameters
     common_ds_params = {
@@ -534,6 +588,7 @@ def main():
         'relative_dropout': config.RELATIVE_DROPOUT,
         'grayscale': config.GRAYSCALE,
         'clean_geo': config.CLEAN_GEO_AUG,
+        'exclude_tracks': excluded_tracks,
     }
 
     # Create datasets based on mode
@@ -671,6 +726,7 @@ def main():
         fusion=config.FUSION,
         fusion_layers=config.FUSION_LAYERS,
         frame_dropout=config.FRAME_DROPOUT,
+        fixed_stn=fixed_stn,
     ).to(config.DEVICE)
 
     # Warm-start the SR front-end from supervised pre-training on registered pairs

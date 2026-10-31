@@ -61,6 +61,7 @@ class MultiFrameDataset(Dataset):
         relative_dropout: bool = False,
         grayscale: bool = False,
         clean_geo: bool = False,
+        exclude_tracks: List[str] = None,
     ):
         """
         Args:
@@ -180,7 +181,18 @@ class MultiFrameDataset(Dataset):
             print(f"-> Total: {len(self.samples)} test samples.")
         else:
             train_tracks, val_tracks = self._load_or_create_split(all_tracks, split_ratio)
-            
+
+            # Held-out tracks (the lock-box) never reach training or validation. The
+            # split above is computed first, so excluding them cannot shift which
+            # tracks end up in the val set.
+            if exclude_tracks:
+                excluded = set(exclude_tracks)
+                n_train, n_val = len(train_tracks), len(val_tracks)
+                train_tracks = [t for t in train_tracks if os.path.basename(t) not in excluded]
+                val_tracks = [t for t in val_tracks if os.path.basename(t) not in excluded]
+                print(f"🔒 Loại {n_train - len(train_tracks)} track khỏi train, "
+                      f"{n_val - len(val_tracks)} khỏi val (danh sách {len(excluded)} track giữ riêng)")
+
             selected_tracks = train_tracks if mode == 'train' else val_tracks
             print(f"[{mode.upper()}] Loaded {len(selected_tracks)} tracks.")
             

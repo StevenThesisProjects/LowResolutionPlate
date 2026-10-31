@@ -32,6 +32,7 @@ class ResTranOCR(nn.Module):
         fusion: str = 'attention',
         fusion_layers: int = 2,
         frame_dropout: float = 0.0,
+        fixed_stn=None,
     ):
         super().__init__()
         self.cnn_channels = 512
@@ -64,7 +65,17 @@ class ResTranOCR(nn.Module):
         else:
             raise ValueError(f"sr_arch must be 'stacked' or 'edvr', got {sr_arch!r}")
         
-        # 1. Spatial Transformer Network
+        # 1. Spatial Transformer Network, or (experiment E4) one fixed affine applied to
+        # every frame. The learned STN of the trained models is close to a fixed crop
+        # (mean theta [[0.78, 0.03, 0.01], [0.06, 0.61, 0.17]], per-frame std 0.04-0.11);
+        # replacing it by that mean tests whether its per-frame adaptivity matters.
+        # Kept as a persistent buffer, so the checkpoint records the transform it used.
+        if fixed_stn is not None:
+            self.use_stn = False
+            self.register_buffer('fixed_theta', torch.tensor(
+                [float(v) for v in fixed_stn], dtype=torch.float32).view(1, 2, 3))
+        else:
+            self.fixed_theta = None
         if self.use_stn:
             self.stn = STNBlock(in_channels=3)
 
@@ -119,8 +130,11 @@ class ResTranOCR(nn.Module):
 
     def _sequence_head(self, feats: torch.Tensor):
         """[N, 512, H', W'] feature map -> (log-probs [N, W', C], sequence [N, W', 512])."""
-        # Collapse whatever height survived, after fusion rather than before it.
-        seq = F.adaptive_avg_pool2d(feats, (1, None)).squeeze(2).permute(0, 2, 1)
+        # Collapse whatever height survived (only --fusion-2d keeps one), after fusion
+        # rather than before it. With height 1 this is the original squeeze + permute.
+        if feats.size(2) != 1:
+            feats = F.adaptive_avg_pool2d(feats, (1, None))
+        seq = feats.squeeze(2).permute(0, 2, 1)
         seq = self.transformer(self.pos_encoder(seq))
         return self.head(seq).log_softmax(2), seq
 
@@ -164,6 +178,10 @@ class ResTranOCR(nn.Module):
                 theta = theta.expand(b, f, 2, 3).reshape(b * f, 2, 3)
             grid = F.affine_grid(theta, x_flat.size(), align_corners=False)
             x_aligned = F.grid_sample(x_flat, grid, align_corners=False)
+        elif self.fixed_theta is not None:
+            theta = self.fixed_theta.to(x_flat.dtype).expand(b * f, 2, 3)
+            grid = F.affine_grid(theta, x_flat.size(), align_corners=False)
+            x_aligned = F.grid_sample(x_flat, grid, align_corners=False)
         else:
             x_aligned = x_flat
         
@@ -175,7 +193,7 @@ class ResTranOCR(nn.Module):
         if self.temporal_fusion:
             fused = self.fusion(fusion_in, num_frames=f)   # [B, 512, 1, W']
         else:
-            fused = self.fusion(fusion_in, log_sharp)      # [B, 512, H', W']
+            fused = self.fusion(fusion_in, log_sharp, num_frames=f)  # [B, 512, H', W']
 
         # [B, C, H', W'] -> pool height -> [B, W', C] -> PE -> Transformer -> head
         logits, seq_out = self._sequence_head(fused)
