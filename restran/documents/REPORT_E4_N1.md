@@ -18,7 +18,7 @@ Ngày 31/10/2026. Trả lời ISSUE #10 (E4/N4) và ISSUE #8 (N1) trong review n
   - Không kiểu che nào hơn không che (ước lượng từ −0,19 đến +0,33, mọi CI chứa 0).
   - Vì vậy cơ chế "che độc lập buộc fusion khai thác thông tin bổ sung giữa các frame" **không được ủng hộ**.
 - **Hệ quả cho bài báo:**
-  - Cấu hình chốt giữ nguyên, theo đúng đăng ký trước.
+  - Cấu hình chốt giữ nguyên, theo đúng đăng ký trước. Con số chính vẫn là kết quả lock-box: 79,12% ở epoch cuối, hơn baseline +1,52. Một số run đơn lẻ trong E4/N1 vượt 79% (cao nhất 79,6 ở epoch cuối), nhưng trung bình 3 seed của các nhánh không khác nhau (mục 3).
   - Claim chính vẫn là E3 dạng B: phương pháp làm model bền hơn khi thiếu frame. Thêm vào đó là phân tích vai trò STN.
   - Độ bền khi chỉ có 1 frame không đến từ che frame. E2 (leave-one-out) cần ưu tiên hai thành phần còn lại là frame dropout và CTC phụ.
 
@@ -30,7 +30,8 @@ Ngày 31/10/2026. Trả lời ISSUE #10 (E4/N4) và ISSUE #8 (N1) trong review n
 |---|---|
 | Giao thức | Giống lock-box: train 18.001 track (đã loại 1.000 track lock-box), val 999 để theo dõi, chấm trên lock-box. 30 epoch, lưu 6 epoch cuối và best. Cấu hình nền là cấu hình chốt (#50); mỗi nhánh chỉ khác nó đúng một điểm |
 | Seed | 3 seed mỗi nhánh (42, 43, 7) |
-| Thống kê | Như lock-box: CI 95% bootstrap theo track (10.000 lần) và Welch theo seed. Thước đo chính là Last-6 |
+| Thống kê | Như lock-box: CI 95% bootstrap theo track (10.000 lần) và Welch theo seed |
+| Thước đo | **Last-6 là thước đo chính** (đăng ký trước), vì ít nhiễu hơn một epoch đơn lẻ khi so các nhánh với nhau. Epoch cuối và best được báo cáo kèm theo. Mọi so sánh dùng trung bình 3 seed |
 | Vai trò | Kết quả E4 và N1 **không** làm thay đổi cấu hình chốt; chúng chỉ dùng để mô tả cơ chế |
 | Cách đọc kết quả | Viết ngày 25/10, trước khi chạy run nào (trích ở mục 2 và 3) |
 
@@ -75,11 +76,11 @@ Ngày 31/10/2026. Trả lời ISSUE #10 (E4/N4) và ISSUE #8 (N1) trong review n
 
 **Theo nhánh** (accuracy % trên 1.000 track lock-box, trung bình ± std 3 seed):
 
-| Nhánh | Epoch cuối | **Last-6** | Best |
-|---|---|---|---|
-| STN học được | 78,90 ± 0,35 | **78,29 ± 0,26** | 78,87 ± 0,21 |
-| Crop cố định | 77,20 ± 0,26 | **76,60 ± 0,15** | 77,20 ± 0,10 |
-| Không STN | 75,67 ± 1,00 | **74,94 ± 0,74** | 75,43 ± 1,40 |
+| Nhánh | Epoch cuối | **Last-6** | Best | Epoch cuối theo seed 42 / 43 / 7 |
+|---|---|---|---|---|
+| STN học được | 78,90 ± 0,35 | **78,29 ± 0,26** | 78,87 ± 0,21 | 79,1 / 79,1 / 78,5 |
+| Crop cố định | 77,20 ± 0,26 | **76,60 ± 0,15** | 77,20 ± 0,10 | 77,4 / 77,3 / 76,9 |
+| Không STN | 75,67 ± 1,00 | **74,94 ± 0,74** | 75,43 ± 1,40 | 74,9 / 75,3 / 76,8 |
 
 **So sánh** (CI 95% bootstrap theo track; Welch theo seed):
 
@@ -134,12 +135,18 @@ Chênh 0,2–0,4 điểm, nhỏ hơn độ lệch giữa các seed. Cả 3 seed 
 
 **Theo nhánh** (lock-box, trung bình ± std 3 seed):
 
-| Nhánh | Epoch cuối | **Last-6** | Best |
-|---|---|---|---|
-| Không che | 78,60 ± 0,89 | **78,38 ± 0,42** | 78,23 ± 0,57 |
-| Tube | 79,10 ± 0,26 | **78,71 ± 0,44** | 78,90 ± 1,04 |
-| Độc lập (dải dọc) | 78,70 ± 0,95 | **78,49 ± 0,97** | 78,67 ± 1,10 |
-| Bổ sung | 78,40 ± 0,46 | **78,19 ± 0,05** | 77,93 ± 0,38 |
+| Nhánh | Epoch cuối | **Last-6** | Best | Epoch cuối theo seed 42 / 43 / 7 |
+|---|---|---|---|---|
+| Không che | 78,60 ± 0,89 | **78,38 ± 0,42** | 78,23 ± 0,57 | 78,9 / 77,6 / 79,3 |
+| Tube | 79,10 ± 0,26 | **78,71 ± 0,44** | 78,90 ± 1,04 | 79,0 / 79,4 / 78,9 |
+| Độc lập (dải dọc) | 78,70 ± 0,95 | **78,49 ± 0,97** | 78,67 ± 1,10 | 78,8 / 79,6 / 77,7 |
+| Bổ sung | 78,40 ± 0,46 | **78,19 ± 0,05** | 77,93 ± 0,38 | 78,5 / 77,9 / 78,8 |
+
+**Về các con số trên 79%.**
+- Tube có epoch cuối trung bình 79,10, cao nhất trong 4 nhánh. Nhưng tube − không che ở epoch cuối chỉ là +0,50 [−0,43; +1,47], nên không phân biệt được với các nhánh khác.
+- Nhiều run đơn lẻ vượt 79%. Trên lock-box: độc lập seed 43 đạt 79,6 (epoch cuối) và 79,8 (best); tube seed 43 đạt 79,4. Trên val 999 lúc train, best cao nhất là 79,48 (độc lập seed 43) và 79,38 (tube seed 42).
+- Các số này là một seed hoặc một epoch được chọn sau khi đã thấy kết quả, nên lạc quan; độ lệch giữa các seed lên tới khoảng 1 điểm. Chọn nhánh có số cao nhất lúc này sẽ là thêm một vòng chọn cấu hình trên lock-box. Vì vậy chỉ dùng trung bình 3 seed để so sánh, và cấu hình chốt giữ nguyên.
+- Con số chính của phương pháp cho bài báo vẫn là kết quả lock-box của cấu hình chốt: **79,12% ở epoch cuối** (4 seed, chấm một lần; xem `REPORT_lockbox.md`).
 
 **So sánh** (Last-6; CI 95% bootstrap theo track; Welch theo seed):
 
