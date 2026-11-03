@@ -1,26 +1,17 @@
 % =====================================================================
 %  MSE Applied Capstone Project Proposal -- PlateReader LR
 %  Springer LLNCS class (llncs.cls v2.24, included in this folder).
-%  Compiles with pdfLaTeX (Overleaf default) or XeLaTeX. No BibTeX run:
-%  the references are in sections/06_references.tex.
-%  Figures are vector PDFs in figures/, built from the TikZ sources in
+%  Compile with XeLaTeX or tectonic (`tectonic main.tex`) so that every
+%  font is Times New Roman (see fonts.tex). No BibTeX run: the references
+%  are in sections/06_references.tex.
+%  Figures are 300-dpi PNGs in figures/, built from the TikZ sources in
 %  figures/src/ (run `sh build_figures.sh` after editing a source).
 %  Figures are included at their natural size, never scaled, so every
-%  diagram uses the same 8 pt / 7 pt Computer Modern text.
+%  diagram uses the same 8 pt / 7 pt Times New Roman text.
 % =====================================================================
 \documentclass[runningheads]{llncs}
 
-\usepackage{iftex}
-\ifPDFTeX
-  % T5 = Vietnamese encoding (vntex), used only for the Vietnamese title;
-  % T1 stays the default encoding for the English text.
-  \usepackage[T5,T1]{fontenc}
-  \newcommand{\vn}[1]{{\fontencoding{T5}\selectfont #1}}
-\else
-  \usepackage{fontspec}   % Latin Modern, same design as Computer Modern
-  \newcommand{\vn}[1]{#1}
-\fi
-\usepackage{amsmath,amssymb}
+\input{fonts}           % Times New Roman everywhere; defines \vn{...}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tabularx}
@@ -67,15 +58,25 @@
 \newcommand{\Plan}{\textcolor{plan}{Planned}}
 \newcommand{\Prog}{\textcolor{plan}{In progress}}
 
-% Numbered "6 References" heading (IEEE [n] labels are set in 06_references.tex).
+% Numbered "6. REFERENCES" heading (IEEE [n] labels are set in 06_references.tex).
 \makeatletter
 \patchcmd{\thebibliography}{\section*{\refname}}{}{}{}
+% Headings follow the MSE template: "1. INTRODUCTION", "1.1 Background".
+\def\@seccntformat#1{\csname the#1\endcsname\ifstrequal{#1}{section}{.}{}\quad}
+% Template header above the project title.
+\patchcmd{\@maketitle}{\begin{center}}{\begin{center}%
+  {\large\bfseries MASTER OF SOFTWARE ENGINEERING (MSE)\par}\vskip 4pt
+  {\large\bfseries CAPSTONE PROJECT PROPOSAL\par}\vskip .8cm}{}{}
 \makeatother
+\usepackage{enumitem}
+\newcommand{\cellitems}[1]{% bulleted list inside a table cell
+  \begin{minipage}[t]{\linewidth}\raggedright
+  \begin{itemize}[nosep,leftmargin=1.1em,label=\textbullet]#1\end{itemize}%
+  \vspace{2pt}\end{minipage}}
 
 \begin{document}
 
 \title{\projecttitle}
-\subtitle{MSE Applied Capstone Project Proposal}
 \titlerunning{Low-Resolution Plate Recognition for Parking Facilities}
 \author{\studentname}
 \authorrunning{N.~N.~Minh}

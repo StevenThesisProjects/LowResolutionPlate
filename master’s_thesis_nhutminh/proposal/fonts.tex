@@ -1,0 +1,45 @@
+% =====================================================================
+%  Font setup shared by main.tex and every figure (figures/src/figstyle.tex).
+%  All text -- body, headings, tables, code, URLs and figure labels -- is
+%  Times New Roman. Math letters and digits are Times New Roman too; math
+%  symbols come from TeX Gyre Termes Math (a Times design), because Times
+%  New Roman has no math table.
+%
+%  XeLaTeX / tectonic: the installed Times New Roman is used. If it is not
+%  installed (e.g. Overleaf), TeX Gyre Termes, a metric clone, is used.
+%  pdfLaTeX: Times via newtx (no TrueType fonts in pdfLaTeX).
+%  Provides \vn{...} for Vietnamese text.
+% =====================================================================
+\usepackage{iftex}
+\ifPDFTeX
+  % T5 = Vietnamese encoding (vntex), used only for the Vietnamese title.
+  \usepackage[T5,T1]{fontenc}
+  \usepackage{newtxtext,newtxmath}
+  \newcommand{\vn}[1]{{\fontencoding{T5}\selectfont #1}}
+\else
+  \usepackage{amsmath}
+  \usepackage{unicode-math}
+  % 1) fonts/ folder next to main.tex (needed on Overleaf, which has no
+  %    Times New Roman): TimesNewRoman.ttf, -Bold, -Italic, -BoldItalic.
+  % 2) Times New Roman installed on the system (macOS, Windows).
+  % 3) TeX Gyre Termes, a free metric clone, as the last resort.
+  \IfFileExists{fonts/TimesNewRoman.ttf}
+    {\def\tnrpath{Path=./fonts/,}\def\tnr{TimesNewRoman.ttf}%
+     \def\tnrit{TimesNewRoman-Italic.ttf}\def\tnrbf{TimesNewRoman-Bold.ttf}%
+     \def\tnrbi{TimesNewRoman-BoldItalic.ttf}}
+    {\def\tnrpath{}%
+     \IfFontExistsTF{Times New Roman}
+       {\def\tnr{Times New Roman}\def\tnrit{Times New Roman Italic}%
+        \def\tnrbf{Times New Roman Bold}\def\tnrbi{Times New Roman Bold Italic}}
+       {\def\tnr{texgyretermes-regular.otf}\def\tnrit{texgyretermes-italic.otf}%
+        \def\tnrbf{texgyretermes-bold.otf}\def\tnrbi{texgyretermes-bolditalic.otf}%
+        \PackageWarningNoLine{fonts}{Times New Roman not found; using TeX Gyre Termes}}}
+  \edef\x{\noexpand\setmainfont{\tnr}[\tnrpath BoldFont=\tnrbf,ItalicFont=\tnrit,BoldItalicFont=\tnrbi]}\x
+  \edef\x{\noexpand\setsansfont{\tnr}[\tnrpath BoldFont=\tnrbf,ItalicFont=\tnrit,BoldItalicFont=\tnrbi]}\x
+  \edef\x{\noexpand\setmonofont{\tnr}[\tnrpath BoldFont=\tnrbf,ItalicFont=\tnrit,BoldItalicFont=\tnrbi]}\x
+  \setmathfont{texgyretermes-math.otf}                           % symbols
+  \edef\x{\noexpand\setmathfont{\tnr}[\tnrpath range={up/{Latin,latin,num,Greek,greek}}]}\x
+  \edef\x{\noexpand\setmathfont{\tnrit}[\tnrpath range={it/{Latin,latin,Greek,greek}->up}]}\x
+  \edef\x{\noexpand\setmathfont{\tnrbf}[\tnrpath range={bfup/{Latin,latin,num}->up}]}\x
+  \newcommand{\vn}[1]{#1}
+\fi

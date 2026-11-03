@@ -1,8 +1,9 @@
 % =====================================================================
 %  Shared style for every diagram in the proposal.
 %  Each figure is a standalone TikZ file that \input's this preamble, so
-%  all diagrams use the same font family (Computer Modern, T1 -- identical
-%  to the LLNCS body text), the same sizes and the same palette.
+%  all diagrams use the same font family (Times New Roman, loaded from
+%  ../../fonts.tex exactly as in the body text), the same sizes and the
+%  same palette.
 %
 %  Font rule (do not change per figure):
 %    node text   \footnotesize  (8 pt)
@@ -12,8 +13,7 @@
 %  width) and included WITHOUT scaling, so the printed size is the same
 %  in every figure.
 % =====================================================================
-\usepackage[T1]{fontenc}
-\usepackage{amsmath,amssymb}
+\input{../../fonts}   % Times New Roman, same setup as main.tex
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,shapes.geometric,shapes.multipart,

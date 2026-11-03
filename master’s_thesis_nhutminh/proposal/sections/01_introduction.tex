@@ -1,5 +1,5 @@
 % =====================================================================
-\section{Introduction}
+\section{INTRODUCTION}
 % =====================================================================
 
 \subsection{Background}
@@ -48,10 +48,10 @@ Dataset owners (UFPR) & Images are used only for non-commercial academic work an
 \end{tabularx}
 \end{table}
 
-\fig{usecase.pdf}{Use cases in scope. Operators recognize, review and export; the administrator
+\fig{usecase.png}{Use cases in scope. Operators recognize, review and export; the administrator
 runs the stack; the ML engineer manages the model and the threshold $\tau$.}{fig:usecase}
 
-\subsection{Practical Problem Statement and User Pain-Point}
+\subsection{Practical problem statement and User pain-point}
 
 Parking staff currently have no tool that uses all the frames in which a vehicle appears, indicates
 which automatic readings are reliable, and helps them correct the others. Fig.~\ref{fig:workflow}
@@ -73,9 +73,9 @@ pain points.
         reviewers would wait behind the batch.
 \end{description}
 
-\fig{workflow.pdf}{Current workflow (a) and proposed workflow with confidence-based routing (b).}{fig:workflow}
+\fig{workflow.png}{Current workflow (a) and proposed workflow with confidence-based routing (b).}{fig:workflow}
 
-\subsection{Research Objectives and Questions}
+\subsection{Research Objectives / Questions}
 
 Table~\ref{tab:objectives} states the engineering objectives in SMART form. Week~1 starts on
 October 5, 2026.
@@ -120,23 +120,27 @@ trained on Brazilian plates, so the system is described as working on that domai
 \label{tab:scope}
 \begin{tabularx}{\textwidth}{@{}L L@{}}
 \toprule
-\textbf{In-scope components} & \textbf{Out-of-scope components} \\
+\textbf{In-Scope Components} & \textbf{Out-of-Scope Components} \\
 \midrule
-MF-SR-OCR inference with greedy and layout-constrained decoding &
-Plate detection and tracking in raw video (stretch goal only); gate hardware such as barriers, ticket machines or RFID readers \\
-Selective prediction: track confidence, threshold $\tau$, review queue &
-Non-Brazilian plates (10 Vietnamese plates tested qualitatively to document the limitation) \\
-FastAPI REST API: single track, ZIP batch, review, suggestions, CSV export &
-In-app user accounts (identity is delegated to Cloudflare Access) \\
-PostgreSQL storage of results and review history (text only, no images) &
-GPU or edge deployment, INT8 quantization, Kubernetes \\
-React web app with single-track, batch and review screens &
-Live camera streams and integration with police or VMS systems \\
-Docker Compose deployment on one CPU host, Cloudflare Tunnel, backups &
-Storing or publishing dataset images \\
-Automated tests, CI/CD pipeline, API and user documentation &
-New model research beyond a minimal ablation \\
-Roles: operator/reviewer, administrator, ML engineer & \\
+\cellitems{
+  \item MF-SR-OCR inference with greedy and layout-constrained decoding
+  \item Selective prediction: track confidence, threshold $\tau$, review queue
+  \item FastAPI REST API: single track, ZIP batch, review, suggestions, CSV export
+  \item PostgreSQL storage of results and review history (text only, no images)
+  \item React web app with single-track, batch and review screens
+  \item Docker Compose deployment on one CPU host, Cloudflare Tunnel, backups
+  \item Automated tests, CI/CD pipeline, API and user documentation
+  \item User roles: operator/reviewer, administrator, ML engineer}
+&
+\cellitems{
+  \item Plate detection and tracking in raw video (stretch goal only)
+  \item Gate hardware such as barriers, ticket machines or RFID readers
+  \item Non-Brazilian plates (10 Vietnamese plates tested qualitatively to document the limitation)
+  \item In-app user accounts (identity is delegated to Cloudflare Access, treated as a black box)
+  \item GPU or edge deployment, INT8 quantization, Kubernetes
+  \item Live camera streams and integration with police or VMS systems
+  \item Storing or publishing dataset images
+  \item New model research beyond a minimal ablation} \\
 \bottomrule
 \end{tabularx}
 \end{table}

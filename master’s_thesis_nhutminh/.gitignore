@@ -97,3 +97,5 @@ backup/
 backups/
 # proposal/
 .claude/
+# Times New Roman copies for Overleaf (licensed font, not redistributed)
+proposal/fonts/

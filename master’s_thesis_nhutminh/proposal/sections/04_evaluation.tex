@@ -1,5 +1,5 @@
 % =====================================================================
-\section{Expected Results and Performance Evaluation}
+\section{EXPECTED RESULTS AND PERFORMANCE EVALUATION}
 % =====================================================================
 
 \subsection{Deliverables}
@@ -15,14 +15,14 @@ proposal date.
 \toprule
 Deliverable & Content & State \\
 \midrule
-Source code repository with README & Model, FastAPI backend, tests & \Done \\
+Production-ready source code repository with comprehensive README instructions & Model, FastAPI backend, tests & \Done \\
  & React frontend, release tag \code{v1.0} & \Plan \\
-Deployment configuration & Docker Compose with PostgreSQL, backup and restore scripts, \code{.env.example} & \Done \\
+Automated deployment configuration scripts & Docker Compose with PostgreSQL, backup and restore scripts, \code{.env.example} & \Done \\
  & \code{web} service, tunnel token, production settings & \Plan \\
-API documentation & OpenAPI 3.1 (Swagger UI, ReDoc), one page per endpoint, database schema & \Done \\
+Comprehensive API documentation & OpenAPI 3.1 (Swagger UI, ReDoc), one page per endpoint, database schema & \Done \\
+User manuals and architectural documentation & Operator guide, administrator guide, design decisions (ADRs) & \Plan \\
 CI/CD workflows & GitHub Actions for pull requests and releases & \Plan \\
 Model package and evaluation reports & Frozen checkpoint with manifest; statistics, parity, latency, user study & \Plan \\
-User manual and architecture document & Operator guide, administrator guide, design decisions (ADRs) & \Plan \\
 Thesis chapters and demo & Chapters 3--5, demo script, backup video & \Plan \\
 \bottomrule
 \end{tabularx}
@@ -40,17 +40,17 @@ from a script in the repository.
 \label{tab:vv}
 \begin{tabularx}{\textwidth}{@{}>{\bfseries}P{22mm} L L@{}}
 \toprule
-Testing tier & Methodology and tools & Success criteria / target metrics \\
+Testing Tier & Methodology and Tools & Success Criteria / Target Metrics \\
 \midrule
-Unit & pytest (backend), Vitest (frontend) & $\ge 80\%$ backend statement coverage; all tests pass \\
-Integration & API against a real PostgreSQL container & Every endpoint returns the documented status code and body \\
-Model parity & API vs.\ offline evaluation on 999 validation tracks, greedy and constrained & 0 divergent tracks with the same checkpoint hash \\
-Model validation & 3 seeds; McNemar \cite{mcnemar1947} and bootstrap CI \cite{efron1993bootstrap}; sealed test set used once & 95\% CI of the gain over the baseline excludes 0; $p<0.05$ \\
-Performance & Load script and Locust on the demo host & p95 $\le 1$\,s per track; 1{,}000 tracks in $\le 20$\,min; reads p95 $\le 100$\,ms during a batch \\
-Robustness & Corrupt images, wrong types, too many frames, oversized or broken ZIPs & $\ge 8$ error cases, each with its documented 4xx code; no \code{500} \\
-Security & Bandit, pip-audit, npm audit, Trivy, OWASP ZAP baseline \cite{owasp2021} & 0 high or critical findings \\
-End to end & 30 cases (20 validation, 10 test tracks) on Chrome Android and Safari iOS & 30/30 pass \\
-Usability & 5 users, SUS questionnaire, timed review with and without the app & SUS $\ge 68$; review time per flagged track $-30\%$ \\
+Unit Testing & pytest (backend), Vitest (frontend) & $\ge 80\%$ backend statement coverage; all tests pass \\
+Integration Testing & API against a real PostgreSQL container & Every endpoint returns the documented status code and body \\
+Performance Testing & Load script and Locust on the demo host & p95 $\le 1$\,s per track; 1{,}000 tracks in $\le 20$\,min; reads p95 $\le 100$\,ms during a batch \\
+Security Testing & Bandit, pip-audit, npm audit, Trivy, OWASP ZAP baseline \cite{owasp2021} & 0 high or critical findings \\
+Model Parity Testing & API vs.\ offline evaluation on 999 validation tracks, greedy and constrained & 0 divergent tracks with the same checkpoint hash \\
+Model Validation & 3 seeds; McNemar \cite{mcnemar1947} and bootstrap CI \cite{efron1993bootstrap}; sealed test set used once & 95\% CI of the gain over the baseline excludes 0; $p<0.05$ \\
+Robustness Testing & Corrupt images, wrong types, too many frames, oversized or broken ZIPs & $\ge 8$ error cases, each with its documented 4xx code; no \code{500} \\
+End-to-End Testing & 30 cases (20 validation, 10 test tracks) on Chrome Android and Safari iOS & 30/30 pass \\
+Usability Testing & 5 users, SUS questionnaire, timed review with and without the app & SUS $\ge 68$; review time per flagged track $-30\%$ \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -65,7 +65,7 @@ natively on the development laptop and 192.75\,ms on the lab server; inside Dock
 is 810--910\,ms, so the official measurement will be taken on the Linux demo host in Week~6.
 Fig.~\ref{fig:multiseed} shows the multi-seed model results.
 
-\fig{multiseed.pdf}{Exact-match accuracy on the 999 validation tracks. Error bars show the standard
+\fig{multiseed.png}{Exact-match accuracy on the 999 validation tracks. Error bars show the standard
 deviation over seeds 42, 100 and 2026.}{fig:multiseed}
 
 On the same tracks, the super-resolved frames reach a PSNR of 16.59\,dB and an SSIM of 0.397, against
