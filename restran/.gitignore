@@ -1,0 +1,31 @@
+# Python internals
+__pycache__/
+*.py[cod]
+.python-version
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Data & Datasets (1.2 GB local copy — do not commit)
+/dataset/
+/data/
+
+# Model Checkpoints
+*.pth
+*.pt
+*.ckpt
+
+# Outputs & Submission
+results/
+submission_*.txt
+predictions.txt
+outputs/
+logs/
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
