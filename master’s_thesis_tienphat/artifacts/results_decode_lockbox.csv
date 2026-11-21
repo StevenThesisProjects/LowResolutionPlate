@@ -1,0 +1,13 @@
+split,run,seed,decoder,n,acc,acc_mercosur,n_mercosur,acc_brazilian,n_brazilian,invalid_syntax,changed_vs_greedy,fixed_vs_greedy,broken_vs_greedy,mcnemar_p
+lockbox,combo3_s42,42,greedy,1000,79.9,83.42,808,65.1,192,1,0,0,0,1.0
+lockbox,combo3_s42,42,beam,1000,79.9,83.42,808,65.1,192,0,1,0,0,1.0
+lockbox,combo3_s42,42,constrained,1000,79.9,83.42,808,65.1,192,0,1,0,0,1.0
+lockbox,combo3_s43,43,greedy,1000,80.3,84.28,808,63.54,192,0,0,0,0,1.0
+lockbox,combo3_s43,43,beam,1000,80.3,84.28,808,63.54,192,0,0,0,0,1.0
+lockbox,combo3_s43,43,constrained,1000,80.3,84.28,808,63.54,192,0,0,0,0,1.0
+lockbox,combo3_s7,7,greedy,1000,78.1,82.55,808,59.38,192,1,0,0,0,1.0
+lockbox,combo3_s7,7,beam,1000,78.1,82.55,808,59.38,192,1,0,0,0,1.0
+lockbox,combo3_s7,7,constrained,1000,78.1,82.55,808,59.38,192,0,1,0,0,1.0
+lockbox,combo3_s2026,2026,greedy,1000,78.2,82.67,808,59.38,192,13,0,0,0,1.0
+lockbox,combo3_s2026,2026,beam,1000,78.2,82.67,808,59.38,192,13,0,0,0,1.0
+lockbox,combo3_s2026,2026,constrained,1000,78.3,82.8,808,59.38,192,0,13,1,0,1.0

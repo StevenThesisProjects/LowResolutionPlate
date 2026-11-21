@@ -92,6 +92,19 @@ class Trainer:
             raise ValueError(f"FRAME_MASK_ORIENT: {self.frame_mask_orient!r}")
         if self.frame_mask_mode == 'complementary' and self.frame_mask_orient != 'vertical':
             raise ValueError("FRAME_MASK_MODE='complementary' needs FRAME_MASK_ORIENT='vertical'")
+        # Round v2, main CTC only: Scenario-B rows weighted relative to Scenario-A
+        # (1 = off), and OHEM keeping the hardest fraction of each batch (0 = off)
+        self.scenario_b_weight = float(getattr(config, 'SCENARIO_B_WEIGHT', 1.0))
+        self.ohem_ratio = float(getattr(config, 'OHEM_RATIO', 0.0))
+        if self.scenario_b_weight <= 0:
+            raise ValueError(f"SCENARIO_B_WEIGHT must be > 0, got {self.scenario_b_weight}")
+        if not 0.0 <= self.ohem_ratio <= 1.0:
+            raise ValueError(f"OHEM_RATIO must be in [0, 1], got {self.ohem_ratio}")
+        self.scenario_b_tracks = set()
+        if self.scenario_b_weight != 1.0:
+            self.scenario_b_tracks = train_loader.dataset.scenario_b_track_ids()
+            print(f"   -> SCENARIO_B_WEIGHT={self.scenario_b_weight}: "
+                  f"{len(self.scenario_b_tracks)} track Scenario-B trong train")
         # Also save the weights of each of the last K epochs (0 = off)
         self.save_last_k = int(getattr(config, 'SAVE_LAST_K', 0))
         # Accuracy on a subset of val, reported alongside the full number. The default
@@ -281,6 +294,33 @@ class Trainer:
         band = band & chosen[..., None, None]
         return images.masked_fill(band.unsqueeze(2), 0.0)
 
+    def _main_ctc(self, log_probs: torch.Tensor, targets: torch.Tensor,
+                  input_lengths: torch.Tensor, target_lengths: torch.Tensor,
+                  track_ids) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Main CTC loss to back-propagate, and the plain batch mean to log.
+
+        With Scenario-B weighting and OHEM both off this is the original criterion
+        call. Otherwise each row's loss is divided by its target length, exactly as
+        reduction='mean' does; Scenario-B rows are weighted, with the weights rescaled
+        to mean 1 over the batch so the loss scale (and the effective LR) is unchanged;
+        and OHEM keeps the ceil(ratio * B) largest rows. The logged value is always the
+        unweighted mean over all rows, so train loss stays comparable across runs.
+        """
+        if self.scenario_b_weight == 1.0 and self.ohem_ratio <= 0:
+            loss = self.criterion(log_probs, targets, input_lengths, target_lengths)
+            return loss, loss.detach()
+        per = F.ctc_loss(log_probs, targets, input_lengths, target_lengths, blank=0,
+                         reduction='none', zero_infinity=True)
+        per = per / target_lengths.to(per.device).clamp(min=1).to(per.dtype)
+        plain = per.mean().detach()
+        if self.scenario_b_weight != 1.0:
+            w = torch.tensor([self.scenario_b_weight if t in self.scenario_b_tracks else 1.0
+                              for t in track_ids], device=per.device, dtype=per.dtype)
+            per = per * (w / w.mean())
+        if self.ohem_ratio > 0:
+            per = per.topk(max(1, math.ceil(self.ohem_ratio * per.numel()))).values
+        return per.mean(), plain
+
     def train_one_epoch(self) -> Dict[str, float]:
         """Train for one epoch.
 
@@ -337,8 +377,8 @@ class Trainer:
                     fill_value=preds.size(1),
                     dtype=torch.long
                 )
-                loss = self.criterion(preds_permuted, targets, input_lengths, target_lengths)
-                ctc_only = loss.detach()
+                loss, ctc_only = self._main_ctc(preds_permuted, targets, input_lengths,
+                                                target_lengths, track_ids)
 
                 if use_distill:
                     with torch.no_grad():

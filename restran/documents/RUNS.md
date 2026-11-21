@@ -1586,7 +1586,7 @@ Theo review của thầy: N1 (xếp hạng cao nhất trong các đề xuất) v
   - `eval_arms.py` dựng đúng kiến trúc từ checkpoint.
 - `tools/regression_check.py`: vẫn **PASS** so với code gốc (train loss 4,1085 → 2,8737; val loss 3,3356 → 2,7804).
 - Chạy thử trên dữ liệu nhỏ: 6 cấu hình đều train được. Cờ sai (`complementary` mà không có `vertical`; đặt kiểu che nhưng không có `--frame-mask`; `--fixed-stn` không đủ 6 số; `--fixed-stn` đi cùng `--no-stn`) thì dừng trong 2–4 giây, trước khi quét dữ liệu.
-- **Chấm lại checkpoint lock-box bằng code mới** (seed 42, 43 của cả hai nhánh, 14 checkpoint, trên máy local): combo3 trùng số cũ ở cả 3 thước đo. Có 3/28.000 dự đoán khác server, đều là các trường hợp hai ký tự gần hoà (chênh log-prob giữa lớp nhất và nhì ≤ 0,008, ví dụ T/Y của `track_13651`). CPU và Apple GPU cho cùng kết quả với nhau. Lệch lớn nhất là 0,1 điểm trên một checkpoint (`base_s43_ep30`: 77,3 so với 77,4 trên server). Đây là sai số số học giữa các phần cứng, không phải do code. **Vì vậy phải chấm N1/E4 trên chính server đã chấm lock-box.**
+- **Chấm lại checkpoint lock-box bằng code mới** (seed 42, 43 của cả hai nhánh, 28 checkpoint, trên máy local): combo3 trùng số cũ ở cả 3 thước đo. Có 3/28.000 dự đoán khác server, đều là các trường hợp hai ký tự gần hoà (chênh log-prob giữa lớp nhất và nhì ≤ 0,008, ví dụ T/Y của `track_13651`). CPU và Apple GPU cho cùng kết quả với nhau. Lệch lớn nhất là 0,1 điểm trên một checkpoint (`base_s43_ep30`: 77,3 so với 77,4 trên server). Đây là sai số số học giữa các phần cứng, không phải do code. **Vì vậy phải chấm N1/E4 trên chính server đã chấm lock-box.**
 
 ## N1 + E4: lệnh chạy (giao thức lock-box, 21 run trên server mới)
 
@@ -2122,15 +2122,390 @@ Lệnh train: mục "Phần B: N1". Mỗi đợt 4 run song song (`nproc/4`). L�
 
 ---
 
+## Phân tích 31/10/2026 — hướng lên trên 80%
+
+Mục tiêu đặt lại cho đúng: **trung bình ≥ 3 seed, epoch cuối, một model train một lần, trên tập chưa dùng để chọn cấu hình**. Hiện tại 79,12 (lock-box, train 18.001 track). Run đơn cao nhất là 80,30 (lock-box, `combo3_s43`, epoch cuối), không phải 79,6, nhưng run đơn không dùng làm mục tiêu được.
+
+**1. Công thức hiện tại đã bão hoà.** Gộp 15 model gần cấu hình chốt trên lock-box (4 nhánh N1 + `combo3new`, epoch cuối): trung bình một model 78,74%. Đa số phiếu của cả 15 model chỉ đạt 79,60%. Đây là trần của việc khử hết dao động giữa các seed, nên giảm dao động (EMA, SWA, chọn checkpoint) không đưa lên 80%. 63,5% track luôn đúng, 10,0% luôn sai, 26,5% lúc đúng lúc sai.
+
+**2. Dữ liệu cùng miền là đòn bẩy có bằng chứng mạnh nhất.** Cùng cấu hình, cùng val 999, epoch cuối:
+
+| | Train 18.001 (lock-box) | Train 19.001 (giao thức 999) | Chênh |
+|---|---|---|---|
+| Phương pháp (4 seed) | 77,65 (TB6 77,28) | 78,73 (TB6 78,37) | **+1,08** (TB6 +1,09) |
+| Baseline (4 / 3 seed) | 76,65 (TB6 76,22) | 77,48 (TB6 77,12) | +0,83 (TB6 +0,90) |
+
+Thêm 1.000 track Scenario-B (+12,5% dữ liệu Scenario-B) cho khoảng +1 điểm. Các đội thi train trên đủ 20.000 track; ta đang giữ lại 1.999 track (999 val + 1.000 lock-box), tức khoảng 20% dữ liệu Scenario-B.
+
+**3. Lỗi nằm ở đâu.**
+- **Brazilian:** 19% số track lock-box nhưng chiếm 35% số lỗi; accuracy 61,0 so với 83,0 (Mercosur). Phương pháp chỉ giúp Brazilian +0,4 (Mercosur +1,3). 20% track Brazilian luôn sai. Trần HR của Brazilian là 94,6% (run #15), nên vấn đề là xuống cấp ở LR. Dữ liệu train Brazilian chủ yếu là Scenario-A (5.000 track PNG), Scenario-B Brazilian chỉ khoảng 1.600 track train.
+- **Kiểu lỗi** (val 999, 12 model N1, đọc từ `submission_*.txt`): 58% lỗi chỉ sai 1 ký tự. Lỗi tập trung ở ký tự thứ 2–3 (chữ cái). Cặp nhầm nhiều nhất: 6↔8, M↔H, 4↔6, O↔Q, 1↔3, N→H, D→O, V↔Y.
+- **Độ tin cậy có ích:** giữ 90% track tự tin nhất thì accuracy 86,2%; 80% thì 91,8% (phục vụ N3 / tính năng "cần kiểm tra" của app).
+
+**4. Đã thử, không giúp** (không làm lại): 40 / 60 epoch, cosine; 32×192, 64×256; letterbox; ImageNet pretrained; fusion temporal / 2D; STN chung; sharpness prior; EMA; distillation từ teacher HR; mọi biến thể SR; constrained decoding; layout balance; aug-degrade; clean-geo; synthetic `native`; che frame (N1).
+
+**5. Chưa thử:**
+- Train trên đủ 20.000 track (không đo được: không dùng tập test chính thức, xem mục 6).
+- Lấy mẫu Scenario-B nhiều hơn (miền của test). Chưa có cờ.
+- Bỏ hoặc giảm nhánh synthetic: cờ `--no-synthetic` có sẵn, chưa chạy. Nửa synthetic được đọc đúng 98%, còn ảnh thật chỉ khoảng 78%.
+- Khai thác mẫu khó (OHEM: tăng trọng số loss của mẫu khó) hoặc loss tách các cặp ký tự hay nhầm (N2). Đội hạng 2 dùng aux CTC + center loss + OHEM. Chưa có cờ.
+- Weight decay (đang 1e-4, AdamW; chưa có cờ dòng lệnh). Dấu hiệu overfit: val loss thấp nhất ở khoảng ep19–24 rồi tăng.
+
+**6. Kế hoạch sửa lại (31/10): thầy quyết định không dùng tập test chính thức.**
+- **Lock-box là tập đánh giá độc lập duy nhất.** Vì vậy "trên 80%" phải đo trên lock-box, với giao thức train 18.001 track (so trực tiếp được với baseline 77,60 và cấu hình chốt 79,12). Cần cải thiện thật khoảng +0,9 điểm.
+- **Train trên đủ 20.000 track không đo được** (không còn tập nào ngoài train). Vẫn dùng được cho model triển khai trong app, nhưng không báo cáo accuracy cho model đó.
+- **Vòng v2 (phát triển chỉ trên val 999)**, cùng một server, 3 seed (42, 43, 7) mỗi nhánh:
+
+  | Nhánh | Thay đổi so với cấu hình chốt | Cờ |
+  |---|---|---|
+  | `ref` | không (cấu hình chốt chạy lại trên server này) | — |
+  | `bweight` | lấy mẫu Scenario-B nhiều hơn | cần thêm cờ |
+  | `nosyn` | bỏ nhánh synthetic | `--no-synthetic` (có sẵn) |
+  | `ohem` | tăng trọng số loss của mẫu khó | cần thêm cờ |
+  | `wd` | weight decay lớn hơn | cần thêm cờ |
+
+  15 run, khoảng 4 đợt × 4 run.
+- **Tiêu chí, viết trước khi chạy:** giữ ứng viên nếu Last-6 trên val 999 (trung bình 3 seed) hơn `ref` ít nhất +0,6. Kèm báo cáo CI theo track. Không xem lock-box trong vòng này.
+- **Xác nhận:** v2 = `ref` + các ứng viên thắng. Chạy v2 4 seed, thêm seed 2026 cho `ref`, rồi chấm **một lần** trên lock-box. Quy tắc viết trước: đạt nếu trung bình epoch cuối của v2 ≥ 80,0 **và** CI theo track của v2 − `ref` không chứa 0.
+- **Minh bạch:** lock-box sẽ được dùng lần thứ hai để xác nhận (lần 1 là cấu hình chốt). E4/N1 và phân tích lỗi 31/10 chỉ dùng lock-box để mô tả. Các ứng viên dựa chủ yếu vào phân tích trên val (run #10, #15, kiểu lỗi trên val 999). Riêng tỷ lệ lỗi Brazilian thì cũng đã xem trên lock-box ngày 31/10.
+
+## Thay đổi code 31/10/2026: vòng v2, mặc định TẮT
+
+> **Trạng thái ngày 21/11/2026: vòng v2 CHƯA CHẠY run nào. Code giữ nguyên, không revert.**
+> - **Bài ICCIES 2027 đã nộp với kết quả cũ.** Lock-box (25/10), E4 (28/10) và N1 (30/10) đều chạy trước khi có code này. Bài không dùng cờ nào của vòng v2. Chỗ duy nhất bài nhắc tới là "AdamW, weight decay 10⁻⁴", đúng giá trị mặc định hiện tại.
+> - **Không revert, vì cả 3 cờ mặc định tắt.** Ngày 21/11 đã kiểm lại bằng `tools/regression_check.py` trên máy local (CPU, 64 track, 2 epoch). Đối chiếu code hiện tại với bản ngày 25/10 trong `restran 5.zip` (bản đã dùng chạy E4 và N1): **PASS**, train loss 4,1085 → 2,8737 và val loss 3,3356 → 2,7804 ở cả hai bên.
+> - **Chỉ 5 file khác bản 25/10**, mọi file khác trong `train.py`, `configs/`, `src/`, `tools/`, `tests/`, `splits/` trùng md5. Các thay đổi chỉ thêm code, trừ 2 dòng gọi CTC chính trong `trainer.py` được thay bằng `_main_ctc()`. Khi tắt cả hai cờ loss, hàm này gọi đúng `criterion` cũ.
+>
+>   | File | Bản 25/10 (E4, N1; trong `restran 5.zip`) | Bản 31/10 (v2, hiện tại) | Thay đổi |
+>   |---|---|---|---|
+>   | `train.py` | `d9aec99ca097d2411189e2a58e727dd9` | `ee81d6f1e721dac2329f3a4f84a188b4` | +26 dòng: 3 cờ, kiểm tra giá trị |
+>   | `configs/config.py` | `652c96987d42128437b6467b824454f7` | `08973506a05c301fcad10d1c2b6320b3` | +7: `SCENARIO_B_WEIGHT = 1.0`, `OHEM_RATIO = 0.0` |
+>   | `src/data/dataset.py` | `ffe6bac426de63cd6138bb3e5ae02bf6` | `b9a93958ec3783440afc99fbabbc13ee` | +5: `scenario_b_track_ids()` |
+>   | `src/training/trainer.py` | `28631499578a575db1d7d34555d871f7` | `e2981d5e17bcc93afe14b203fae8da6f` | +42 / −2: `_main_ctc()` |
+>   | `tests/test_eval_determinism.py` | `d5d8ca4f64067d09880058571d76ad0c` | `b9b23e4fb265c3a981fd8ab6e9b01114` | +73 / −1: 5 test mới |
+>
+> - **Muốn trả về đúng bản đã chạy E4/N1:** giải nén 5 file trên từ `../restran 5.zip` (đường dẫn trong zip: `restran/<file>`) và chép đè. Code của các run lock-box thì nằm riêng ở `results_new/code_lockbox_frozen.tgz`.
+
+| Cờ | Mặc định | Tác dụng |
+|---|---|---|
+| `--weight-decay W` | 1e-4 (như cũ) | Weight decay của AdamW. Trước đây chỉ đổi được trong `config.py` |
+| `--scenario-b-weight w` | 1 = tắt | CTC chính: mẫu của track Scenario-B (cả ảnh thật lẫn synthetic) nhân trọng số w, rồi chuẩn hoá trọng số về trung bình 1 trong batch, nên thang loss và LR hiệu dụng không đổi. Luồng dữ liệu, thứ tự batch và augment giữ nguyên |
+| `--ohem-ratio r` | 0 = tắt | CTC chính chỉ lấy trung bình ⌈r·B⌉ mẫu có loss lớn nhất trong batch |
+
+- Hai cờ loss chỉ áp cho CTC chính; CTC phụ từng frame giữ nguyên. Cột `train_loss` luôn ghi trung bình **không trọng số** của mọi mẫu, nên vẫn so được giữa các nhánh.
+- Tắt cả hai thì gọi đúng hàm loss cũ (test kiểm bằng phép so từng bit).
+- Chọn đánh trọng số loss thay vì lấy mẫu lại, để luồng dữ liệu giữ nguyên và không lẫn hiệu ứng của lấy mẫu có hoàn lại (`WeightedRandomSampler`, như run #10).
+- **Kiểm chứng:** 19/19 test (5 test mới: tắt cờ = loss cũ; OHEM = trung bình các hàng khó nhất, với r = 1 bằng đúng `reduction='mean'`; trọng số Scenario-B; nhận track Scenario-B từ đường dẫn; kiểm tra giá trị cờ và weight decay). `tools/regression_check.py`: **PASS** so với code gốc (train loss 4,1085 → 2,8737; val loss 3,3356 → 2,7804). Chạy thử 1 epoch trên 64 track với từng cờ: chạy được, log in đúng giá trị. Cờ sai giá trị dừng trong khoảng 2 giây.
+
+## Vòng v2: lệnh chạy (giao thức lock-box, chỉ phát triển trên val 999)
+
+> **CHƯA CHẠY (tính đến 21/11/2026).** Các lệnh dưới đây là kế hoạch. Không có kết quả nào của vòng này trong `results/` hay `results_new/`, và không có số nào của vòng này trong bài ICCIES.
+
+| Nhánh | Thay đổi | Giá trị và lý do |
+|---|---|---|
+| `ref` | không (cấu hình chốt chạy lại trên server này) | — |
+| `bweight` | `--scenario-b-weight 2.0` | Scenario-B chiếm khoảng 62% tổng trọng số loss thay vì 44% (8.001 track B, 10.000 track A trong train) |
+| `nosyn` | `--no-synthetic` | Mỗi epoch còn 282 batch thay vì 563, nên run này nhanh gấp đôi và có một nửa số bước tối ưu |
+| `ohem` | `--ohem-ratio 0.7` | Bỏ 30% mẫu dễ nhất mỗi batch |
+| `wd` | `--weight-decay 0.05` | Với 1e-4, trọng số chỉ co tổng cộng khoảng 0,03% qua 30 epoch (≈ e^(−wd·Σlr), Σlr ≈ 2,6), tức gần như tắt. 0,05 cho khoảng 12% |
+
+**Đăng ký trước** (viết 31/10, trước khi chạy):
+- **Sàng lọc bằng seed 43:** ứng viên chạy tiếp seed 42 và 7 nếu Last-6 trên val 999 hơn `ref` seed 43 ít nhất **+0,3**. `ref` luôn chạy đủ 3 seed. Chênh giữa hai run đơn có độ lệch khoảng 0,5, nên ngưỡng +0,3 cố ý để lỏng, tránh loại nhầm ứng viên tốt.
+- **Giữ ứng viên:** Last-6 trên val 999, trung bình 3 seed, hơn `ref` ít nhất **+0,6**. Báo cáo kèm CI theo track.
+- **Không chấm lock-box trong vòng này.** Mọi lệnh chấm chỉ có `--splits splits/val_tracks.json`.
+- Seed 43 được chọn vì từng cho kết quả cao nhất. Nó không mang lợi thế sang cấu hình khác, vì train không tất định và đổi cấu hình là đổi chuỗi ngẫu nhiên. Điều quan trọng là ứng viên và `ref` cùng seed, cùng server.
+
+**Chuẩn bị server mới.** Trên máy local:
+
+```bash
+cd /Users/nguyentienphat/Learning/Paper/NewClaude/restran
+COPYFILE_DISABLE=1 tar czf restran_code.tgz --exclude __pycache__ train.py configs src tools tests splits
+COPYFILE_DISABLE=1 tar czf restran_data.tgz dataset/data/train
+scp -P <PORT> restran_code.tgz restran_data.tgz root@<IP>:/workspace/
+```
+
+Trên server:
+
+```bash
+mkdir -p /workspace/restran && cd /workspace/restran
+tar xzf /workspace/restran_code.tgz
+tar xzf /workspace/restran_data.tgz
+mkdir -p results
+python -m pip uninstall -y opencv-python opencv-python-headless
+python -m pip install opencv-python-headless albumentations==2.0.8 scipy
+cd /workspace/restran
+python -c "import sys, torch, albumentations, cv2, numpy; print('python', sys.version.split()[0], '| torch', torch.__version__, '| cuda', torch.version.cuda, '| cudnn', torch.backends.cudnn.version(), '| gpu', torch.cuda.get_device_name(0), '| albumentations', albumentations.__version__, '| cv2', cv2.__version__, '| numpy', numpy.__version__)" | tee results/env_v2.txt
+hostname | tee -a results/env_v2.txt
+md5sum train.py configs/config.py src/data/dataset.py src/training/trainer.py tools/eval_arms.py tests/test_eval_determinism.py
+python tools/make_lockbox.py --verify
+python tests/test_eval_determinism.py
+nproc
+```
+
+md5 phải trùng bảng "Các file code đã sửa" ở cuối file. `make_lockbox.py --verify` phải in `✅ Khớp ... 09f90d2b...`, test phải in 19 dòng OK.
+
+### Đợt S: seed 43, 5 run song song
+
+Terminal 1 (`ref`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ref_s43 --seed 43 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_v2_ref_s43_train.log
+```
+
+Terminal 2 (`bweight`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_bweight_s43 --seed 43 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --scenario-b-weight 2.0 \
+    2>&1 | tee results/restran_v2_bweight_s43_train.log
+```
+
+Terminal 3 (`nosyn`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_nosyn_s43 --seed 43 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --no-synthetic \
+    2>&1 | tee results/restran_v2_nosyn_s43_train.log
+```
+
+Terminal 4 (`ohem`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ohem_s43 --seed 43 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --ohem-ratio 0.7 \
+    2>&1 | tee results/restran_v2_ohem_s43_train.log
+```
+
+Terminal 5 (`wd`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_wd_s43 --seed 43 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --weight-decay 0.05 \
+    2>&1 | tee results/restran_v2_wd_s43_train.log
+```
+
+Đầu log mỗi run phải có `🔒 Loại 1000 track khỏi train` và dòng `WEIGHT_DECAY: ... | SCENARIO_B_WEIGHT: ... | OHEM_RATIO: ...` đúng như tên run (`bweight` còn có dòng `SCENARIO_B_WEIGHT=2.0: 8001 track Scenario-B trong train`; `nosyn` có `NO_SYNTHETIC: True`).
+
+**Chấm sàng lọc** (chỉ val 999):
+
+```bash
+cd /workspace/restran
+python tools/eval_arms.py --seeds 43 --splits splits/val_tracks.json \
+    --arm ref:restran_v2_ref:gray \
+    --arm bweight:restran_v2_bweight:gray \
+    --arm nosyn:restran_v2_nosyn:gray \
+    --arm ohem:restran_v2_ohem:gray \
+    --arm wd:restran_v2_wd:gray \
+    --ref ref --out results/arms_eval_v2_s43.json \
+    2>&1 | tee results/arms_eval_v2_s43.log
+```
+
+### Đợt 2: seed 42 (`ref` + các ứng viên qua sàng lọc)
+
+Chỉ chạy `ref` và những nhánh qua sàng lọc. Nếu ít hơn 5 run thì giữ nguyên `$(( $(nproc) / 5 ))` cũng được.
+
+Terminal 1 (`ref`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ref_s42 --seed 42 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_v2_ref_s42_train.log
+```
+
+Terminal 2 (`bweight`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_bweight_s42 --seed 42 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --scenario-b-weight 2.0 \
+    2>&1 | tee results/restran_v2_bweight_s42_train.log
+```
+
+Terminal 3 (`nosyn`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_nosyn_s42 --seed 42 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --no-synthetic \
+    2>&1 | tee results/restran_v2_nosyn_s42_train.log
+```
+
+Terminal 4 (`ohem`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ohem_s42 --seed 42 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --ohem-ratio 0.7 \
+    2>&1 | tee results/restran_v2_ohem_s42_train.log
+```
+
+Terminal 5 (`wd`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_wd_s42 --seed 42 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --weight-decay 0.05 \
+    2>&1 | tee results/restran_v2_wd_s42_train.log
+```
+
+### Đợt 3: seed 7 (`ref` + các ứng viên qua sàng lọc)
+
+Terminal 1 (`ref`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ref_s7 --seed 7 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    2>&1 | tee results/restran_v2_ref_s7_train.log
+```
+
+Terminal 2 (`bweight`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_bweight_s7 --seed 7 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --scenario-b-weight 2.0 \
+    2>&1 | tee results/restran_v2_bweight_s7_train.log
+```
+
+Terminal 3 (`nosyn`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_nosyn_s7 --seed 7 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --no-synthetic \
+    2>&1 | tee results/restran_v2_nosyn_s7_train.log
+```
+
+Terminal 4 (`ohem`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_ohem_s7 --seed 7 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --ohem-ratio 0.7 \
+    2>&1 | tee results/restran_v2_ohem_s7_train.log
+```
+
+Terminal 5 (`wd`):
+```bash
+cd /workspace/restran
+python -u train.py -n restran_v2_wd_s7 --seed 7 --num-workers $(( $(nproc) / 5 )) \
+    --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 \
+    --split-ratio 0.9 --val-split-file splits/val_tracks.json \
+    --exclude-tracks splits/lockbox_tracks.json --save-last-k 6 \
+    --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 \
+    --frame-mask 0.2 --frame-dropout 0.1 --grayscale \
+    --weight-decay 0.05 \
+    2>&1 | tee results/restran_v2_wd_s7_train.log
+```
+
+**Chấm 3 seed** (chỉ val 999; `--allow-missing` tự bỏ nhánh không đủ 3 seed, tức các nhánh không qua sàng lọc):
+
+```bash
+cd /workspace/restran
+python tools/eval_arms.py --seeds 42 43 7 --allow-missing --splits splits/val_tracks.json \
+    --arm ref:restran_v2_ref:gray \
+    --arm bweight:restran_v2_bweight:gray \
+    --arm nosyn:restran_v2_nosyn:gray \
+    --arm ohem:restran_v2_ohem:gray \
+    --arm wd:restran_v2_wd:gray \
+    --ref ref --out results/arms_eval_v2.json \
+    2>&1 | tee results/arms_eval_v2.log
+```
+
+---
+
+## Prototype luận văn: `masters_thesis_tienphat/` (20/11/2026, máy local Apple M4, CPU)
+
+Thư mục mới hiện thực roadmap 12 tuần trên code mới; đối chiếu từng tuần ở `masters_thesis_tienphat/reports/`. **Không train thêm, không đổi code train.** Mọi phép đo dùng checkpoint lock-box đã có trong `results_new/`.
+
+**21/11/2026: đã chuyển thư mục ra cùng cấp với repo** (`NewClaude/masters_thesis_tienphat/`, cạnh `NewClaude/restran/`). App tìm repo qua `MFPLATE_REPO_ROOT`, rồi `../restran`, rồi thư mục cha; Docker build từ thư mục cha chứa cả hai. Không đổi code train, không đổi kết quả.
+
+- **Model phục vụ:** `restran_lockbox_combo3_s42_ep30.pth`, chọn theo quy tắc cố định (cấu hình chốt, seed đầu tiên, epoch cuối; không chọn theo lock-box). SHA-256 `9754ebb1…7bba` khớp `freeze_manifest.json`. App kiểm lại SHA-256 mỗi lần khởi động.
+- **Decoder** (val 999, 4 seed combo3, epoch cuối): greedy 77,66 / beam 77,66 / constrained 77,70. Tiêu chí ghi trước (≥ +0,30 và không thua seed nào) không đạt → app dùng greedy. Lock-box (mô tả): 79,12 / 79,12 / 79,15.
+- **Audit lỗi** (val 999, 4 seed): 893 lỗi; 12 (1,3%) vi phạm cú pháp, đều là sai độ dài; **0/893** lỗi có p(nhãn đúng) > p(dự đoán); 58,7% lỗi sai đúng 1 ký tự.
+- **Ngưỡng "cần kiểm tra"** (chốt trên val 999 trước khi xem lock-box): điểm `mean_char` (AURC 0,0413, thấp nhất); ngưỡng theo số frame N = 1..5 là 0,9980 / 0,9922 / 0,9867 / 0,9820 / 0,9746. Lock-box, 5 frame: tự động 74,0%, precision 95,41%, giữ lại 167/201 lỗi. Precision trên lock-box ≥ 95% ở mọi N. ECE của `mean_char` là 0,20 (tự tin quá mức), của `seq_prob` là 0,08.
+- **Parity:** API (TestClient, upload thật) so với pipeline offline trên val 999: 0/999 track lệch, |Δconf| ≤ 2,9e-6. CPU 76,68% = `val_acc` ep30 trên V100. Lock-box: API trên CPU 79,90%, 0/1.000 track khác đúng/sai so với chấm GPU ngày 25/10. Cache offline cả 4 seed khớp từng con số GPU (79,90 / 80,30 / 78,10 / 78,20). Tiền xử lý của API khớp từng bit với albumentations.
+- **Theo độ nét** (lock-box, baseline so với công thức, 4 seed mỗi bên; thăm dò, không đăng ký trước): Q1 (mờ nhất) +3,40 [+0,90; +6,00], Q2 +2,40 [+0,30; +4,60], Q3 +0,40 [−1,10; +1,90], Q4 −0,10 [−1,60; +1,40].
+- **App:** E2E 30/30, trường hợp lỗi 14/14, pytest 61/61. Latency CPU (M4, HTTP localhost, 5 frame): p50 21,9 ms, p95 24,1 ms; 5 client đồng thời p95 112 ms, 44,8 request/s.
+- **Lỗi tìm ra và đã sửa trong code app:**
+  - constrained beam 10 không ra chuỗi 7 ký tự ở 1/999 track (model đọc chắc 6 ký tự) → giữ top-beam theo từng độ dài tiền tố;
+  - UI gửi `session_id` rỗng khi chưa có phiên → API trả 422.
+- **Chưa làm:** build Docker (daemon không chạy), tunnel và thử trên điện thoại, user test + SUS, ảnh chụp màn hình, nhánh `nosyn` (Issue #1 của roadmap).
+
+---
+
 ## Việc chưa làm
 
+- [ ] **Vòng v2** (`ref`, `bweight`, `nosyn`, `ohem`, `wd`; 15 run, giao thức ở mục "Vòng v2: lệnh chạy"): code xong 31/10, **chưa chạy**. Bài ICCIES nộp với kết quả cũ, nên kết quả v2 (nếu chạy) chỉ dùng cho luận văn hoặc bài sau, và phải ghi là chạy sau khi nộp. Cờ mặc định tắt, regression PASS ngày 21/11
 - [x] ~~Constrained decoding theo pattern biển số~~ → đo được +0,00–0,05 (mục Phân tích 01/10, §1)
 - [x] ~~Bỏ `ChannelShuffle` + augment nhất quán~~ → run #13
 - [x] ~~Vòng E1–E4~~ → run #39–#42
-- [ ] Xin bản LRLPR-26 chính thức có nhãn test: ký `license-agreement.pdf` (repo `github.com/raysonlaroca/lrlpr-26-dataset`), gửi tới `rayson@ppgia.pucpr.br` với tiêu đề `[LRLPR-26] Signed License Agreement`, **từ email trường** (.edu hoặc tương tự, không dùng Gmail). Phản hồi trong khoảng 5 ngày làm việc. Bản chính thức có 20.000 track train + 3.000 track test có nhãn
+- [x] ~~Xin bản LRLPR-26 chính thức có nhãn test~~ → **huỷ (31/10): thầy quyết định không dùng tập test chính thức.** Ghi chú cũ: ký `license-agreement.pdf` (repo `github.com/raysonlaroca/lrlpr-26-dataset`), gửi tới `rayson@ppgia.pucpr.br` với tiêu đề `[LRLPR-26] Signed License Agreement`, **từ email trường** (.edu hoặc tương tự, không dùng Gmail). Phản hồi trong khoảng 5 ngày làm việc. Bản chính thức có 20.000 track train + 3.000 track test có nhãn
 - [x] ~~Vòng hires, fusion temporal~~ → run #43, #44: không cải thiện
 - [x] ~~3 seed `degcal` + 3 seed `degcal + aux` theo giao thức 999~~ → thay bằng seed của combo3 (cấu hình chốt sau run #51)
-- [ ] Chấm mọi checkpoint giao thức 999 trên test 3.000 track khi có nhãn
+- [x] ~~Chấm mọi checkpoint giao thức 999 trên test 3.000 track khi có nhãn~~ → huỷ (31/10), cùng lý do
 - [x] ~~Vòng frame-dropout / frame-mask / grayscale / clean-geo~~ → run #45–#48: fmask, fdrop, gray thắng
 - [x] ~~Vòng combo~~ → run #49–#51: combo3_999 đạt 79,28 (TB6 78,33) trên giao thức của tác giả
 - [ ] Kết quả `restran_combo3_40ep` (nếu đã chạy)
@@ -2156,8 +2531,10 @@ Lệnh train: mục "Phần B: N1". Mỗi đợt 4 run song song (`nproc/4`). L�
 - [x] ~~Sửa REPORT theo review~~ (25/10): lock-box là kết quả chính; ISSUE #2, #4–#10 và MINOR 12–19 đã xử lý (bảng đối chiếu ở mục 10 của REPORT)
 - [x] ~~Báo cáo riêng phần lock-box gửi thầy~~ (25/10): `documents/REPORT_lockbox.md`
 - [ ] Điền 1 chỗ còn trống trong REPORT mục 10: ISSUE #9 (đã gửi diff 5 file chưa). ISSUE #11 đã điền: API chưa xong, đang ưu tiên train model
-- [ ] Prototype API `/predict` (ISSUE #11): chưa xong, báo cáo thầy sau
-- [ ] Các việc còn lại theo review của thầy: E2 (leave-one-out; dòng bỏ che frame đã nằm trong N1), E6, N3
+- [x] ~~Prototype API `/predict` (ISSUE #11)~~ → `masters_thesis_tienphat/` (20/11): API + UI + parity 0/999 + E2E 30/30
+- [x] ~~N3 (hiệu chỉnh độ tin cậy, risk–coverage)~~ → `masters_thesis_tienphat/artifacts/threshold_calibration.json`, `triage_lockbox.json` (20/11)
+- [ ] Các việc còn lại theo review của thầy: E2 (leave-one-out; dòng bỏ che frame đã nằm trong N1), E6
+- [ ] Prototype: build Docker, tunnel + thử iOS/Android, user test 5 người + SUS, 3 ảnh chụp màn hình (xem `masters_thesis_tienphat/reports/tuan_08.md`–`tuan_10.md`)
 
 ---
 
@@ -2179,13 +2556,13 @@ scp -P <PORT> splits/lockbox_tracks.json root@<IP>:/workspace/restran/splits/
 
 Đối chiếu bằng md5 (`md5sum` trên Linux, `md5 -q` trên macOS) — hai bên phải trùng:
 
-| File | md5 (25/10/2026) |
+| File | md5 (31/10/2026) |
 |---|---|
-| `train.py` | `d9aec99ca097d2411189e2a58e727dd9` |
-| `configs/config.py` | `652c96987d42128437b6467b824454f7` |
-| `src/data/dataset.py` | `ffe6bac426de63cd6138bb3e5ae02bf6` |
+| `train.py` | `ee81d6f1e721dac2329f3a4f84a188b4` |
+| `configs/config.py` | `08973506a05c301fcad10d1c2b6320b3` |
+| `src/data/dataset.py` | `b9a93958ec3783440afc99fbabbc13ee` |
 | `src/data/transforms.py` | `7efed8c09cd5e413c3451e4e26d7a4db` |
-| `src/training/trainer.py` | `28631499578a575db1d7d34555d871f7` |
+| `src/training/trainer.py` | `e2981d5e17bcc93afe14b203fae8da6f` |
 | `src/models/restran.py` | `ec0e0d21ce95ccd25235b64d5b0ed846` |
 | `src/models/components.py` | `c43c5cd401db63959871d478d673d5af` |
 | `src/models/sr.py` | `53836e20f56b1c423e2da07a3cd890b5` |
@@ -2194,8 +2571,8 @@ scp -P <PORT> splits/lockbox_tracks.json root@<IP>:/workspace/restran/splits/
 | `tools/eval_lockbox.py` | `373702560b55b1a422993137bedf06e2` |
 | `tools/freeze_manifest.py` | `4f79914a31731d06d9f92cc10f7c5a3b` |
 | `tools/regression_check.py` | `bbb9f022524c804e200efeb7cae4c4b1` |
-| `tools/eval_arms.py` (mới) | `fb1685502c29efdaabb6cfbe3a1d3300` |
-| `tests/test_eval_determinism.py` | `d5d8ca4f64067d09880058571d76ad0c` |
+| `tools/eval_arms.py` | `fb1685502c29efdaabb6cfbe3a1d3300` |
+| `tests/test_eval_determinism.py` | `b9b23e4fb265c3a981fd8ab6e9b01114` |
 | `splits/lockbox_tracks.json` | `3e6014aa7fc254409eeaff57e779c70a` |
 
 ---

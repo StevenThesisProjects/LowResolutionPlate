@@ -1,0 +1,73 @@
+# MF-PlateReader (masters_thesis_tienphat)
+# This folder sits next to the training repository restran/. The model code (src/,
+# configs/), the checkpoints and the dataset live there and must never be copied here.
+
+# --- Licensed data (LRLPR-26): keep it out of any repository -------------------------
+# Demo tracks are crops from the dataset; only the README describing them is tracked.
+samples/*
+!samples/README.md
+# Demo / backup videos show dataset images and are large
+*.mp4
+*.mov
+*.webm
+
+# --- Model weights: the frozen checkpoint stays in restran/results_new/ -----------------
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.safetensors
+
+# --- Secrets ------------------------------------------------------------------------
+# e.g. MFPLATE_API_KEY for docker compose (docker/.env)
+.env
+.env.*
+!.env.example
+
+# --- Generated at run time --------------------------------------------------------------
+# var/: offline log-prob cache (~140 MB, rebuilt by scripts/offline_cache.py), SQLite
+# logs of the API, server logs
+var/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+
+# --- Python -------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# --- Web UI (React + Vite): rebuilt by `npm install && npm run build` -------------------
+webui/node_modules/
+webui/dist/
+webui/.vite/
+*.local
+npm-debug.log*
+
+# --- LaTeX intermediates (proposal/); proposal.pdf itself is tracked ----------------------
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz
+*.xdv
+
+# --- OS, editors, Office lock files ---------------------------------------------------
+.DS_Store
+._*
+.vscode/
+.idea/
+*.swp
+*~
+~$*

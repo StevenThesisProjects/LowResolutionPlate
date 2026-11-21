@@ -1,0 +1,160 @@
+{
+  "source": "results_new/lockbox_eval_per_track.npz (last epoch, 4 seeds per arm)",
+  "quartile_edges": [
+    181.1,
+    352.9,
+    553.3
+  ],
+  "rows": [
+    {
+      "slice": "all",
+      "n": 1000,
+      "sharpness_range": "8-1822",
+      "baseline": 77.6,
+      "recipe": 79.12,
+      "gain": 1.52,
+      "ci95_low": 0.53,
+      "ci95_high": 2.52
+    },
+    {
+      "slice": "Q1",
+      "n": 250,
+      "sharpness_range": "8-180",
+      "baseline": 53.0,
+      "recipe": 56.4,
+      "gain": 3.4,
+      "ci95_low": 0.9,
+      "ci95_high": 6.0
+    },
+    {
+      "slice": "Q2",
+      "n": 250,
+      "sharpness_range": "181-353",
+      "baseline": 79.2,
+      "recipe": 81.6,
+      "gain": 2.4,
+      "ci95_low": 0.3,
+      "ci95_high": 4.6
+    },
+    {
+      "slice": "Q3",
+      "n": 250,
+      "sharpness_range": "353-553",
+      "baseline": 84.1,
+      "recipe": 84.5,
+      "gain": 0.4,
+      "ci95_low": -1.1,
+      "ci95_high": 1.9
+    },
+    {
+      "slice": "Q4",
+      "n": 250,
+      "sharpness_range": "555-1822",
+      "baseline": 94.1,
+      "recipe": 94.0,
+      "gain": -0.1,
+      "ci95_low": -1.6,
+      "ci95_high": 1.4
+    },
+    {
+      "slice": "Mercosur",
+      "n": 808,
+      "sharpness_range": "8-1822",
+      "baseline": 81.62,
+      "recipe": 83.23,
+      "gain": 1.61,
+      "ci95_low": 0.59,
+      "ci95_high": 2.66
+    },
+    {
+      "slice": "Brazilian",
+      "n": 192,
+      "sharpness_range": "9-1288",
+      "baseline": 60.68,
+      "recipe": 61.85,
+      "gain": 1.17,
+      "ci95_low": -1.43,
+      "ci95_high": 3.91
+    },
+    {
+      "slice": "Mercosur Q1",
+      "n": 196,
+      "sharpness_range": "8-180",
+      "baseline": 58.42,
+      "recipe": 61.73,
+      "gain": 3.32,
+      "ci95_low": 0.51,
+      "ci95_high": 6.25
+    },
+    {
+      "slice": "Mercosur Q2",
+      "n": 205,
+      "sharpness_range": "181-353",
+      "baseline": 83.17,
+      "recipe": 85.85,
+      "gain": 2.68,
+      "ci95_low": 0.49,
+      "ci95_high": 5.0
+    },
+    {
+      "slice": "Mercosur Q3",
+      "n": 193,
+      "sharpness_range": "353-553",
+      "baseline": 88.08,
+      "recipe": 88.99,
+      "gain": 0.91,
+      "ci95_low": -0.52,
+      "ci95_high": 2.46
+    },
+    {
+      "slice": "Mercosur Q4",
+      "n": 214,
+      "sharpness_range": "555-1822",
+      "baseline": 95.56,
+      "recipe": 95.21,
+      "gain": -0.35,
+      "ci95_low": -1.75,
+      "ci95_high": 1.05
+    },
+    {
+      "slice": "Brazilian Q1",
+      "n": 54,
+      "sharpness_range": "9-176",
+      "baseline": 33.33,
+      "recipe": 37.04,
+      "gain": 3.7,
+      "ci95_low": -1.39,
+      "ci95_high": 9.26
+    },
+    {
+      "slice": "Brazilian Q2",
+      "n": 45,
+      "sharpness_range": "192-345",
+      "baseline": 61.11,
+      "recipe": 62.22,
+      "gain": 1.11,
+      "ci95_low": -4.44,
+      "ci95_high": 6.67
+    },
+    {
+      "slice": "Brazilian Q3",
+      "n": 57,
+      "sharpness_range": "354-552",
+      "baseline": 70.61,
+      "recipe": 69.3,
+      "gain": -1.32,
+      "ci95_low": -5.7,
+      "ci95_high": 3.07
+    },
+    {
+      "slice": "Brazilian Q4",
+      "n": 36,
+      "sharpness_range": "570-1288",
+      "baseline": 85.42,
+      "recipe": 86.81,
+      "gain": 1.39,
+      "ci95_low": -4.17,
+      "ci95_high": 7.64
+    }
+  ]
+}

@@ -1,0 +1,1203 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MF-PlateReader API",
+    "description": "Đọc biển số Brazil/Mercosur 1 dòng từ 1–5 ảnh crop độ phân giải thấp của cùng một xe, bằng model ResTran đã đóng băng (công thức huấn luyện #50, lock-box). Kết quả chỉ để tham khảo; track có cờ `needs_review` cần người kiểm tra.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/samples": {
+      "get": {
+        "summary": "Samples",
+        "description": "Demo tracks (zip) in samples/. LRLPR-26 data: private demonstrations only.",
+        "operationId": "samples_samples_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/samples/{name}": {
+      "get": {
+        "summary": "Sample File",
+        "operationId": "sample_file_samples__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/model": {
+      "get": {
+        "summary": "Model Info",
+        "operationId": "model_info_model_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInfo"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Model chưa sẵn sàng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "summary": "Predict",
+        "operationId": "predict_predict_post",
+        "parameters": [
+          {
+            "name": "decoder",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "greedy",
+                    "beam",
+                    "constrained"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Mặc định: bộ giải mã đã chốt trong artifacts/decoder_decision.json",
+              "title": "Decoder"
+            },
+            "description": "Mặc định: bộ giải mã đã chốt trong artifacts/decoder_decision.json"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5,
+              "minimum": 1,
+              "description": "Số chuỗi ứng viên trả về",
+              "default": 3,
+              "title": "Top K"
+            },
+            "description": "Số chuỗi ứng viên trả về"
+          },
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Gom lịch sử theo phiên (UI tự sinh)",
+              "title": "Session Id"
+            },
+            "description": "Gom lịch sử theo phiên (UI tự sinh)"
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_predict_predict_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Yêu cầu sai (thiếu ảnh, quá 5 ảnh, zip hỏng...)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Thiếu hoặc sai X-API-Key (khi bật khoá)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File hoặc ảnh quá lớn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Không phải ảnh JPEG/PNG",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ảnh hỏng, quá nhỏ, hoặc tham số sai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Model chưa sẵn sàng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "summary": "Feedback",
+        "operationId": "feedback_feedback_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Ảnh hỏng, quá nhỏ, hoặc tham số sai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "summary": "History",
+        "operationId": "history_history_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryItem"
+                  },
+                  "title": "Response History History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "summary": "Stats",
+        "operationId": "stats_stats_get",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_predict_predict_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "1–5 ảnh crop (jpg/png) của cùng một biển số, hoặc 1 file zip của một track"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_predict_predict_post"
+      },
+      "Candidate": {
+        "properties": {
+          "plate": {
+            "type": "string",
+            "title": "Plate",
+            "description": "Chuỗi ứng viên"
+          },
+          "prob": {
+            "type": "number",
+            "title": "Prob",
+            "description": "p(chuỗi | track), tính đúng bằng thuật toán forward của CTC"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plate",
+          "prob"
+        ],
+        "title": "Candidate"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse"
+      },
+      "FeedbackRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 8,
+            "title": "Request Id"
+          },
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "corrected_plate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9]{1,10}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Plate",
+            "description": "Biển số đúng nếu kết quả sai (chữ và số, tối đa 10 ký tự)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "correct"
+        ],
+        "title": "FeedbackRequest"
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "feedback_id": {
+            "type": "integer",
+            "title": "Feedback Id"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feedback_id",
+          "request_id"
+        ],
+        "title": "FeedbackResponse"
+      },
+      "FrameInfo": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Tên file, hoặc tên trong file zip"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight",
+            "description": "Trọng số attention của frame trong fusion (cộng các frame = 1)"
+          },
+          "sharpness": {
+            "type": "number",
+            "title": "Sharpness",
+            "description": "Phương sai Laplacian của ảnh xám 32x128 (cao = nét)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "name",
+          "width",
+          "height",
+          "weight",
+          "sharpness"
+        ],
+        "title": "FrameInfo"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "ok | unavailable"
+          },
+          "model_loaded": {
+            "type": "boolean",
+            "title": "Model Loaded"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "uptime_s": {
+            "type": "number",
+            "title": "Uptime S"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "model_loaded",
+          "uptime_s"
+        ],
+        "title": "HealthResponse"
+      },
+      "HistoryItem": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "n_frames": {
+            "type": "integer",
+            "title": "N Frames"
+          },
+          "plate": {
+            "type": "string",
+            "title": "Plate"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "needs_review": {
+            "type": "boolean",
+            "title": "Needs Review"
+          },
+          "decoder": {
+            "type": "string",
+            "title": "Decoder"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "feedback_correct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Correct"
+          },
+          "corrected_plate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Plate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "created_at",
+          "n_frames",
+          "plate",
+          "confidence",
+          "needs_review",
+          "decoder",
+          "latency_ms"
+        ],
+        "title": "HistoryItem"
+      },
+      "ModelInfo": {
+        "properties": {
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "checkpoint": {
+            "type": "string",
+            "title": "Checkpoint"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "sha256_verified": {
+            "type": "boolean",
+            "title": "Sha256 Verified"
+          },
+          "parameters": {
+            "type": "integer",
+            "title": "Parameters"
+          },
+          "default_decoder": {
+            "type": "string",
+            "title": "Default Decoder"
+          },
+          "decoders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Decoders"
+          },
+          "triage_score": {
+            "type": "string",
+            "title": "Triage Score"
+          },
+          "thresholds_by_frames": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Thresholds By Frames"
+          },
+          "expected_accuracy_by_frames": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Expected Accuracy By Frames"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "selection_rule": {
+            "type": "string",
+            "title": "Selection Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_version",
+          "checkpoint",
+          "sha256",
+          "sha256_verified",
+          "parameters",
+          "default_decoder",
+          "decoders",
+          "triage_score",
+          "thresholds_by_frames",
+          "expected_accuracy_by_frames",
+          "limits",
+          "scope",
+          "selection_rule"
+        ],
+        "title": "ModelInfo"
+      },
+      "PredictResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "plate": {
+            "type": "string",
+            "title": "Plate",
+            "description": "Biển số đọc được"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "description": "Trung bình độ tin cậy từng ký tự (định nghĩa của cuộc thi)"
+          },
+          "sequence_prob": {
+            "type": "number",
+            "title": "Sequence Prob",
+            "description": "Xác suất CTC của cả chuỗi"
+          },
+          "char_conf": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Char Conf",
+            "description": "Độ tin cậy từng ký tự"
+          },
+          "top3": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Top3",
+            "description": "Phần tử đầu luôn là `plate`; sau đó là các chuỗi khả dĩ nhất tiếp theo (số phần tử = top_k)"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout",
+            "description": "Mercosur | Brazilian | null nếu sai cú pháp"
+          },
+          "n_frames": {
+            "type": "integer",
+            "title": "N Frames"
+          },
+          "frame_weights": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Frame Weights"
+          },
+          "sharpness": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Sharpness"
+          },
+          "frames": {
+            "items": {
+              "$ref": "#/components/schemas/FrameInfo"
+            },
+            "type": "array",
+            "title": "Frames"
+          },
+          "needs_review": {
+            "type": "boolean",
+            "title": "Needs Review"
+          },
+          "review_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Review Reasons"
+          },
+          "triage": {
+            "$ref": "#/components/schemas/Triage"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "expected_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Accuracy",
+            "description": "Accuracy trung bình trên lock-box với đúng số frame này (E3, 4 seed)"
+          },
+          "reference_plate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Plate",
+            "description": "Nhãn đúng, chỉ có khi zip chứa annotations.json"
+          },
+          "decoder": {
+            "type": "string",
+            "title": "Decoder"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/Timing"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "plate",
+          "confidence",
+          "sequence_prob",
+          "char_conf",
+          "top3",
+          "layout",
+          "n_frames",
+          "frame_weights",
+          "sharpness",
+          "frames",
+          "needs_review",
+          "review_reasons",
+          "triage",
+          "warnings",
+          "expected_accuracy",
+          "decoder",
+          "latency_ms",
+          "timing",
+          "model_version"
+        ],
+        "title": "PredictResponse"
+      },
+      "Timing": {
+        "properties": {
+          "read_ms": {
+            "type": "number",
+            "title": "Read Ms"
+          },
+          "model_ms": {
+            "type": "number",
+            "title": "Model Ms"
+          },
+          "decode_ms": {
+            "type": "number",
+            "title": "Decode Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "read_ms",
+          "model_ms",
+          "decode_ms"
+        ],
+        "title": "Timing"
+      },
+      "Triage": {
+        "properties": {
+          "needs_review": {
+            "type": "boolean",
+            "title": "Needs Review"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons",
+            "description": "low_confidence | invalid_layout | not_calibrated"
+          },
+          "score_name": {
+            "type": "string",
+            "title": "Score Name",
+            "description": "Điểm dùng để phân loại (chọn trên val 999)"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold",
+            "description": "Ngưỡng cho đúng số frame của track"
+          }
+        },
+        "type": "object",
+        "required": [
+          "needs_review",
+          "reasons",
+          "score_name",
+          "score",
+          "threshold"
+        ],
+        "title": "Triage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

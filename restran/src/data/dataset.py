@@ -358,6 +358,11 @@ class MultiFrameDataset(Dataset):
             for s in self.samples
         ]
 
+    def scenario_b_track_ids(self) -> set:
+        """Track ids whose frames come from Scenario-B, the domain of val and test."""
+        return {s['track_id'] for s in self.samples
+                if s.get('paths') and 'Scenario-B' in s['paths'][0]}
+
     def layout_counts(self) -> Dict[str, int]:
         """Number of indexed samples per layout, for logging."""
         counts: Dict[str, int] = {}

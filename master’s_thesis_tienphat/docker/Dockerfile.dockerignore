@@ -1,0 +1,16 @@
+# Build context = the folder holding restran/ and masters_thesis_tienphat/.
+# Send only what the image copies.
+*
+!restran/src/
+!restran/configs/
+!masters_thesis_tienphat/docker/requirements-docker.txt
+!masters_thesis_tienphat/model/restran_lockbox_combo3_s42_ep30.pth
+!masters_thesis_tienphat/mfplate/
+!masters_thesis_tienphat/ui/
+!masters_thesis_tienphat/webui/
+!masters_thesis_tienphat/artifacts/serving_config.json
+!masters_thesis_tienphat/artifacts/decoder_decision.json
+!masters_thesis_tienphat/artifacts/threshold_calibration.json
+**/__pycache__
+**/node_modules
+masters_thesis_tienphat/webui/dist
