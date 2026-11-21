@@ -1,0 +1,36 @@
+{
+  "created": "2026-11-20T21:20:38",
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "python": "3.12.6",
+    "torch": "2.13.0"
+  },
+  "decoder": "greedy",
+  "model_version": "restran-recipe-s42-ep30-9754ebb1915e",
+  "val_api_vs_offline": {
+    "split": "splits/val_tracks.json",
+    "tracks": 999,
+    "plate_mismatches": 0,
+    "mismatch_list": [],
+    "max_abs_confidence_diff": 2.919521876809661e-06,
+    "max_abs_char_conf_diff": 1.7223888397199794e-05,
+    "criterion": "<= 2 tracks differ (roadmap, section 4, criterion 1)",
+    "passed": true
+  },
+  "val_cpu_vs_gpu": {
+    "api_cpu_accuracy": 76.6767,
+    "api_cpu_correct": 766,
+    "gpu_val_acc_epoch30": 76.6767,
+    "gpu_correct_implied": 766,
+    "source": "results_new/restran_lockbox_combo3_s42_metrics.csv (epoch 30)",
+    "same_accuracy": true
+  },
+  "lockbox_cpu_vs_gpu": {
+    "tracks": 1000,
+    "api_cpu_accuracy": 79.9,
+    "gpu_lockbox_accuracy": 79.9,
+    "tracks_with_different_correctness": 0,
+    "differing_tracks": [],
+    "source": "results_new/lockbox_eval_per_track.npz (method_last, seed 42)"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "created": "2026-11-20T21:16:35",
+  "model": "combo3_s42_ep30",
+  "decoder": "greedy",
+  "rule": "score = lowest AURC on val 999 (5 frames); threshold_N = lowest t with precision(score >= t) >= 0.95 on val 999, subsets of N frames pooled",
+  "target_precision": 0.95,
+  "score": "mean_char",
+  "aurc_val_5frames": {
+    "mean_char": 0.04126,
+    "min_char": 0.04246,
+    "seq_prob": 0.04136
+  },
+  "ece_val_5frames": {
+    "mean_char": 0.2016,
+    "min_char": 0.1154,
+    "seq_prob": 0.0792
+  },
+  "confidence_gap_val_5frames": 0.1046,
+  "thresholds_by_frames": {
+    "1": 0.9979528022269075,
+    "2": 0.9921708229020235,
+    "3": 0.9866506659379899,
+    "4": 0.9819847270487267,
+    "5": 0.9746480153143721
+  },
+  "val": {
+    "1": {
+      "n": 4995,
+      "accuracy": 54.73,
+      "coverage": 0.3009,
+      "precision_auto": 0.9501,
+      "precision_auto_wilson95_low": 0.9379,
+      "accuracy_review_group": 0.374,
+      "errors_caught": 2186,
+      "errors_total": 2261
+    },
+    "2": {
+      "n": 9990,
+      "accuracy": 67.98,
+      "coverage": 0.547,
+      "precision_auto": 0.95,
+      "precision_auto_wilson95_low": 0.9439,
+      "accuracy_review_group": 0.3534,
+      "errors_caught": 2926,
+      "errors_total": 3199
+    },
+    "3": {
+      "n": 9990,
+      "accuracy": 73.18,
+      "coverage": 0.6442,
+      "precision_auto": 0.9501,
+      "precision_auto_wilson95_low": 0.9445,
+      "accuracy_review_group": 0.3365,
+      "errors_caught": 2358,
+      "errors_total": 2679
+    },
+    "4": {
+      "n": 4995,
+      "accuracy": 75.82,
+      "coverage": 0.6939,
+      "precision_auto": 0.9501,
+      "precision_auto_wilson95_low": 0.9423,
+      "accuracy_review_group": 0.3231,
+      "errors_caught": 1035,
+      "errors_total": 1208
+    },
+    "5": {
+      "n": 999,
+      "accuracy": 76.68,
+      "coverage": 0.7277,
+      "precision_auto": 0.9505,
+      "precision_auto_wilson95_low": 0.9322,
+      "accuracy_review_group": 0.2757,
+      "errors_caught": 197,
+      "errors_total": 233
+    }
+  }
+}

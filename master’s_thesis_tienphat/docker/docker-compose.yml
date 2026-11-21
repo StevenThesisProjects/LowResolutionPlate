@@ -1,0 +1,60 @@
+# From masters_thesis_tienphat/ (the restran/ repository must sit next to it):
+#   docker compose -f docker/docker-compose.yml up --build
+# Web UI (React) and API on one port: http://localhost:8000   (API docs: /docs)
+# Private URL for phones (roadmap week 9), optional:
+#   docker compose -f docker/docker-compose.yml --profile tunnel up
+#   then read the https://....trycloudflare.com address in the `tunnel` service log.
+# Old Gradio UI, optional: add --profile gradio (http://localhost:7860).
+name: mfplate
+
+services:
+  api:
+    build:
+      # The folder holding both restran/ and masters_thesis_tienphat/
+      context: ../..
+      dockerfile: masters_thesis_tienphat/docker/Dockerfile
+    image: mfplate:1.0
+    environment:
+      MFPLATE_API_KEY: ${MFPLATE_API_KEY:-}
+      MFPLATE_THREADS: ${MFPLATE_THREADS:-0}
+    volumes:
+      - mfplate-data:/data          # SQLite log survives restarts
+      # Demo tracks (LRLPR-26 data, licensed): mounted read-only from the host, never
+      # baked into the image. Remove this line to run without samples.
+      - ../samples:/app/masters_thesis_tienphat/samples:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  tunnel:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest   # pin a dated tag before the defence
+    command: ["tunnel", "--no-autoupdate", "--url", "http://api:8000"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  gradio:
+    profiles: ["gradio"]
+    image: mfplate:1.0
+    command: ["python", "ui/app.py"]
+    environment:
+      MFPLATE_API_URL: http://api:8000
+      MFPLATE_API_KEY: ${MFPLATE_API_KEY:-}
+      MFPLATE_UI_HOST: 0.0.0.0
+      MFPLATE_UI_PORT: "7860"
+    ports:
+      - "7860:7860"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mfplate-data:

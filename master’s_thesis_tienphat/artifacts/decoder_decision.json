@@ -1,0 +1,35 @@
+{
+  "created": "2026-11-20T21:26:34",
+  "rule": "beam decoder becomes default only if mean gain over greedy >= +0.3 points on val 999 across 4 seeds and no seed below greedy",
+  "split": "splits/val_tracks.json (999 tracks)",
+  "runs": [
+    "combo3_s42",
+    "combo3_s43",
+    "combo3_s7",
+    "combo3_s2026"
+  ],
+  "gain_over_greedy": {
+    "beam": {
+      "per_seed": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mean": 0.0,
+      "passes": false
+    },
+    "constrained": {
+      "per_seed": [
+        0.0,
+        0.0,
+        0.0,
+        0.2
+      ],
+      "mean": 0.05,
+      "passes": false
+    }
+  },
+  "default_decoder": "greedy",
+  "table": "artifacts/results_decode.csv"
+}

@@ -1,0 +1,10 @@
+# Runtime only (torch/torchvision are installed from the CPU wheel index in the Dockerfile)
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+pydantic==2.13.4
+httpx==0.28.1
+gradio==6.32.0
+pillow==12.2.0

@@ -1,0 +1,217 @@
+{
+  "split": "splits/val_tracks.json (999 tracks)",
+  "runs": [
+    "combo3_s42",
+    "combo3_s43",
+    "combo3_s7",
+    "combo3_s2026"
+  ],
+  "decoder": "greedy",
+  "per_run": {
+    "combo3_s42": {
+      "errors": 233,
+      "accuracy": 76.68,
+      "types": {
+        "same_layout_confusion": 232,
+        "wrong_length": 1
+      },
+      "syntax_violations": 1,
+      "syntax_violation_share": 0.0043,
+      "other_layout": 0,
+      "gt_more_probable_than_prediction": 0
+    },
+    "combo3_s43": {
+      "errors": 209,
+      "accuracy": 79.08,
+      "types": {
+        "same_layout_confusion": 206,
+        "other_layout": 3
+      },
+      "syntax_violations": 0,
+      "syntax_violation_share": 0.0,
+      "other_layout": 3,
+      "gt_more_probable_than_prediction": 0
+    },
+    "combo3_s7": {
+      "errors": 220,
+      "accuracy": 77.98,
+      "types": {
+        "same_layout_confusion": 218,
+        "other_layout": 1,
+        "wrong_length": 1
+      },
+      "syntax_violations": 1,
+      "syntax_violation_share": 0.0045,
+      "other_layout": 1,
+      "gt_more_probable_than_prediction": 0
+    },
+    "combo3_s2026": {
+      "errors": 231,
+      "accuracy": 76.88,
+      "types": {
+        "same_layout_confusion": 220,
+        "wrong_length": 10,
+        "other_layout": 1
+      },
+      "syntax_violations": 10,
+      "syntax_violation_share": 0.0433,
+      "other_layout": 1,
+      "gt_more_probable_than_prediction": 0
+    }
+  },
+  "pooled": {
+    "errors": 893,
+    "syntax_violations": 12,
+    "syntax_violation_share": 0.0134,
+    "gt_more_probable": 0,
+    "gt_more_probable_share": 0.0,
+    "errors_same_length": 881,
+    "wrong_chars_distribution": {
+      "1": 524,
+      "2": 180,
+      "3": 103,
+      "4": 31,
+      "5": 31,
+      "6": 8,
+      "7": 4
+    },
+    "one_wrong_char_share_of_all_errors": 0.5868,
+    "wrong_char_by_position": {
+      "1": 154,
+      "2": 308,
+      "3": 377,
+      "4": 198,
+      "5": 157,
+      "6": 169,
+      "7": 185
+    }
+  },
+  "top10_pairs": [
+    [
+      "6↔8",
+      89
+    ],
+    [
+      "H↔M",
+      50
+    ],
+    [
+      "4↔6",
+      47
+    ],
+    [
+      "O↔Q",
+      46
+    ],
+    [
+      "5↔6",
+      44
+    ],
+    [
+      "H↔N",
+      34
+    ],
+    [
+      "V↔Y",
+      34
+    ],
+    [
+      "D↔O",
+      33
+    ],
+    [
+      "5↔9",
+      33
+    ],
+    [
+      "A↔B",
+      29
+    ]
+  ],
+  "top10_by_layout": {
+    "Mercosur": [
+      [
+        "1→3",
+        26
+      ],
+      [
+        "8→6",
+        24
+      ],
+      [
+        "4→6",
+        23
+      ],
+      [
+        "H→M",
+        22
+      ],
+      [
+        "M→H",
+        22
+      ],
+      [
+        "N→H",
+        21
+      ],
+      [
+        "6→8",
+        20
+      ],
+      [
+        "D→B",
+        14
+      ],
+      [
+        "2→3",
+        14
+      ],
+      [
+        "E→C",
+        14
+      ]
+    ],
+    "Brazilian": [
+      [
+        "6→8",
+        30
+      ],
+      [
+        "6→5",
+        22
+      ],
+      [
+        "5→6",
+        21
+      ],
+      [
+        "5→9",
+        20
+      ],
+      [
+        "O→Q",
+        19
+      ],
+      [
+        "D→O",
+        17
+      ],
+      [
+        "M→N",
+        17
+      ],
+      [
+        "1→7",
+        15
+      ],
+      [
+        "8→6",
+        15
+      ],
+      [
+        "Q→O",
+        14
+      ]
+    ]
+  }
+}

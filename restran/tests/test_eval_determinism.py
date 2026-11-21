@@ -47,7 +47,7 @@ class _Loader:
         return len(self.batches)
 
 
-def _trainer(**overrides):
+def _trainer(b_tracks=(), **overrides):
     cfg = Config()
     cfg.DEVICE = torch.device("cpu")
     cfg.EPOCHS = 1
@@ -56,6 +56,7 @@ def _trainer(**overrides):
         setattr(cfg, k, v)
     model = ResTranOCR(num_classes=cfg.NUM_CLASSES, frame_dropout=cfg.FRAME_DROPOUT)
     loader = _Loader([_batch(seed=1)])
+    loader.dataset.scenario_b_track_ids = lambda: set(b_tracks)
     with contextlib.redirect_stdout(io.StringIO()):
         return Trainer(model, loader, _Loader([_batch(seed=2)]), cfg, cfg.IDX2CHAR)
 
@@ -295,6 +296,77 @@ def test_eval_arms_rebuilds_each_architecture():
         assert got == kind, (kw, got)
         with torch.no_grad():
             assert torch.equal(model(x), src(x))
+
+
+def _ctc_inputs(b=8, t=32, seed=0):
+    g = torch.Generator().manual_seed(seed)
+    log_probs = torch.randn(t, b, 37, generator=g).log_softmax(2)
+    lengths = torch.randint(5, 8, (b,), generator=g)
+    targets = torch.randint(1, 37, (int(lengths.sum()),), generator=g)
+    return log_probs, targets, torch.full((b,), t, dtype=torch.long), lengths
+
+
+def _per_row_ctc(log_probs, targets, input_lengths, lengths):
+    import torch.nn.functional as F
+    per = F.ctc_loss(log_probs, targets, input_lengths, lengths, blank=0,
+                     reduction='none', zero_infinity=True)
+    return per / lengths.clamp(min=1)
+
+
+def test_main_ctc_off_is_the_original_criterion():
+    t = _trainer()
+    assert t.scenario_b_weight == 1.0 and t.ohem_ratio == 0.0
+    assert t.optimizer.param_groups[0]["weight_decay"] == 1e-4
+    args = _ctc_inputs()
+    loss, logged = t._main_ctc(*args, tuple(f"track_{i}" for i in range(8)))
+    assert torch.equal(loss, t.criterion(*args)) and torch.equal(logged, loss.detach())
+
+
+def test_ohem_keeps_the_hardest_rows():
+    args = _ctc_inputs()
+    ids = tuple(f"track_{i}" for i in range(8))
+    per = _per_row_ctc(*args)
+    full = _trainer(OHEM_RATIO=1.0)
+    loss, logged = full._main_ctc(*args, ids)
+    # Per-row normalisation reproduces reduction='mean' exactly when nothing is dropped
+    assert torch.allclose(loss, full.criterion(*args)) and torch.allclose(logged, loss)
+    half = _trainer(OHEM_RATIO=0.5)
+    loss, logged = half._main_ctc(*args, ids)
+    assert torch.allclose(loss, per.sort(descending=True).values[:4].mean())
+    assert torch.allclose(logged, per.mean())
+
+
+def test_scenario_b_weight_rescales_rows():
+    args = _ctc_inputs()
+    ids = tuple(f"track_{i}" for i in range(8))
+    b = {"track_0", "track_3", "track_5"}
+    t = _trainer(b_tracks=b, SCENARIO_B_WEIGHT=2.0)
+    assert t.scenario_b_tracks == b
+    per = _per_row_ctc(*args)
+    w = torch.tensor([2.0 if i in b else 1.0 for i in ids])
+    loss, logged = t._main_ctc(*args, ids)
+    assert torch.allclose(loss, (per * w / w.mean()).mean())
+    assert torch.allclose(logged, per.mean())
+
+
+def test_scenario_b_track_ids_from_paths():
+    from src.data.dataset import MultiFrameDataset
+    fake = types.SimpleNamespace(samples=[
+        {"track_id": "track_00001", "paths": ["d/Scenario-A/Brazilian/track_00001/lr-001.png"]},
+        {"track_id": "track_10001", "paths": ["d/Scenario-B/Mercosur/track_10001/lr-001.jpg"]},
+        {"track_id": "track_10001", "paths": ["d/Scenario-B/Mercosur/track_10001/hr-001.jpg"]},
+    ])
+    assert MultiFrameDataset.scenario_b_track_ids(fake) == {"track_10001"}
+
+
+def test_v2_flag_validation_and_weight_decay():
+    assert _trainer(WEIGHT_DECAY=0.05).optimizer.param_groups[0]["weight_decay"] == 0.05
+    for kw in ({"SCENARIO_B_WEIGHT": 0.0}, {"OHEM_RATIO": 1.5}, {"OHEM_RATIO": -0.1}):
+        try:
+            _trainer(**kw)
+        except ValueError:
+            continue
+        raise AssertionError(f"accepted {kw}")
 
 
 if __name__ == "__main__":

@@ -65,7 +65,7 @@ Bản sửa ngày 25/10/2026, theo review của thầy ngày 23/10 (`documents/T
 - **Chi phí:** không thêm tham số, không đổi chi phí suy luận. Huấn luyện chậm hơn: augment nhất quán làm mỗi epoch chậm thêm 46%, CTC phụ làm mỗi batch chậm thêm khoảng 8% (mục 3).
 - **Super-Resolution đa khung hình** đã được kiểm tra có đối chứng. Với kiến trúc SR và loss pixel đã thử, SR dựng ảnh tốt hơn bilinear 9,3% nhưng accuracy nhận dạng giảm 1,36 điểm (1 seed; mục 6).
 
-**Còn thiếu:** tập test chính thức 3.000 track (bản đang có không kèm nhãn, đang xin cấp); leave-one-out nhiều seed (E2), nay quan trọng hơn vì cần biết mức lợi và độ bền khi thiếu frame đến từ thành phần nào.
+**Còn thiếu:** leave-one-out nhiều seed (E2), nay quan trọng hơn vì cần biết mức lợi và độ bền khi thiếu frame đến từ thành phần nào.
 
 ---
 
@@ -434,7 +434,7 @@ Cả hai dùng giao thức lock-box (train 18.001, val 999), cấu hình nền l
 | MINOR 17: metric chính | Epoch cuối là thước đo chính trên lock-box | — |
 | MINOR 18: "đội hạng 3 không dùng SR" | Đã bỏ | — |
 | MINOR 19: "không tăng chi phí" | "Không tăng chi phí suy luận"; báo cáo chi phí huấn luyện (mục 3) | Cần đo lại bằng một run chạy riêng trên V100 |
-| Nhãn tập test | Bản đang có không kèm nhãn | Đang xin bản có nhãn |
+| Nhãn tập test | Bản đang có không kèm nhãn | Theo ý kiến thầy (31/10): **không dùng tập test chính thức**. Lock-box là tập đánh giá độc lập duy nhất |
 
 Đối chiếu với review ngày 10/09 nằm ở Phụ lục C.
 
@@ -442,7 +442,7 @@ Cả hai dùng giao thức lock-box (train 18.001, val 999), cấu hình nền l
 
 ## 11. Hạn chế và bước tiếp theo
 
-1. **Chưa có kết quả trên tập test chính thức.** Khi có nhãn, 8 bộ checkpoint lock-box sẽ được chấm trên tập test với cùng thước đo và thống kê, như một phân tích xác nhận thêm. Quyết định (b) vẫn dựa trên lock-box như đã đăng ký. Bảng xếp hạng cuộc thi để tham khảo: top 20 từ 76,47% đến 82,13%; các đội dẫn đầu dùng ensemble 3–4 model và/hoặc dữ liệu ngoài.
+1. **Không dùng tập test chính thức** (theo ý kiến thầy, 31/10). Lock-box 1.000 track là tập đánh giá độc lập duy nhất, nên mọi con số cuối đều đo trên lock-box (SE lấy mẫu khoảng ±1,3 điểm). Kết quả không so trực tiếp được với bảng xếp hạng cuộc thi, vốn đo trên tập test. Bảng xếp hạng cuộc thi để tham khảo: top 20 từ 76,47% đến 82,13%; các đội dẫn đầu dùng ensemble 3–4 model và/hoặc dữ liệu ngoài.
 2. **Tầng seed chưa đạt p < 0,05 trên lock-box**, vì phương pháp dao động giữa các seed lớn hơn baseline. Giảm dao động này là một hướng cải thiện.
 3. **E3 cho dạng B**, nên claim chính là "bền hơn khi thiếu frame". **N1 không ủng hộ** claim khai thác thông tin bổ sung giữa các frame, và cho thấy che frame không đóng góp gì đo được trong cấu hình chốt. Bài báo không được trình bày che frame như nguồn gốc của mức lợi.
 4. **Số công bố 78,70% chưa tái lập được với cấu hình công bố** trong môi trường của chúng tôi. E5 (fp32) sẽ loại trừ hoặc xác nhận nguyên nhân tràn số fp16.

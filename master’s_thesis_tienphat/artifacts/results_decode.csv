@@ -1,0 +1,13 @@
+split,run,seed,decoder,n,acc,acc_mercosur,n_mercosur,acc_brazilian,n_brazilian,invalid_syntax,changed_vs_greedy,fixed_vs_greedy,broken_vs_greedy,mcnemar_p
+val,combo3_s42,42,greedy,999,76.68,82.89,789,53.33,210,1,0,0,0,1.0
+val,combo3_s42,42,beam,999,76.68,82.89,789,53.33,210,2,1,0,0,1.0
+val,combo3_s42,42,constrained,999,76.68,82.89,789,53.33,210,0,1,0,0,1.0
+val,combo3_s43,43,greedy,999,79.08,84.03,789,60.48,210,0,0,0,0,1.0
+val,combo3_s43,43,beam,999,79.08,84.03,789,60.48,210,0,0,0,0,1.0
+val,combo3_s43,43,constrained,999,79.08,84.03,789,60.48,210,0,0,0,0,1.0
+val,combo3_s7,7,greedy,999,77.98,83.65,789,56.67,210,1,0,0,0,1.0
+val,combo3_s7,7,beam,999,77.98,83.65,789,56.67,210,1,1,0,0,1.0
+val,combo3_s7,7,constrained,999,77.98,83.65,789,56.67,210,0,1,0,0,1.0
+val,combo3_s2026,2026,greedy,999,76.88,82.76,789,54.76,210,10,0,0,0,1.0
+val,combo3_s2026,2026,beam,999,76.88,82.76,789,54.76,210,10,0,0,0,1.0
+val,combo3_s2026,2026,constrained,999,77.08,82.89,789,55.24,210,0,10,2,0,0.5

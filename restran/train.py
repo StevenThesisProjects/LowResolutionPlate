@@ -329,6 +329,20 @@ def parse_args() -> argparse.Namespace:
         help="Replace the learned STN by one fixed affine 'a,b,tx,c,d,ty' (E4)",
     )
     parser.add_argument(
+        "--weight-decay", type=float, default=None,
+        help="AdamW weight decay (default 1e-4)",
+    )
+    parser.add_argument(
+        "--scenario-b-weight", type=float, default=None,
+        help="Main-CTC loss weight of Scenario-B tracks relative to Scenario-A, the "
+             "domain of val/lock-box/test (1.0 = off)",
+    )
+    parser.add_argument(
+        "--ohem-ratio", type=float, default=None,
+        help="Online hard example mining: the main CTC averages only the hardest "
+             "fraction of each batch, e.g. 0.7 (0 = off)",
+    )
+    parser.add_argument(
         "--exclude-tracks", type=str, default=None,
         help="JSON list of track ids kept out of training AND validation (the lock-box, "
              "see documents/lockbox_protocol.md)",
@@ -415,6 +429,9 @@ def main():
         'frame_mask_orient': 'FRAME_MASK_ORIENT',
         'fixed_stn': 'FIXED_STN',
         'save_last_k': 'SAVE_LAST_K',
+        'weight_decay': 'WEIGHT_DECAY',
+        'scenario_b_weight': 'SCENARIO_B_WEIGHT',
+        'ohem_ratio': 'OHEM_RATIO',
     }
 
     for arg_name, config_name in arg_to_config.items():
@@ -441,6 +458,12 @@ def main():
     if (config.FRAME_MASK_MODE != 'independent' or config.FRAME_MASK_ORIENT != 'mixed') \
             and config.FRAME_MASK <= 0:
         print("❌ ERROR: --frame-mask-mode/--frame-mask-orient cần --frame-mask > 0"); sys.exit(1)
+    if config.WEIGHT_DECAY < 0:
+        print("❌ ERROR: --weight-decay phải ≥ 0"); sys.exit(1)
+    if config.SCENARIO_B_WEIGHT <= 0:
+        print("❌ ERROR: --scenario-b-weight phải > 0"); sys.exit(1)
+    if not 0.0 <= config.OHEM_RATIO <= 1.0:
+        print("❌ ERROR: --ohem-ratio phải nằm trong [0, 1]"); sys.exit(1)
 
     config.LOG_BATCH_LOSS = args.log_batch_loss
 
@@ -538,6 +561,9 @@ def main():
     print(f"   GRAD_CLIP: {config.GRAD_CLIP}")
     print(f"   AMP_DTYPE: {config.AMP_DTYPE}")
     print(f"   SKIP_GRAD_NORM: {config.SKIP_GRAD_NORM or 'off'} | EMA_DECAY: {config.EMA_DECAY or 'off'}")
+    print(f"   WEIGHT_DECAY: {config.WEIGHT_DECAY} | "
+          f"SCENARIO_B_WEIGHT: {config.SCENARIO_B_WEIGHT if config.SCENARIO_B_WEIGHT != 1.0 else 'off'} | "
+          f"OHEM_RATIO: {config.OHEM_RATIO or 'off'}")
     print(f"   DEVICE: {config.DEVICE}")
     print(f"   SUBMISSION_MODE: {args.submission_mode}")
 

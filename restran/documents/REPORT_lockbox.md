@@ -114,7 +114,7 @@ McNemar chính xác ở epoch cuối, từng cặp seed (phương pháp đúng m
 **Kiểm chứng sau khi chấm:**
 - 56/56 checkpoint, 24/24 file code và 3/3 file split khớp SHA-256 với manifest.
 - Tính lại CI với seed bootstrap khác: Last-6 [+0,80; +2,52]; quyết định không đổi.
-- Chấm lại 14 checkpoint trên máy khác (CPU và Apple GPU): 3/28.000 dự đoán đổi kết quả. Cả 3 là trường hợp hai ký tự gần hoà nhau (chênh log-prob ≤ 0,008). Lệch lớn nhất 0,1 điểm trên một checkpoint; kết luận không đổi.
+- Chấm lại 28 checkpoint trên máy khác (CPU và Apple GPU): 3/28.000 dự đoán đổi kết quả. Cả 3 là trường hợp hai ký tự gần hoà nhau (chênh log-prob ≤ 0,008). Lệch lớn nhất 0,1 điểm trên một checkpoint; kết luận không đổi.
 
 **Thay đổi so với protocol:**
 - Log huấn luyện của `restran_lockbox_base_s42` không có trên server. File summary của run này vẫn ghi `Train samples: 36002` (18.001 track × 2), giống 7 run còn lại, nên run này đã loại lock-box đúng.

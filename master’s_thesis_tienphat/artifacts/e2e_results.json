@@ -1,0 +1,763 @@
+{
+  "created": "2026-11-20T21:31:24",
+  "url": "http://127.0.0.1:8000",
+  "model_version": "restran-recipe-s42-ep30-9754ebb1915e",
+  "e2e": [
+    {
+      "id": "T01",
+      "kind": "track",
+      "track": "track_13125",
+      "layout": "Mercosur",
+      "sharpness_quartile": 1,
+      "label": "KRB6I42",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.959288,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 21.17,
+      "warnings": []
+    },
+    {
+      "id": "T02",
+      "kind": "track",
+      "track": "track_20825",
+      "layout": "Mercosur",
+      "sharpness_quartile": 1,
+      "label": "HKW7F75",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "MKW7F75",
+      "correct": false,
+      "confidence": 0.927535,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 23.3,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T03",
+      "kind": "track",
+      "track": "track_14539",
+      "layout": "Mercosur",
+      "sharpness_quartile": 1,
+      "label": "BAT9D82",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "BAT9D82",
+      "correct": true,
+      "confidence": 0.973775,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 21.25,
+      "warnings": []
+    },
+    {
+      "id": "T04",
+      "kind": "track",
+      "track": "track_16292",
+      "layout": "Mercosur",
+      "sharpness_quartile": 2,
+      "label": "SEO8B02",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "SEO8B02",
+      "correct": true,
+      "confidence": 0.99973,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 21.18,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T05",
+      "kind": "track",
+      "track": "track_17145",
+      "layout": "Mercosur",
+      "sharpness_quartile": 2,
+      "label": "BCJ1E88",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "BCJ1E88",
+      "correct": true,
+      "confidence": 0.986312,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 19.85,
+      "warnings": []
+    },
+    {
+      "id": "T06",
+      "kind": "track",
+      "track": "track_13296",
+      "layout": "Mercosur",
+      "sharpness_quartile": 2,
+      "label": "MGA1B14",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "MGA1B14",
+      "correct": true,
+      "confidence": 0.93712,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 20.71,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T07",
+      "kind": "track",
+      "track": "track_20672",
+      "layout": "Mercosur",
+      "sharpness_quartile": 3,
+      "label": "TES3I89",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "TES3I89",
+      "correct": true,
+      "confidence": 0.999897,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 20.93,
+      "warnings": []
+    },
+    {
+      "id": "T08",
+      "kind": "track",
+      "track": "track_20273",
+      "layout": "Mercosur",
+      "sharpness_quartile": 3,
+      "label": "BCS8B36",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "BCS8B36",
+      "correct": true,
+      "confidence": 0.9997,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 21.2,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T09",
+      "kind": "track",
+      "track": "track_19475",
+      "layout": "Mercosur",
+      "sharpness_quartile": 3,
+      "label": "ASY6G57",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "ASY6G57",
+      "correct": true,
+      "confidence": 0.999661,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 19.77,
+      "warnings": []
+    },
+    {
+      "id": "T10",
+      "kind": "track",
+      "track": "track_21931",
+      "layout": "Mercosur",
+      "sharpness_quartile": 4,
+      "label": "RNC7A38",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "RNC7A38",
+      "correct": true,
+      "confidence": 0.998207,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 21.07,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T11",
+      "kind": "track",
+      "track": "track_19240",
+      "layout": "Mercosur",
+      "sharpness_quartile": 4,
+      "label": "OJZ3E82",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "OJZ3E82",
+      "correct": true,
+      "confidence": 0.999918,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 20.62,
+      "warnings": []
+    },
+    {
+      "id": "T12",
+      "kind": "track",
+      "track": "track_14372",
+      "layout": "Mercosur",
+      "sharpness_quartile": 4,
+      "label": "SFB6A67",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "SFB6A67",
+      "correct": true,
+      "confidence": 0.999964,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 21.49,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T13",
+      "kind": "track",
+      "track": "track_10538",
+      "layout": "Brazilian",
+      "sharpness_quartile": 1,
+      "label": "EBR0547",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "EBR0547",
+      "correct": true,
+      "confidence": 0.98823,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 21.19,
+      "warnings": []
+    },
+    {
+      "id": "T14",
+      "kind": "track",
+      "track": "track_12486",
+      "layout": "Brazilian",
+      "sharpness_quartile": 1,
+      "label": "APO5432",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "ARQ5432",
+      "correct": false,
+      "confidence": 0.879959,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 21.21,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T15",
+      "kind": "track",
+      "track": "track_12233",
+      "layout": "Brazilian",
+      "sharpness_quartile": 2,
+      "label": "BAL9903",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "BAL9903",
+      "correct": true,
+      "confidence": 0.957871,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 20.13,
+      "warnings": []
+    },
+    {
+      "id": "T16",
+      "kind": "track",
+      "track": "track_10687",
+      "layout": "Brazilian",
+      "sharpness_quartile": 2,
+      "label": "AWB4811",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "AWB4811",
+      "correct": true,
+      "confidence": 0.862616,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 20.17,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T17",
+      "kind": "track",
+      "track": "track_11539",
+      "layout": "Brazilian",
+      "sharpness_quartile": 3,
+      "label": "BCO5163",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "BCE9163",
+      "correct": false,
+      "confidence": 0.875501,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 21.05,
+      "warnings": []
+    },
+    {
+      "id": "T18",
+      "kind": "track",
+      "track": "track_11335",
+      "layout": "Brazilian",
+      "sharpness_quartile": 3,
+      "label": "AKE6476",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "AKE6476",
+      "correct": true,
+      "confidence": 0.944333,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 21.43,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "T19",
+      "kind": "track",
+      "track": "track_11194",
+      "layout": "Brazilian",
+      "sharpness_quartile": 4,
+      "label": "ABQ1928",
+      "input": "5 ảnh",
+      "status": 200,
+      "passed": true,
+      "plate": "ABQ1928",
+      "correct": true,
+      "confidence": 0.997295,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 20.9,
+      "warnings": []
+    },
+    {
+      "id": "T20",
+      "kind": "track",
+      "track": "track_11702",
+      "layout": "Brazilian",
+      "sharpness_quartile": 4,
+      "label": "AWP8930",
+      "input": "zip track (lr + hr + annotations)",
+      "status": 200,
+      "passed": true,
+      "plate": "AWP8930",
+      "correct": true,
+      "confidence": 0.999473,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 5,
+      "latency_ms": 20.88,
+      "warnings": [
+        "Zip có 5 ảnh HR; chỉ dùng 5 ảnh lr-*"
+      ]
+    },
+    {
+      "id": "E01",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "1 frame",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.948766,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 1,
+      "latency_ms": 11.11,
+      "warnings": [
+        "Chỉ có 1 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 1 frame là 55.6% (5 frame: 79.1%)."
+      ]
+    },
+    {
+      "id": "E02",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "2 frame",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.931677,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 2,
+      "latency_ms": 13.33,
+      "warnings": [
+        "Chỉ có 2 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 2 frame là 69.0% (5 frame: 79.1%)."
+      ]
+    },
+    {
+      "id": "E03",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "3 frame",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.993982,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 3,
+      "latency_ms": 15.45,
+      "warnings": [
+        "Chỉ có 3 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 3 frame là 74.1% (5 frame: 79.1%)."
+      ]
+    },
+    {
+      "id": "E04",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "4 frame",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.992287,
+      "needs_review": false,
+      "reasons": [],
+      "n_frames": 4,
+      "latency_ms": 15.73,
+      "warnings": [
+        "Chỉ có 4 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 4 frame là 77.0% (5 frame: 79.1%)."
+      ]
+    },
+    {
+      "id": "E05",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "ảnh xám 1 kênh (PNG)",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.961101,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 22.3,
+      "warnings": []
+    },
+    {
+      "id": "E06",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "ảnh xoay 90°",
+      "status": 200,
+      "passed": true,
+      "plate": "SEF009",
+      "correct": false,
+      "confidence": 0.315338,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence",
+        "invalid_layout"
+      ],
+      "n_frames": 5,
+      "latency_ms": 24.39,
+      "warnings": [
+        "r0.png: tỉ lệ rộng/cao 0.4, không giống ảnh crop biển số 1 dòng (thường khoảng 2–3).",
+        "r1.png: tỉ lệ rộng/cao 0.4, không giống ảnh crop biển số 1 dòng (thường khoảng 2–3).",
+        "r2.png: tỉ lệ rộng/cao 0.4, không giống ảnh crop biển số 1 dòng (thường khoảng 2–3).",
+        "r3.png: tỉ lệ rộng/cao 0.4, không giống ảnh crop biển số 1 dòng (thường khoảng 2–3).",
+        "r4.png: tỉ lệ rộng/cao 0.4, không giống ảnh crop biển số 1 dòng (thường khoảng 2–3).",
+        "Chuỗi đọc được không theo mẫu biển Brazil (LLLNNNN) hay Mercosur (LLLNLNN)."
+      ]
+    },
+    {
+      "id": "E07",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "ảnh lộn ngược 180°",
+      "status": 200,
+      "passed": true,
+      "plate": "CNT9G89",
+      "correct": false,
+      "confidence": 0.800102,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 26.28,
+      "warnings": []
+    },
+    {
+      "id": "E08",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "không phải biển số: nhiễu ngẫu nhiên",
+      "status": 200,
+      "passed": true,
+      "plate": "ASC0292",
+      "correct": false,
+      "confidence": 0.320818,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 1,
+      "latency_ms": 12.13,
+      "warnings": [
+        "Chỉ có 1 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 1 frame là 55.6% (5 frame: 79.1%)."
+      ]
+    },
+    {
+      "id": "E09",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "không phải biển số: thẻ trắng có viền",
+      "status": 200,
+      "passed": true,
+      "plate": "AVK725",
+      "correct": false,
+      "confidence": 0.191225,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence",
+        "invalid_layout"
+      ],
+      "n_frames": 1,
+      "latency_ms": 11.62,
+      "warnings": [
+        "Chỉ có 1 frame; model được thiết kế cho 5 frame liên tiếp của cùng một xe. Trên lock-box, accuracy trung bình với 1 frame là 55.6% (5 frame: 79.1%).",
+        "Chuỗi đọc được không theo mẫu biển Brazil (LLLNNNN) hay Mercosur (LLLNLNN)."
+      ]
+    },
+    {
+      "id": "E10",
+      "kind": "edge",
+      "track": "track_13125",
+      "label": "KRB6I42",
+      "input": "cùng 1 frame lặp 5 lần",
+      "status": 200,
+      "passed": true,
+      "plate": "ARB6I42",
+      "correct": false,
+      "confidence": 0.948766,
+      "needs_review": true,
+      "reasons": [
+        "low_confidence"
+      ],
+      "n_frames": 5,
+      "latency_ms": 22.24,
+      "warnings": [
+        "Có frame trùng nhau hoàn toàn; trọng số fusion sẽ bị lệch về frame đó."
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "case": "không gửi file nào",
+      "expected_status": 400,
+      "expected_code": "no_files",
+      "status": 400,
+      "code": "no_files",
+      "message": "Cần gửi 1 đến 5 ảnh crop biển số (trường `files`)",
+      "passed": true
+    },
+    {
+      "case": "6 ảnh (quá 5)",
+      "expected_status": 400,
+      "expected_code": "too_many_files",
+      "status": 400,
+      "code": "too_many_files",
+      "message": "Nhận 6 ảnh, tối đa 5 ảnh của cùng một biển số",
+      "passed": true
+    },
+    {
+      "case": "file .txt",
+      "expected_status": 415,
+      "expected_code": "unsupported_type",
+      "status": 415,
+      "code": "unsupported_type",
+      "message": "plate.txt: chỉ nhận ảnh JPEG hoặc PNG",
+      "passed": true
+    },
+    {
+      "case": "ảnh GIF đổi đuôi .jpg",
+      "expected_status": 415,
+      "expected_code": "unsupported_type",
+      "status": 415,
+      "code": "unsupported_type",
+      "message": "p.jpg: chỉ nhận ảnh JPEG hoặc PNG",
+      "passed": true
+    },
+    {
+      "case": "JPEG bị cắt cụt (file hỏng)",
+      "expected_status": 422,
+      "expected_code": "corrupt_image",
+      "status": 422,
+      "code": "corrupt_image",
+      "message": "cut.jpg: không giải mã được ảnh (file hỏng?)",
+      "passed": true
+    },
+    {
+      "case": "file rỗng",
+      "expected_status": 422,
+      "expected_code": "empty_file",
+      "status": 422,
+      "code": "empty_file",
+      "message": "e.jpg: file rỗng",
+      "passed": true
+    },
+    {
+      "case": "ảnh > 2 MB",
+      "expected_status": 413,
+      "expected_code": "file_too_large",
+      "status": 413,
+      "code": "file_too_large",
+      "message": "big.jpg: vượt 2 MB mỗi ảnh",
+      "passed": true
+    },
+    {
+      "case": "ảnh 4000 px chiều rộng",
+      "expected_status": 413,
+      "expected_code": "image_too_large",
+      "status": 413,
+      "code": "image_too_large",
+      "message": "wide.png: ảnh 4000x8 px vượt giới hạn 2048 px mỗi cạnh",
+      "passed": true
+    },
+    {
+      "case": "ảnh 2×3 px",
+      "expected_status": 422,
+      "expected_code": "image_too_small",
+      "status": 422,
+      "code": "image_too_small",
+      "message": "dot.png: ảnh 3x2 px quá nhỏ",
+      "passed": true
+    },
+    {
+      "case": "zip hỏng",
+      "expected_status": 400,
+      "expected_code": "zip_invalid",
+      "status": 400,
+      "code": "zip_invalid",
+      "message": "t.zip: không đọc được file zip",
+      "passed": true
+    },
+    {
+      "case": "zip không có ảnh",
+      "expected_status": 400,
+      "expected_code": "zip_no_images",
+      "status": 400,
+      "code": "zip_no_images",
+      "message": "t.zip: zip không chứa ảnh .jpg/.png nào",
+      "passed": true
+    },
+    {
+      "case": "gửi lẫn zip và ảnh",
+      "expected_status": 400,
+      "expected_code": "mixed_upload",
+      "status": 400,
+      "code": "mixed_upload",
+      "message": "Gửi 1 file zip HOẶC 1–5 ảnh, không gửi lẫn",
+      "passed": true
+    },
+    {
+      "case": "decoder không tồn tại",
+      "expected_status": 422,
+      "expected_code": "invalid_parameter",
+      "status": 422,
+      "code": "invalid_parameter",
+      "message": "query.decoder: Input should be 'greedy', 'beam' or 'constrained'",
+      "passed": true
+    },
+    {
+      "case": "feedback cho request_id không tồn tại",
+      "expected_status": 404,
+      "expected_code": "not_found",
+      "status": 404,
+      "code": "not_found",
+      "message": "Không có dự đoán với request_id 00000000000000000000000000000000",
+      "passed": true
+    }
+  ]
+}

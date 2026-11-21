@@ -1,0 +1,65 @@
+{
+  "created": "2026-11-20T21:03:13",
+  "model_version": "restran-recipe-s42-ep30-9754ebb1915e",
+  "checkpoint": {
+    "path": "results_new/restran_lockbox_combo3_s42_ep30.pth",
+    "sha256": "9754ebb1915eac8284c130cea479393c5695b25ae1587c1bd24950bc128a7bba",
+    "bytes": 134719041,
+    "manifest": "results_new/freeze_manifest.json",
+    "manifest_key": "results/restran_lockbox_combo3_s42_ep30.pth",
+    "manifest_digest": "39c39dfceb86a2d5b9d338ade096c5a00a85bebe88ad0127e049d318b7117824",
+    "matches_manifest": true
+  },
+  "selection_rule": "recipe #50 (combo3), lock-box run, seed 42, last epoch (30): fixed rule, not chosen by any lock-box score",
+  "training": {
+    "run": "restran_lockbox_combo3_s42",
+    "train_tracks": 18001,
+    "train_samples": 36002,
+    "excluded": [
+      "splits/val_tracks.json (999)",
+      "splits/lockbox_tracks.json (1000)"
+    ],
+    "flags": "--seed 42 --epochs 30 --lr 3e-4 --grad-clip 1.0 --skip-grad-norm 100 --split-ratio 0.9 --val-split-file splits/val_tracks.json --consistent-aug --no-channel-shuffle --degrade-strength calibrated --aux-frame-ctc 0.2 --frame-mask 0.2 --frame-dropout 0.1 --grayscale --exclude-tracks splits/lockbox_tracks.json --save-last-k 6",
+    "source": "documents/RUNS.md, section 'Lock-box: lệnh chạy'; results_new/restran_lockbox_combo3_s42_train.log",
+    "environment": {
+      "python": "3.10.13",
+      "platform": "Linux-6.14.7-sm1-x86_64-with-glibc2.35",
+      "host": "fierce-ibex",
+      "torch": "2.14.1+cu126",
+      "cuda": "12.6",
+      "cudnn": 91002,
+      "gpu": "Tesla V100-SXM2-32GB"
+    }
+  },
+  "architecture": {
+    "name": "ResTranOCR (STN + ResNet34 + AttentionFusion + Transformer x3 + CTC)",
+    "parameters": 31077676,
+    "num_classes": 37,
+    "time_steps": 16
+  },
+  "preprocessing": {
+    "size": [
+      32,
+      128
+    ],
+    "resize": "cv2.INTER_LINEAR",
+    "normalize": "mean 0.5, std 0.5",
+    "grayscale": true,
+    "luma": "BT.601 (0.299, 0.587, 0.114), replicated to 3 channels",
+    "frames": "1-5, fed directly (AttentionFusion accepts any count)"
+  },
+  "lockbox_reference": {
+    "this_checkpoint_last_epoch_acc": 79.9,
+    "recipe_4_seeds_last_epoch_mean": 79.12,
+    "baseline_4_seeds_last_epoch_mean": 77.6,
+    "source": "results_new/lockbox_eval.json"
+  },
+  "expected_accuracy_by_frames": {
+    "1": 55.59,
+    "2": 69.02,
+    "3": 74.13,
+    "4": 77.0,
+    "5": 79.12
+  },
+  "scope": "Brazilian/Mercosur single-row plates, 7 characters (LRLPR-26). Not for Vietnamese plates. Input = plate crops, no detector."
+}

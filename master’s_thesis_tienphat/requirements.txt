@@ -1,0 +1,17 @@
+# MF-PlateReader: API + UI + tests. Versions = the ones the app was tested with (20/11/2026).
+# PyTorch: pip install torch==2.13.0 torchvision==0.28.0 (CPU is enough for the app).
+torch==2.13.0
+torchvision==0.28.0
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.34
+pydantic==2.13.4
+httpx==0.28.1
+gradio==6.32.0
+pillow==12.2.0
+# Analysis scripts and tests only
+matplotlib==3.11.0
+albumentations==2.0.8
+pytest==9.2.0

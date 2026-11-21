@@ -1,0 +1,443 @@
+% MSE Applied Capstone Project Proposal (template V2), MF-PlateReader.
+% Build: tectonic proposal.tex   (or upload the folder to Overleaf, compiler pdfLaTeX)
+% References: python3 make_refs.py  (writes references.tex in order of first citation)
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext,newtxmath}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage{float}
+\usepackage{microtype}
+\emergencystretch=1.5em
+
+\setlist{nosep,leftmargin=1.4em}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.18}
+\captionsetup{font=small,labelfont=bf}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{\MakeUppercase}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{12pt}{4pt}
+\titlespacing*{\subsection}{0pt}{8pt}{2pt}
+\newcommand{\done}{\textcolor{green!45!black}{done}}
+\newcommand{\planned}{\textcolor{orange!80!black}{planned}}
+\newcommand{\pp}{\,pp}
+
+\begin{document}
+
+\begin{center}
+{\large\bfseries MASTER OF SOFTWARE ENGINEERING (MSE)}\\[2pt]
+{\bfseries CAPSTONE PROJECT PROPOSAL}\\[10pt]
+{\Large\bfseries MF-PlateReader: A Web Service with Human Review for Reading\\[2pt]
+Low-Resolution License Plates from Multi-Frame Camera Crops}
+\end{center}
+
+\vspace{4pt}
+\begin{tabularx}{\textwidth}{@{}P{3.3cm}L@{}}
+\toprule
+Student & Tien-Phat Nguyen \quad (Student ID: 25MS23284) \\
+Email & \texttt{phatnt25ms23284@fpt.edu.vn} \\
+Supervisor & Vo-Trung-Dung Huynh \\
+Programme & Master of Software Engineering, FPT University, Ho Chi Minh City \\
+Project type & Applied capstone: machine-learning component, REST service, web client \\
+Duration & August--December 2026; prototype demonstration on 27 December 2026 \\
+Status date & 20 November 2026 \\
+\bottomrule
+\end{tabularx}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+
+\subsection{Background}
+
+Automatic license plate recognition (ALPR) is used in traffic enforcement, parking management, toll collection and incident investigation. When the plate is large and sharp, existing systems read it reliably~\cite{laroca2021efficient,shi2017crnn,ke2023ultrafast}. Much surveillance footage does not meet this condition. Cameras are mounted far from the road or use low-cost sensors, vehicles move, recordings are made at night or in rain, and the video is strongly compressed. In such footage a plate may reach the recognizer at about $47\times17$ pixels, which leaves five to seven pixels for each character.
+
+The ICPR 2026 Competition on Low-Resolution License Plate Recognition (LRLPR) formalized this setting~\cite{laroca2026icpr}. Each vehicle is observed as a \emph{track} of five consecutive low-resolution (LR) crops of the same plate, and a track counts as read only if all seven characters are correct. The training set contains 20{,}000 tracks of Brazilian and Mercosur plates. Scenario A (10{,}000 tracks) was recorded under stable conditions with lossless images. Scenario B (10{,}000 tracks, 2{,}000 Brazilian and 8{,}000 Mercosur) contains rain, night scenes and JPEG compression, and matches the test distribution. The best competition entry reached 82.13\% on the blind test set with a model ensemble and external data~\cite{laroca2026icpr}. The organizers also released the baseline code of the recognizer ResTran~\cite{baselinecode}, which this project builds on.
+
+Four groups of stakeholders are affected. CCTV operators and footage reviewers in traffic control rooms and parking facilities search recorded video for a vehicle and transcribe its plate. Investigators and managers act on that transcription and need to know how far they can trust it. System integrators need a documented interface to call a recognizer from their own software. The machine-learning team trains new model versions and has to show that a new version is better before it replaces the current one. The system is a decision-support tool: it reads the plate and says when a person should check the reading.
+
+\subsection{Practical problem statement and user pain points}
+
+On such footage the recognizer is right on most tracks, and the available tools do not say which readings are wrong. The following problems were measured with the competition baseline on the LRLPR data during the first phase of the project.
+
+\begin{enumerate}[label=\textbf{P\arabic*}]
+\item \textbf{Image quality limits accuracy.} With one LR frame, the baseline reads 56.53\% of the tracks correctly. With five frames it reads 77.19\%, and when the same network is trained and tested on the high-resolution frames it reads 98.45\%. Since the same network reads almost every plate when the input is sharp, the bottleneck is the information in each frame. A super-resolution front-end that we trained reconstructed the high-resolution image 9.3\% better than bilinear interpolation (L1 error), yet lowered recognition accuracy by 1.36 percentage points (pp).
+\item \textbf{Every reading has to be checked by hand.} With about one wrong reading in five and no reliable signal of which ones are wrong, an operator must verify all results. The model's own confidence does not help as it is: on 999 validation tracks, 87\% of the characters receive a confidence above 0.98, yet only 77\% of the plates are read correctly; the expected calibration error of the plate confidence is 0.20.
+\item \textbf{The research code is not a service.} The baseline consists of training and evaluation scripts that read folders and write text files. It has no API, no validation of uploaded files (corrupt, oversized, wrong format), no model versioning, and no record of results or user corrections, so it cannot be integrated into an operator's workflow.
+\item \textbf{Claims about new model versions are unreliable.} In our environment the published training configuration diverged in two out of two seeds. Improvements of one to two pp are as large as the variation between training seeds and as the 1.3\pp{} standard error of accuracy on 1{,}000 tracks. Choosing a configuration on the same split that is reported also inflates the estimate~\cite{recht2019imagenet}. Without a held-out evaluation, the team cannot tell whether a new version should be deployed.
+\item \textbf{Fewer than five usable frames.} In practice frames are occluded, dropped, or blurred. A pipeline that assumes exactly five frames either fails or pads the input in an untested way.
+\end{enumerate}
+
+\subsection{Research objectives and questions}
+
+Table~\ref{tab:objectives} lists the engineering objectives. O1--O3 were completed before this proposal was written; O4 and O5 are still open.
+
+\begin{table}[H]
+\centering\small
+\caption{SMART objectives. pp = percentage points; status as of 20 November 2026.}\label{tab:objectives}
+\begin{tabularx}{\textwidth}{@{}P{0.6cm}LP{4.6cm}P{1.35cm}P{2.6cm}@{}}
+\toprule
+ID & Objective & Measure and target & Deadline & Status \\
+\midrule
+O1 & Improve the recognizer through training only, without changing the network used at inference & Gain $\geq$ 1.0\pp{} (mean of the last 6 epochs) over the stabilized baseline on a pre-registered held-out set; 95\% bootstrap CI above 0; 0 extra parameters & 31 Oct & \done: +1.64\pp, CI [0.78, 2.48] \\
+O2 & Serve the frozen model through a documented REST API & $\leq$ 2 of 999 tracks differ from the offline evaluation; p95 latency $\leq$ 1\,s per 5-frame track on CPU; OpenAPI spec & 22 Nov & \done: 0/999; 24\,ms \\
+O3 & Flag readings that need human review & Precision of auto-accepted readings $\geq$ 95\% on held-out tracks, for 1--5 frames; coverage reported & 22 Nov & \done: 95.4\% at 74.0\% coverage (5 frames) \\
+O4 & Make the system usable and deployable & Web UI usable in a phone browser; containerized deployment with a private HTTPS URL; 30/30 end-to-end cases; $\geq$ 8 malformed inputs rejected with the documented error & 6 Dec & UI and tests \done{} (30/30, 14/14); deployment \planned \\
+O5 & Validate with users & 5 participants; System Usability Scale (SUS) $\geq$ 68; task completion $\geq$ 80\% & 13 Dec & \planned \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The model-related objectives answer three research questions:
+\begin{itemize}
+\item \textbf{RQ1.} Does regularizing multi-frame fusion during training improve exact-match accuracy on held-out tracks, at no extra inference cost?
+\item \textbf{RQ2.} Where does the improvement come from: the number of frames available at test time, the spatial transformer, or per-frame masking?
+\item \textbf{RQ3.} Which share of the readings can be accepted automatically at 95\% precision, and how does it depend on the number of frames?
+\end{itemize}
+
+\subsection{Scope}
+
+\begin{table}[H]
+\centering\small
+\caption{Project boundaries.}\label{tab:scope}
+\begin{tabularx}{\textwidth}{@{}LL@{}}
+\toprule
+In-scope components & Out-of-scope components \\
+\midrule
+Recognition of single-row, 7-character Brazilian and Mercosur plates from 1--5 cropped LR frames of one vehicle & Plate detection and tracking in full video frames (the dataset contains only crops) \\
+Training recipe on the ResTran architecture, its held-out evaluation and mechanism experiments & Vietnamese and other two-row plate formats \\
+REST API (six endpoints) covering upload validation, inference, decoding, triage, feedback, history, statistics and model information & Model ensembles and external training data \\
+Web UI (desktop and mobile browser) for upload, results, review flag, feedback and session history & Integration with commercial video management systems or camera hardware \\
+Triage thresholds calibrated per number of frames & User accounts and role-based access control (a shared API key only) \\
+SQLite log of predictions and feedback (no images stored) & GPU serving, autoscaling, high-availability clusters \\
+Docker images, Docker Compose deployment, private tunnel for the demonstration & Retraining from user feedback (feedback is stored for later use only) \\
+Automated tests, latency measurement, user test with SUS & The official LRLPR test set (not used, by decision of the supervisor) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Literature and technical review}
+
+\subsection{Overview of existing solutions}
+
+Existing work falls into four groups, compared in Table~\ref{tab:existing}.
+
+\textbf{General-purpose OCR engines.} Tesseract~\cite{smith2007tesseract} and PP-OCR~\cite{du2020ppocr} are open-source engines that support many languages. Both are built for documents and scene text with legible characters, read one image at a time, and know nothing about plate syntax.
+
+\textbf{ALPR pipelines.} Recognizers such as CRNN~\cite{shi2017crnn} read a cropped plate without segmenting characters. Complete systems combine a detector with such a recognizer: Laroca et~al.~\cite{laroca2021efficient} report 96.9\% average end-to-end recognition across eight public datasets with a YOLO-based, layout-independent design, and Ke et~al.~\cite{ke2023ultrafast} target real-time operation in unconstrained scenes. These systems read one frame and assume the plate is readable in it.
+
+\textbf{Restoration before recognition.} Another line restores the image first, with plate-specific super-resolution~\cite{nascimento2023sr,nascimento2025benchmark}, text-oriented super-resolution~\cite{wang2020tsrn}, or multi-frame restoration with optical flow~\cite{na2025mflpr2}. The restored image is easy to inspect, but a second network runs at inference time, and a better reconstruction does not necessarily give a better reading (problem P1).
+
+\textbf{Multi-frame recognizers.} The LRLPR competition~\cite{laroca2026icpr} produced recognizers that fuse the five frames inside the network. The baseline ResTran passes each frame through a spatial transformer (STN)~\cite{jaderberg2015stn} and a shared ResNet-34~\cite{he2016resnet}, fuses the frames with attention, and decodes the sequence with a Transformer encoder~\cite{vaswani2017attention} and CTC~\cite{graves2006ctc}. The top-ranked entries added ensembles and external data.
+
+\begin{table}[H]
+\centering\small
+\caption{Existing approaches and their trade-offs in this setting.}\label{tab:existing}
+\begin{tabularx}{\textwidth}{@{}P{2.6cm}P{2.8cm}LL@{}}
+\toprule
+Approach & Examples & Strengths & Trade-offs for 47$\times$17-pixel tracks \\
+\midrule
+General OCR & Tesseract~\cite{smith2007tesseract}, PP-OCR~\cite{du2020ppocr} & Open source, many languages & One image; built for legible text; no plate syntax \\
+Single-frame ALPR & \cite{laroca2021efficient,shi2017crnn,ke2023ultrafast} & Fast, accurate on readable plates & Ignores the other four frames; no signal of when to distrust a reading \\
+Restoration first & \cite{nascimento2023sr,nascimento2025benchmark,wang2020tsrn,na2025mflpr2} & Inspectable enhanced image & Extra network at inference; reconstruction gains need not transfer to recognition \\
+Multi-frame recognizers & ResTran~\cite{baselinecode}, LRLPR entries~\cite{laroca2026icpr} & Use all five frames; best accuracy & Research code; ensembles multiply cost; no API, triage or versioning \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Technical gaps and limitations of current approaches}
+
+\begin{enumerate}[label=\textbf{G\arabic*}]
+\item \textbf{Single-frame tools discard information.} At this resolution one frame gives 56.5\% accuracy; the gain from fusing five frames (about 20\pp) is unavailable to tools that read one image.
+\item \textbf{Accuracy gains are bought with inference cost.} Super-resolution front-ends and ensembles add networks at inference. An operator tool runs on an ordinary CPU server, where every extra network adds to the time per reading.
+\item \textbf{No operating point for automation.} None of the reviewed solutions states which readings can be accepted without review. Modern networks tend to be over-confident~\cite{guo2017calibration}, and selective classification~\cite{geifman2017selective} shows that a calibrated threshold on the confidence can guarantee a target error rate on the accepted part. The multi-frame recognizers we reviewed do not report such an operating point.
+\item \textbf{No service layer.} The multi-frame research code offers no input validation, versioned model artifacts, documented API, audit log, or feedback loop.
+\item \textbf{Weak evaluation practice.} Configurations are usually chosen and reported on the same validation split~\cite{recht2019imagenet}, so a deployment decision has no unbiased estimate behind it. None of the works we reviewed fixes its evaluation in advance, as pre-registration does~\cite{nosek2018preregistration}.
+\end{enumerate}
+
+\subsection{Rationale for the selected approach and stack}
+
+The workload decides most choices: one model, a few operators sending one track at a time (low request rate), CPU-only hosts, a single maintainer, and a fixed demonstration date. Table~\ref{tab:tradeoffs} lists the decisions and the evidence behind them.
+
+\begin{table}[H]
+\centering\small
+\caption{Engineering decisions and trade-offs.}\label{tab:tradeoffs}
+\begin{tabularx}{\textwidth}{@{}P{2.3cm}P{3.6cm}P{2.3cm}L@{}}
+\toprule
+Decision & Options considered & Chosen & Reason \\
+\midrule
+Accuracy strategy & Super-resolution front-end; ensemble of models; training-only recipe & Training-only recipe & Super-resolution lowered accuracy by 1.36\pp{} in our test; an ensemble of $k$ models costs $k$ times at inference; the recipe adds 0 parameters and 0 inference cost (O1) \\
+Service architecture & Microservices; dedicated model server (e.g.\ TorchServe, Triton); modular monolith API + thin UI & Modular monolith API, separate UI client & One model and a low request rate do not justify service decomposition; a single process keeps parity with the offline evaluation easy to prove; the UI calls the API over HTTP, so the frontend can be replaced \\
+API framework & Flask; FastAPI; model-server REST frontends & FastAPI~\cite{fastapi} & Same Python runtime as PyTorch~\cite{paszke2019pytorch}; request validation with typed schemas; OpenAPI 3.1 spec~\cite{openapi} generated from code \\
+Inference runtime & Eager PyTorch; TorchScript; ONNX & Eager PyTorch on CPU & Measured 18\,ms per 5-frame track, far below the 1\,s target; an exported copy would be a second artifact that must also pass parity \\
+Data store & PostgreSQL; MongoDB; SQLite & SQLite (WAL mode) & Single node, low write rate, relational data (prediction 1--$n$ feedback), zero administration; migrate to PostgreSQL only if several API replicas are needed \\
+Frontend & Next.js; Streamlit; Gradio~\cite{abid2019gradio} & Gradio & Python only; upload, gallery and table components work in mobile browsers; Next.js would add 2--3 weeks of work outside the project's focus \\
+Deployment & Kubernetes; cloud VM with public IP; Docker Compose + Cloudflare Tunnel & Docker Compose~\cite{dockercompose} + tunnel~\cite{cloudflaretunnel} & Two containers on one host; the tunnel gives HTTPS without opening inbound ports or paying for a public IP \\
+Decoding & Greedy; beam; beam constrained to plate syntax & Greedy (default), others selectable & A rule fixed before measuring: a beam decoder is adopted only if it gains $\geq$ 0.3\pp{} on validation; the constrained decoder gained 0.05\pp \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Proposed solution and engineering design}
+
+\subsection{High-level system architecture}
+
+The system is a modular monolith with two runtime containers and an offline machine-learning pipeline (Figure~\ref{fig:arch}). The UI container serves the web interface; it holds no model and reaches the API only through the public REST interface. The API container runs one FastAPI process, which passes each request through upload validation, preprocessing, inference, decoding and triage, and writes the result to an SQLite store on a Docker volume. The offline pipeline runs in the training repository on a rented GPU. It trains the model, evaluates it on the pre-registered held-out set, calibrates the decoder choice and the triage thresholds on the validation set, and freezes the results as versioned artifacts.
+
+The API and the offline pipeline share only these frozen artifacts: the checkpoint with its SHA-256 hash, \texttt{serving\_config.json}, \texttt{decoder\_decision.json} and \texttt{threshold\_calibration.json}. The API loads them at start-up and refuses to serve a checkpoint whose hash differs from the one recorded before the held-out evaluation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_architecture.pdf}
+\caption{High-level architecture. Solid boxes run at serving time; the offline pipeline produces the frozen artifacts that the API loads.}\label{fig:arch}
+\end{figure}
+
+\subsection{Core component design and interfacing}
+
+\textbf{Recognition model.} The network is ResTran (31.08M parameters) and is not modified. The project changes only how it is trained and how its input is prepared, through the six components in Table~\ref{tab:recipe}. Augmentation is replayed with Albumentations~\cite{buslaev2020albumentations}, the per-frame loss follows deep supervision~\cite{lee2015dsn}, and frame dropout follows modality dropout~\cite{neverova2016moddrop}. None of them adds parameters, and apart from the luma conversion of the input, none runs at inference time. Training becomes slower: replaying augmentation adds 51\% per epoch, and the auxiliary loss adds about 8\% per batch.
+
+\begin{table}[H]
+\centering\small
+\caption{Training recipe (configuration \#50).}\label{tab:recipe}
+\begin{tabularx}{\textwidth}{@{}P{3.5cm}L@{}}
+\toprule
+Component & Change \\
+\midrule
+Track-consistent augmentation & One set of augmentation parameters per track, replayed on all five frames; channel shuffle removed \\
+Calibrated degradation & Gaussian noise of the synthetic low-resolution branch limited to a standard deviation of 0.02--0.08 \\
+Luma input & BT.601 luma replicated to three channels, for training and inference \\
+Per-frame auxiliary CTC & Each frame is also decoded alone by the shared Transformer and head; weight 0.2 \\
+Frame dropout & With probability 0.1, a frame's features are replaced by the mean of the other frames before fusion \\
+Independent masking & With probability 0.2, one vertical or horizontal band is erased, independently in each frame \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Service components.} Table~\ref{tab:components} lists the modules of the \texttt{mfplate} package and the UI. The API imports the model code from the training repository, so it serves exactly the network that was trained.
+
+\begin{table}[H]
+\centering\small
+\caption{Software components.}\label{tab:components}
+\begin{tabularx}{\textwidth}{@{}P{2.7cm}L@{}}
+\toprule
+Module & Responsibility \\
+\midrule
+\texttt{uploads} & Accept 1--5 JPEG/PNG files or one zip of a track; detect the format from magic bytes; enforce limits (2\,MB per image, 2048\,px per side, 12\,MB per zip); use only \texttt{lr-*} frames from a track zip \\
+\texttt{preprocess} & Resize to 32$\times$128, normalize, convert to luma; bit-identical to the training pipeline; per-frame sharpness (Laplacian variance) \\
+\texttt{engine} & Load the checkpoint, verify SHA-256, run inference on 1--5 frames, expose per-frame attention weights; one forward pass at a time \\
+\texttt{decoding} & Greedy, beam and syntax-constrained CTC decoding; exact CTC probability of each candidate; top-$k$ alternatives; per-character confidence \\
+\texttt{api} & HTTP endpoints, triage (threshold for the given number of frames, plate-syntax check), warnings, uniform error envelope, optional API key \\
+\texttt{storage} & SQLite tables \texttt{predictions} and \texttt{feedback}; review rate and feedback accuracy \\
+\texttt{ui/app.py} & Gradio client: upload, plate card with review badge, frame gallery with fusion weights, top-3, per-character confidence, feedback, session history \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Interfaces.} All communication uses REST over HTTP with JSON bodies; images are uploaded as \texttt{multipart/form-data}. The API exposes six endpoints (Table~\ref{tab:endpoints}) and publishes its OpenAPI 3.1 specification at \texttt{/openapi.json}. Every error has the form \texttt{\{"error": \{"code", "message"\}, "request\_id"\}}. There are 17 documented error codes, mapped to HTTP 400, 401, 404, 413, 415, 422, 500 and 503. Each response also carries a \texttt{model\_version} that includes the first 12 hexadecimal digits of the checkpoint hash.
+
+\begin{table}[H]
+\centering\small
+\caption{REST endpoints.}\label{tab:endpoints}
+\begin{tabularx}{\textwidth}{@{}P{3.2cm}L@{}}
+\toprule
+Endpoint & Purpose \\
+\midrule
+\texttt{POST /predict} & Read a plate. Returns the plate, confidence, CTC probability, per-character confidence, top-$k$ candidates, layout, per-frame weights and sharpness, review flag with reasons, warnings, expected accuracy for the number of frames sent, latency and model version \\
+\texttt{POST /feedback} & Record whether a reading was correct and, if not, the corrected plate \\
+\texttt{GET /history} & Recent readings of a session \\
+\texttt{GET /stats} & Number of readings, review rate, mean latency, accuracy reported by users for auto-accepted and reviewed readings \\
+\texttt{GET /model} & Model version, verified hash, default decoder, thresholds per number of frames, upload limits \\
+\texttt{GET /health} & 200 when the model is loaded, 503 otherwise (used by the container health check) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Data model.} The table \texttt{predictions} stores the request id, time, session, SHA-256 of the input files, number of frames, plate, confidence, triage score, review flag, decoder, latency, model version and the full JSON response. The table \texttt{feedback} references a prediction and stores the user's verdict and the corrected plate. Images are never stored: the dataset is licensed, and a plate is personal data. The hashes are enough to detect repeated inputs and to audit the log.
+
+\textbf{Triage.} A reading is flagged for review when its confidence score is below the threshold for its number of frames, or when the string does not follow either plate pattern (LLLNLNN or LLLNNNN). The score and the thresholds are chosen on the 999-track validation split by rules written before the measurement. The score is the one with the lowest area under the risk--coverage curve~\cite{geifman2017selective}. For each number of frames, the threshold is the lowest one at which the auto-accepted readings reach 95\% precision.
+
+\subsection{Software engineering methodology and DevOps pipeline}
+
+\textbf{Process.} Work follows Kanban with a weekly cadence. The backlog comes from the supervisor's 12-week roadmap and from the issues raised in the supervisor's code and experiment review. Items are prioritized with MoSCoW, and progress is reviewed with the supervisor every week. Each roadmap week has a written report that records what was delivered and what was replaced.
+
+\textbf{Experiment management.} Machine-learning work follows rules that make results auditable:
+\begin{itemize}
+\item Every new training feature sits behind a command-line flag that is off by default. A regression check confirms that, with all flags off, training is bit-identical to the original baseline code.
+\item Every run is logged with its command, metrics and outcome.
+\item Evaluation decisions are written down before the data are seen: the held-out protocol, the decoder rule and the threshold rule.
+\item A manifest records the SHA-256 hashes of the code, the data splits and all evaluated checkpoints before the held-out set is scored.
+\end{itemize}
+
+\textbf{Build and deployment.}
+\begin{itemize}
+\item One Docker image (Python 3.11, CPU build of PyTorch, non-root user) serves both containers; Docker Compose starts the API with a health check, then the UI, and optionally the tunnel.
+\item A Dockerfile-specific ignore list keeps the datasets and the other checkpoints out of the build context.
+\item Dependencies are pinned to the versions under which the tests pass.
+\end{itemize}
+
+\textbf{Continuous integration (planned).} The code will move to a Git repository with a pipeline that runs on every push:
+\begin{itemize}
+\item lint (ruff);
+\item unit and API tests with a coverage gate of 80\%;
+\item a dependency vulnerability scan (pip-audit);
+\item a Docker build and a comparison of the generated OpenAPI file with the committed one.
+\end{itemize}
+A version tag builds the release image used for the demonstration. The tests and the coverage report already run locally and the Docker files are written, but the image has not been built yet and the hosted pipeline is not set up.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Expected results and performance evaluation}
+
+\subsection{Deliverables}
+
+\begin{itemize}
+\item Source code with README instructions: the training repository (recipe behind default-off flags) and the application package \texttt{masters\_thesis\_tienphat} (API, UI, analysis scripts, 61 automated tests).
+\item The frozen model and its manifest: checkpoint, SHA-256 hashes, serving configuration, decoder and threshold decisions.
+\item Deployment configuration: a Dockerfile and a Docker Compose file with health checks and an optional Cloudflare Tunnel service.
+\item API documentation: the generated OpenAPI 3.1 specification and a written guide with example requests and responses and the table of error codes.
+\item Architecture and user documentation: this design, a demonstration script, the user-test protocol, and weekly reports mapping the roadmap to the delivered work.
+\item Evaluation reports: the held-out (lock-box) report, mechanism experiments, error audit, triage calibration, parity, end-to-end and latency reports.
+\item A conference paper on the training recipe and its pre-registered evaluation, prepared for ICCIES 2027.
+\end{itemize}
+
+\subsection{Verification and validation plan}
+
+\begin{table}[H]
+\centering\small
+\caption{Verification and validation plan. Results measured on 20 November 2026 unless marked as planned.}\label{tab:vv}
+\begin{tabularx}{\textwidth}{@{}P{2.2cm}LP{3.3cm}P{3.0cm}@{}}
+\toprule
+Testing tier & Methodology and tools & Success criterion & Result \\
+\midrule
+Unit & pytest: decoder (22 tests, incl.\ exact CTC probability against brute-force enumeration), preprocessing (9, bit-identity with training pipeline) & All pass; $\geq$ 80\% statement and branch coverage & Pass; 93\% (coverage.py) \\
+API / integration & FastAPI TestClient: 30 tests, 17 of them malformed inputs & All pass & 30/30 \\
+Parity & Every validation track sent through the API and compared with the offline evaluation; CPU vs.\ GPU & $\leq$ 2 of 999 tracks differ & 0/999; held-out set 0/1000 \\
+Model evaluation & Pre-registered held-out set of 1{,}000 tracks, 4 seeds per arm, scored once; paired bootstrap~\cite{efron1993bootstrap}, McNemar~\cite{mcnemar1947} & Gain $\geq$ 1.0\pp, CI above 0 & +1.64\pp, CI [0.78, 2.48] \\
+End-to-end & 30 scripted cases against the running server: 20 tracks (layout $\times$ sharpness quartile) + 10 edge cases & 30/30 answered with a complete response & 30/30 \\
+Error handling & 14 malformed requests against the running server & Documented status and error code & 14/14 \\
+Performance & HTTP benchmark: 200 sequential requests, 1--5 frames, 5 concurrent clients & p95 $\leq$ 1\,s per 5-frame track & 24.1\,ms; 112\,ms with 5 clients (dev machine) \\
+Security & Input validation tests (magic bytes, size, dimensions, zip limits); optional API key; non-root container; no image storage; pip-audit & No high or critical known vulnerability in runtime dependencies & Validation tests pass; scan \planned \\
+Usability & 5 participants, 4 tasks, SUS questionnaire~\cite{brooke1996sus} & SUS $\geq$ 68; completion $\geq$ 80\% & \planned \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Success metrics and SLA compliance}
+
+Table~\ref{tab:kpi} lists the KPIs. The accuracy and triage figures come from the held-out set, which played no part in choosing the model, the decoder or the thresholds. The latency figures were measured on the development machine (Apple M4, 10 cores) and will be measured again on the demonstration host.
+
+\begin{table}[H]
+\centering\small
+\caption{Key performance indicators.}\label{tab:kpi}
+\begin{tabularx}{\textwidth}{@{}LP{3.4cm}P{4.4cm}@{}}
+\toprule
+KPI & Target & Current value \\
+\midrule
+Exact-match accuracy on the held-out set (mean of 4 seeds, last epoch) & $>$ baseline, CI above 0 & 79.12\% vs.\ 77.60\% (+1.52\pp, CI [0.53, 2.52]) \\
+Accuracy with fewer frames (robustness, RQ2) & Reported per number of frames & +5.00\pp{} over the baseline with 1 frame, +1.52\pp{} with 5 \\
+Precision of auto-accepted readings (5 frames) & $\geq$ 95\% & 95.4\% \\
+Share of readings accepted automatically (5 frames) & Reported; $\geq$ 70\% desired & 74.0\% \\
+Share of wrong readings routed to review (5 frames) & $\geq$ 80\% & 83.1\% (167 of 201) \\
+API--offline parity & $\leq$ 2/999 & 0/999 \\
+Latency, one 5-frame track, p95 & $\leq$ 1\,s & 24.1\,ms \\
+Model integrity & 100\% of start-ups verify the checkpoint hash & Enforced; mismatch returns 503 \\
+Availability during the demonstration week & $\geq$ 99\% of health checks succeed & \planned{} (health check every 15\,s) \\
+User acceptance & SUS $\geq$ 68 & \planned \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Project implementation and research plan}
+
+\subsection{Work breakdown structure and project phases}
+
+\begin{table}[H]
+\centering\small
+\caption{Work breakdown structure.}\label{tab:wbs}
+\begin{tabularx}{\textwidth}{@{}P{3.7cm}LP{3.6cm}@{}}
+\toprule
+Phase & Work packages & Outputs \\
+\midrule
+P1 Requirements and baseline analysis (Aug--Sep) & Reproduce the baseline; diagnose training divergence and stabilize; measure the high-resolution ceiling, the one-frame vs.\ five-frame gap and the error types; agree on requirements and the 12-week roadmap with the supervisor & Stabilized baseline; run log; roadmap \\
+P2 Model engineering (Oct) & Develop the training recipe behind default-off flags; cumulative ablation; seeds on the published protocol & Configuration \#50 \\
+P3 Pre-registered validation (late Oct) & Protocol; held-out set; 8 training runs; freeze manifest; single scoring; mechanism experiments (frames, STN, masking) & Held-out report; mechanism report \\
+P4 Paper (Nov) & Write the conference paper & ICCIES 2027 submission \\
+P5 Service design and API (Nov) & Decoder study; error audit; triage calibration; API; parity; OpenAPI; tests & API v1.0; parity and calibration reports \\
+P6 Web UI and deployment (Nov--Dec) & Gradio UI; SQLite log and feedback; Docker images; Compose; tunnel; mobile checks & Running demo at a private URL \\
+P7 Testing and user evaluation (Dec) & End-to-end and error cases; latency on the demonstration host; user test with SUS & Test report; SUS results \\
+P8 Thesis, demonstration and release (Dec) & Thesis chapters; demonstration script and backup video; rehearsal with the supervisor; release tag & Thesis; demo; v1.0 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Project timeline and milestones}
+
+Figure~\ref{fig:gantt} shows the schedule and Table~\ref{tab:milestones} the milestones. Phases P6 and P7 partly overlap: the UI and the automated tests were built together with the API, so the remaining work in December is deployment, user testing and documentation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_gantt.pdf}
+\caption{Gantt chart (status on 20 November 2026). Diamonds mark the milestones of Table~\ref{tab:milestones}.}\label{fig:gantt}
+\end{figure}
+
+\begin{table}[H]
+\centering\small
+\caption{Milestones.}\label{tab:milestones}
+\begin{tabularx}{\textwidth}{@{}P{0.7cm}P{1.6cm}LP{1.6cm}@{}}
+\toprule
+ID & Date & Milestone & Status \\
+\midrule
+M1 & 12 Aug & Stabilized baseline training (no divergence in 30 epochs) & \done \\
+M2 & 23 Oct & Recipe frozen; held-out protocol written before any held-out run & \done \\
+M3 & 25 Oct & Held-out set scored once: +1.52\pp, CI above 0 & \done \\
+M4 & 31 Oct & Mechanism experiments complete (frames, STN, masking) & \done \\
+M5 & 20 Nov & API with decoder, triage, parity 0/999 and OpenAPI spec (MVP backend) & \done \\
+M6 & 29 Nov & Web UI v1 with screenshots on desktop and phone & code \done; screenshots \planned \\
+M7 & 6 Dec & Containerized deployment at a private HTTPS URL & \planned \\
+M8 & 13 Dec & Full test cycle on the demonstration host and SUS with 5 users & \planned \\
+M9 & 27 Dec & Final demonstration; release v1.0; thesis submitted & \planned \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Feasibility assessment and risk mitigation strategy}
+
+The model work is complete, so the remaining risk lies in deployment, user evaluation and documentation. These need no GPU and fit in the five remaining weeks. Table~\ref{tab:risks} lists the identified threats.
+
+\begin{table}[H]
+\centering\small
+\caption{Risks and mitigation.}\label{tab:risks}
+\begin{tabularx}{\textwidth}{@{}P{2.2cm}LL@{}}
+\toprule
+Risk category & Identified threat & Mitigation strategy \\
+\midrule
+Technical & Training diverges at the published learning rate (observed in 2/2 seeds) & Lower peak rate, tighter gradient clipping, skip non-finite steps; applied to baseline and recipe alike (resolved) \\
+Technical & Accuracy is limited to about 79\% by image quality; wrong readings reach users & Triage with calibrated thresholds; show top-3 candidates and per-character confidence; describe the result as decision support \\
+Technical & Docker image not yet built on the target host; CPU slower than the development machine & Build in week 1 of P6; repeat the latency benchmark on the host; fall back to running both processes directly with Python \\
+Resource & GPU time is rented per round, and results can be lost when a server is returned & Copy all results and manifests to local storage after each round; all remaining work is CPU-only \\
+Data / legal & The LRLPR-26 data are licensed; plates are personal data & No image storage in the log; demo samples kept private; private tunnel with API key; no public deployment \\
+Validity & Choosing configurations on the reported split overstates gains & Pre-registered held-out set scored once; decoder and thresholds fixed on validation before the held-out set was read \\
+Schedule & Prototype work compressed into the last weeks of the term & MoSCoW: API, UI and tests (must) were finished first; tunnel and mobile checks (should); continuous integration (could) \\
+Usability & Only five participants; they may not be real operators & Report SUS with its spread; record task completion and observed problems; state the limitation in the thesis \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\renewcommand{\refname}{6.\quad REFERENCES}
+\input{references.tex}
+
+\end{document}

@@ -1,0 +1,59 @@
+{
+  "created": "2026-11-20T21:30:57",
+  "note": "descriptive: thresholds were fixed on val 999 before this file was computed",
+  "thresholds_from": "artifacts/threshold_calibration.json",
+  "thresholds_created": "2026-11-20T21:16:35",
+  "score": "mean_char",
+  "lockbox": {
+    "1": {
+      "n": 5000,
+      "accuracy": 55.7,
+      "coverage": 0.3192,
+      "precision_auto": 0.9599,
+      "precision_auto_wilson95_low": 0.9491,
+      "accuracy_review_group": 0.3681,
+      "errors_caught": 2151,
+      "errors_total": 2215
+    },
+    "2": {
+      "n": 10000,
+      "accuracy": 68.84,
+      "coverage": 0.5501,
+      "precision_auto": 0.9546,
+      "precision_auto_wilson95_low": 0.9487,
+      "accuracy_review_group": 0.363,
+      "errors_caught": 2866,
+      "errors_total": 3116
+    },
+    "3": {
+      "n": 10000,
+      "accuracy": 74.25,
+      "coverage": 0.6456,
+      "precision_auto": 0.9515,
+      "precision_auto_wilson95_low": 0.946,
+      "accuracy_review_group": 0.3617,
+      "errors_caught": 2262,
+      "errors_total": 2575
+    },
+    "4": {
+      "n": 5000,
+      "accuracy": 77.4,
+      "coverage": 0.6956,
+      "precision_auto": 0.9546,
+      "precision_auto_wilson95_low": 0.9471,
+      "accuracy_review_group": 0.3614,
+      "errors_caught": 972,
+      "errors_total": 1130
+    },
+    "5": {
+      "n": 1000,
+      "accuracy": 79.9,
+      "coverage": 0.74,
+      "precision_auto": 0.9541,
+      "precision_auto_wilson95_low": 0.9365,
+      "accuracy_review_group": 0.3577,
+      "errors_caught": 167,
+      "errors_total": 201
+    }
+  }
+}

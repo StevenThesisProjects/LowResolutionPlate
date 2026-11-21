@@ -169,6 +169,13 @@ class Config:
     # Experiment E4: replace the learned STN by one fixed affine "a,b,tx,c,d,ty" ("" = off).
     FIXED_STN: str = ""
 
+    # Round v2, main CTC loss only (both off by default = the original 'mean' CTC):
+    # weight of Scenario-B tracks relative to Scenario-A (the lock-box and the test set
+    # are Scenario-B), and online hard example mining — average only the hardest
+    # OHEM_RATIO of each batch (0 = off).
+    SCENARIO_B_WEIGHT: float = 1.0
+    OHEM_RATIO: float = 0.0
+
     # Train AND validate on the undegraded HR frames. Not a submittable model —
     # it measures the accuracy ceiling that image enhancement could ever reach.
     USE_HR: bool = False
