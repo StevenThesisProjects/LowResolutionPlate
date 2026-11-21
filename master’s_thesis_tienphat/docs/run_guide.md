@@ -16,7 +16,7 @@ Mọi lệnh dưới đây đã chạy thử lại ngày 21/11/2026, sau khi tá
 Bố cục thư mục:
 
 ```
-NewClaude/
+LowResolutionPlate/
 ├── restran/                   repo train: src/, configs/ (code mạng), results_new/, dataset/
 └── masters_thesis_tienphat/   app: backend mfplate/, frontend webui/, model/ (checkpoint), báo cáo
 ```
@@ -34,9 +34,6 @@ Backend tự tìm repo theo thứ tự: biến `MFPLATE_REPO_ROOT`, thư mục `
 
 Mọi đường dẫn bên dưới tính từ thư mục `masters_thesis_tienphat/`:
 
-```bash
-cd /Users/nguyentienphat/Learning/Paper/NewClaude/masters_thesis_tienphat
-```
 
 ## 2. Cài đặt (làm một lần)
 
