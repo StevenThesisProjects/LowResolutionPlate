@@ -20,12 +20,12 @@ system within the dataset license.
 work or data copies.}{fig:architecture}
 
 The inference service runs MF-SR-OCR (Fig.~\ref{fig:model}). A spatial transformer
-\cite{jaderberg2015stn} straightens each frame, deformable convolutions \cite{zhu2019dcnv2} align
+straightens each frame, deformable convolutions align
 the frames to the middle one, and a branch super-resolves them by a factor of two. A residual backbone
-with GroupNorm \cite{wu2018groupnorm} encodes each frame, attention fuses the five feature maps, and a
+with GroupNorm encodes each frame, attention fuses the five feature maps, and a
 two-layer BiLSTM with a CTC head \cite{graves2006ctc} reads the sequence over $T=32$ steps and 37
 classes. Training uses $\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$ with
-EMA weights \cite{tarvainen2017mean}. At inference, a beam search of width 16 keeps only prefixes
+EMA weights. At inference, a beam search of width 16 keeps only prefixes
 that match one of the two plate layouts.
 
 \fig{model.png}{MF-SR-OCR recognition pipeline as served by the inference service.}{fig:model}
@@ -122,7 +122,7 @@ The chunk length follows the measured 0.66\,s per track on CPU.}{fig:concurrency
 
 \subsection{Software Engineering Methodology and DevOps Pipeline}
 
-\textbf{Methodology.} Work follows Kanban \cite{anderson2010kanban} with a weekly cadence
+\textbf{Methodology.} Work follows Kanban with a weekly cadence
 (Fig.~\ref{fig:kanban}). GitHub Issues hold the backlog, each item is sized to one week or less, at
 most two items are in progress, and each item goes through one branch and one pull request. The
 weekly report to the supervisor serves as the review and re-planning meeting. Kanban suits a single
@@ -139,7 +139,7 @@ release.
 
 \fig{protocol.png}{Data split (to scale) and model validation protocol.}{fig:protocol}
 
-\textbf{CI/CD.} GitHub Actions \cite{github_actions} will run the pipeline in Fig.~\ref{fig:cicd}.
+\textbf{CI/CD.} GitHub Actions will run the pipeline in Fig.~\ref{fig:cicd}.
 Every pull request runs static checks, unit tests, integration tests against a PostgreSQL service
 container, and security scans. A release tag adds a gate on the lab machine (parity and latency),
 builds and pushes the images, deploys them with Compose and runs a smoke test, with rollback to the

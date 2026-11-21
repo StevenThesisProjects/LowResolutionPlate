@@ -20,9 +20,11 @@ high-resolution (HR) crops and the plate text. Plates follow two Brazilian layou
 and \code{LLLNLNN}, and a track counts as correct only when all seven characters match. With five
 to seven pixels of width per character, a single frame often leaves some glyphs ambiguous.
 
-The author's model MF-SR-OCR \cite{nguyen2026mfsrocr} restores and reads these tracks by combining
-the five frames. Today it exists as research code: training scripts, evaluation scripts and
-checkpoints. This capstone turns it into a web application that parking staff can use. The benchmark
+The author's model MF-SR-OCR restores and reads these tracks by combining the five frames. The
+paper describing it is to be presented at the EAI FPT International Conference on Intelligent
+Systems and Advanced Technologies (EAI FISAT 2026), November 25--27, 2026, at FPT University,
+Ho Chi Minh City\footnote{\url{https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/}}. Today the
+model exists as research code: training scripts, evaluation scripts and checkpoints. This capstone turns it into a web application that parking staff can use. The benchmark
 plates are Brazilian and the model is trained on them, so the system is built and evaluated on that
 domain. Vietnamese plates follow other layouts, often on two rows, and supporting them needs labeled
 Vietnamese data; this is outside the present scope (Section~1.4).
