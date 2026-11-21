@@ -19,14 +19,13 @@ system within the dataset license.
 \fig{architecture.png}{High-level architecture. Solid arrows are calls; dashed arrows are background
 work or data copies.}{fig:architecture}
 
-The inference service runs MF-SR-OCR (Fig.~\ref{fig:model}). A spatial transformer
-straightens each frame, deformable convolutions align
-the frames to the middle one, and a branch super-resolves them by a factor of two. A residual backbone
-with GroupNorm encodes each frame, attention fuses the five feature maps, and a
-two-layer BiLSTM with a CTC head \cite{graves2006ctc} reads the sequence over $T=32$ steps and 37
-classes. Training uses $\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$ with
-EMA weights. At inference, a beam search of width 16 keeps only prefixes
-that match one of the two plate layouts.
+The inference service runs MF-SR-OCR (Fig.~\ref{fig:model}). A spatial transformer straightens each
+frame, deformable convolutions align the frames to the middle one, and a branch super-resolves them
+by a factor of two. A residual backbone with GroupNorm encodes each frame, attention fuses the five
+feature maps, and a two-layer BiLSTM with a CTC head \cite{graves2006ctc} reads the sequence over
+$T=32$ steps and 37 classes. Training uses
+$\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$ with EMA weights. At
+inference, a beam search of width 16 keeps only prefixes that match one of the two plate layouts.
 
 \fig{model.png}{MF-SR-OCR recognition pipeline as served by the inference service.}{fig:model}
 
@@ -69,8 +68,7 @@ $\tau=0.90$ is provisional; with it, 887 of 999 validation tracks are accepted a
 \textbf{Interfaces.} Clients talk to the service through REST over HTTP under \code{/api/v1}: multipart
 uploads in, JSON out, CSV for export, and one error format (RFC~9457). The 14 operations group into
 three resources (Fig.~\ref{fig:apimap}). The full OpenAPI 3.1 description and one page per endpoint
-are in the repository (\code{api-docs/}); the figures below show the contract and its behavior
-instead of reproducing that reference.
+are in the repository (\code{api-docs/}).
 
 \fig{apimap.png}{REST resource map of \code{/api/v1} with success status codes.}{fig:apimap}
 

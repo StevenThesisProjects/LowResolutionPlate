@@ -4,25 +4,25 @@
 
 \subsection{Overview of existing solutions}
 
-Three groups of solutions are relevant. Table~\ref{tab:existing} summarizes how each one relates to
-the requirements of this project.
+Three groups of solutions read plates, and Table~\ref{tab:existing} compares them with the
+requirements of this project. A fourth topic, selective prediction, concerns when a model should
+abstain from a reading.
 
 \textbf{Commercial ALPR services and cloud OCR.} Rekor (the company behind OpenALPR)
 \cite{openalpr}, Plate Recognizer \cite{platerecognizer} and the text detection feature of Amazon
-Rekognition are mature products, and dedicated ALPR products are common in
-parking access control. They handle many countries and camera types, scale on demand and come with
-documentation and support. They are built around one image per
-request, and the cloud versions process images on the provider's servers, with a price per call.
+Rekognition are mature products, and dedicated ALPR systems are common in parking access control.
+They handle many countries and camera types, scale on demand and come with documentation and
+support. They take one image per request, and the cloud versions process images on the provider's
+servers, with a price per call.
 
 \textbf{Open-source OCR libraries.} The open-source OpenALPR engine \cite{openalpr} and general OCR
-systems such as PP-OCR can be self-hosted and adapted. They are designed for
-images in which the characters are legible, and they read one image at a time.
+systems such as PP-OCR can be self-hosted and adapted. They are designed for images in which the
+characters are legible, and they read one image at a time.
 
 \textbf{Research models for low-resolution plates.} One line of work restores the image before
-reading it, using attention and sub-pixel convolution \cite{nascimento2023attention}. Another line
-combines several frames: voting over
-super-resolved frames \cite{nascimento2025toward} and optical-flow restoration in MF-LPR$^2$
-\cite{na2025mflpr2}. Most recognizers in this area build on CRNN with CTC
+reading it, using attention and sub-pixel convolution \cite{nascimento2023attention}. Another
+combines several frames, either by voting over super-resolved frames \cite{nascimento2025toward} or
+by optical-flow restoration as in MF-LPR$^2$ \cite{na2025mflpr2}. Most recognizers in this area build on CRNN with CTC
 \cite{shi2017crnn,graves2006ctc}. In the ICPR 2026 competition, the best entry reached $82.13\%$ on
 the competition test set \cite{laroca2026icpr}. These models are released as training and evaluation
 code, which suits research use.
@@ -49,8 +49,8 @@ Research LR models & 1--5 frames & training code & Target the right images; pack
 
 \subsection{Technical gaps / Limitations of current approaches}
 
-The solutions above serve their intended settings. For low-resolution surveillance tracks, five
-needs remain open in the material reviewed.
+The solutions above work in the settings they were built for. For low-resolution surveillance
+tracks, the material reviewed leaves five needs open.
 
 \begin{description}
   \item[G1. Resolution.] At five to seven pixels per character, the input is below the range that
@@ -78,8 +78,8 @@ MF-SR-OCR is served because it has the lowest seed-to-seed spread and because it
 frames can be shown to reviewers. Whether those frames help reviewers is tested in RQ3. J1 needs
 $4.17\times$ fewer operations per track and remains available as a fallback through configuration.
 
-\textbf{Architecture.} Table~\ref{tab:arch} compares three options. A modular monolith fits one
-developer, one CPU host and one model that should be loaded once.
+\textbf{Architecture.} Table~\ref{tab:arch} compares three options. With one developer and one CPU
+host, and a model that should be loaded only once, a modular monolith is the simplest fit.
 
 \begin{table}[tbp]
 \centering
@@ -116,10 +116,10 @@ MongoDB & Flexible documents & The data is relational (batch, prediction, review
 \end{table}
 
 \textbf{Backend, API style and frontend.} FastAPI \cite{fastapi} keeps the service in Python, so the
-API reuses the exact preprocessing of the training code; this is what makes the 999/999 parity
-possible. It also generates the OpenAPI description. REST with JSON fits browser clients and file
-uploads; errors follow RFC~9457. gRPC would add a proxy layer for browsers without a
-clear gain at this load. Batch progress uses polling for now; Server-Sent Events are an option if
+API reuses the exact preprocessing of the training code, and its output matches the offline model on
+all 999 validation tracks. FastAPI also generates the OpenAPI description. REST with JSON fits
+browser clients and file uploads; errors follow RFC~9457. gRPC would need a proxy layer for browsers
+and brings no clear gain at this load. Batch progress uses polling for now; Server-Sent Events are an option if
 polling becomes a cost. For the frontend, Gradio, Streamlit and React were compared in
 Week~1. React was chosen because the review screen needs custom interaction (suggestion buttons,
 per-character highlights) and the author has production experience with it. Its extra cost of two to
