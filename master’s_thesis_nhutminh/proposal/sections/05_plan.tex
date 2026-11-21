@@ -1,14 +1,14 @@
 % =====================================================================
-\section{Project Implementation and Research Plan}
+\section{PROJECT IMPLEMENTATION AND RESEARCH PLAN}
 % =====================================================================
 
-\subsection{Work Breakdown Structure and Project Phases}
+\subsection{Work Breakdown Structure (WBS) and Project phases}
 
 The work is split into eight packages (Fig.~\ref{fig:wbs}) and five phases that overlap in time
 (Table~\ref{tab:phases}). Model validation and backend work run in parallel because GPU runs take
 about 7 hours each and leave time for coding.
 
-\fig{wbs.pdf}{Work breakdown structure.}{fig:wbs}
+\fig{wbs.png}{Work breakdown structure.}{fig:wbs}
 
 \begin{table}[tbp]
 \centering
@@ -27,14 +27,14 @@ Deployment and handover & W9--12 & Public demo, documentation, thesis chapters, 
 \end{tabularx}
 \end{table}
 
-\subsection{Project Timeline and Milestones}
+\subsection{Project timeline and Milestones}
 
 Fig.~\ref{fig:gantt} shows the schedule and Table~\ref{tab:milestones} the milestones. Weeks~1 and~2
 are complete. Some Week~2 deliverables were taken further than planned: batch processing, the review
 endpoints and the Docker stack were built together with the API skeleton, which leaves room in
 Weeks~7--9.
 
-\fig{gantt.pdf}{Gantt chart. Filled bars are complete; the dashed line marks the proposal date.}{fig:gantt}
+\fig{gantt.png}{Gantt chart. Filled bars are complete; the dashed line marks the proposal date.}{fig:gantt}
 
 \begin{table}[tbp]
 \centering
@@ -57,7 +57,7 @@ M9 & Dec 27 (W12) & Release \code{v1.0} and defense & \Plan \\
 \end{tabularx}
 \end{table}
 
-\subsection{Feasibility Assessment and Risk Mitigation Strategy}
+\subsection{Feasibility assessment and Risk mitigation Strategy}
 
 The plan looks feasible within 12 weeks. The model is trained and validated over three seeds, the
 backend already runs in Docker with full parity, inference needs no GPU, and every tool in the stack
@@ -68,21 +68,21 @@ when it is. Table~\ref{tab:risks} lists the identified risks.
 
 \begin{table}[tbp]
 \centering
-\caption{Risk register (L = likelihood, I = impact; H/M/L).}
+\caption{Risk register. L/I = likelihood/impact (H = high, M = medium, L = low).}
 \label{tab:risks}
-\begin{tabularx}{\textwidth}{@{}>{\bfseries}P{20mm} L c L@{}}
+\begin{tabularx}{\textwidth}{@{}P{22mm} L L@{}}
 \toprule
-Category & Identified threat & L/I & Mitigation strategy \\
+Risk Category & Identified Threat Description & Actionable Mitigation Strategy \\
 \midrule
-Technical & MF-SR-OCR is not significantly better than J1 at the W3 gate & H/M & Report the equivalence as a result; keep J1 as a configuration-only fallback \\
-Technical & The current checkpoint saw tracks that would form the sealed test set & H/H & Retrain once (seed 42, $\approx$7 GPU-hours) on the new split; use the sealed set exactly once \\
-Technical & CPU latency above 1\,s on the demo host & M/M & Measure on Linux (0.19--0.27\,s natively); tune threads; fall back to J1 ($4.17\times$ fewer operations) \\
-Domain & Parking lots in Vietnam use Vietnamese plates, which the model has not been trained on & H/H & State the Brazilian domain in the interface and the thesis; test 10 Vietnamese plates qualitatively; keep the layout rules configurable so a model trained on Vietnamese data can replace the current one \\
-Data and legal & Dataset images cannot be shown publicly & H/H & Store no images; demo with own or openly licensed samples; dataset images only in the thesis and defense \\
-Resource & Limited GPU budget & M/M & One seed per ablation arm; reuse existing runs \\
-Schedule & UI scope grows; defense date not yet fixed & M/H & Freeze the UI at three screens after W8; MoSCoW priorities; re-plan when the date is set \\
-Security & The API has no accounts of its own & M/H & Expose it only behind Cloudflare Access; bind the database to localhost; scan images in CI \\
-Operational & Loss of reviewer corrections during the user study & L/H & Backups every 6\,h kept 7 days, manual dumps before and after sessions; restore tested \\
+\textbf{Technical Risk} (L/I: H/M) & MF-SR-OCR is not significantly better than J1 at the W3 gate & Report the equivalence as a result; keep J1 as a configuration-only fallback \\
+\textbf{Technical Risk} (L/I: H/H) & The current checkpoint saw tracks that would form the sealed test set & Retrain once (seed 42, $\approx$7 GPU-hours) on the new split; use the sealed set exactly once \\
+\textbf{Technical Risk} (L/I: M/M) & CPU latency above 1\,s on the demo host & Measure on Linux (0.19--0.27\,s natively); tune threads; fall back to J1 ($4.17\times$ fewer operations) \\
+\textbf{Domain Risk} (L/I: H/H) & Parking lots in Vietnam use Vietnamese plates, which the model has not been trained on & State the Brazilian domain in the interface and the thesis; test 10 Vietnamese plates qualitatively; keep the layout rules configurable so a model trained on Vietnamese data can replace the current one \\
+\textbf{Data and Legal Risk} (L/I: H/H) & Dataset images cannot be shown publicly & Store no images; demo with own or openly licensed samples; dataset images only in the thesis and defense \\
+\textbf{Resource Risk} (L/I: M/M) & Limited GPU budget & One seed per ablation arm; reuse existing runs \\
+\textbf{Schedule Risk} (L/I: M/H) & UI scope grows; defense date not yet fixed & Freeze the UI at three screens after W8; MoSCoW priorities (Must have, Should have, Could have, Won't have); re-plan when the date is set \\
+\textbf{Security Risk} (L/I: M/H) & The API has no accounts of its own & Expose it only behind Cloudflare Access; bind the database to localhost; scan images in CI \\
+\textbf{Operational Risk} (L/I: L/H) & Loss of reviewer corrections during the user study & Backups every 6\,h kept 7 days, manual dumps before and after sessions; restore tested \\
 \bottomrule
 \end{tabularx}
 \end{table}

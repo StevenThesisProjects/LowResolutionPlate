@@ -1,28 +1,28 @@
 % =====================================================================
-\section{Literature and Technical Review}
+\section{LITERATURE AND TECHNICAL REVIEW}
 % =====================================================================
 
-\subsection{Overview of Existing Solutions}
+\subsection{Overview of existing solutions}
 
-Three groups of solutions are relevant. Table~\ref{tab:existing} summarizes how each one relates to
-the requirements of this project.
+Three groups of solutions read plates, and Table~\ref{tab:existing} compares them with the
+requirements of this project. A fourth topic, selective prediction, concerns when a model should
+abstain from a reading.
 
 \textbf{Commercial ALPR services and cloud OCR.} Rekor (the company behind OpenALPR)
 \cite{openalpr}, Plate Recognizer \cite{platerecognizer} and the text detection feature of Amazon
-Rekognition \cite{awsrekognition} are mature products, and dedicated ALPR products are common in
-parking access control. They handle many countries and camera types, scale on demand and come with
-documentation and support. They are built around one image per
-request, and the cloud versions process images on the provider's servers, with a price per call.
+Rekognition are mature products, and dedicated ALPR systems are common in parking access control.
+They handle many countries and camera types, scale on demand and come with documentation and
+support. They take one image per request, and the cloud versions process images on the provider's
+servers, with a price per call.
 
 \textbf{Open-source OCR libraries.} The open-source OpenALPR engine \cite{openalpr} and general OCR
-systems such as PP-OCR \cite{du2020ppocr} can be self-hosted and adapted. They are designed for
-images in which the characters are legible, and they read one image at a time.
+systems such as PP-OCR can be self-hosted and adapted. They are designed for images in which the
+characters are legible, and they read one image at a time.
 
 \textbf{Research models for low-resolution plates.} One line of work restores the image before
-reading it, using attention and sub-pixel convolution \cite{nascimento2023attention} or layout- and
-character-aware losses \cite{nascimento2024lcdnet}. Another line combines several frames: voting over
-super-resolved frames \cite{nascimento2025toward} and optical-flow restoration in MF-LPR$^2$
-\cite{na2025mflpr2}. Most recognizers in this area build on CRNN with CTC
+reading it, using attention and sub-pixel convolution \cite{nascimento2023attention}. Another
+combines several frames, either by voting over super-resolved frames \cite{nascimento2025toward} or
+by optical-flow restoration as in MF-LPR$^2$ \cite{na2025mflpr2}. Most recognizers in this area build on CRNN with CTC
 \cite{shi2017crnn,graves2006ctc}. In the ICPR 2026 competition, the best entry reached $82.13\%$ on
 the competition test set \cite{laroca2026icpr}. These models are released as training and evaluation
 code, which suits research use.
@@ -47,10 +47,10 @@ Research LR models & 1--5 frames & training code & Target the right images; pack
 \end{tabularx}
 \end{table}
 
-\subsection{Technical Gaps for This Use Case}
+\subsection{Technical gaps / Limitations of current approaches}
 
-The solutions above serve their intended settings. For low-resolution surveillance tracks, five
-needs remain open in the material reviewed.
+The solutions above work in the settings they were built for. For low-resolution surveillance
+tracks, the material reviewed leaves five needs open.
 
 \begin{description}
   \item[G1. Resolution.] At five to seven pixels per character, the input is below the range that
@@ -67,19 +67,19 @@ needs remain open in the material reviewed.
         service \cite{sculley2015hidden}.
 \end{description}
 
-\subsection{Rationale for the Selected Approach and Stack}
+\subsection{Rationale for the selected approach and stack}
 
 \textbf{Model.} MF-SR-OCR addresses G1 and G2. It rectifies, aligns, super-resolves and fuses five
 frames in one network and reaches $79.95\%\pm0.15$ over three seeds, against $75.78\%$ for the
 retrained CRNN+STN baseline (Fig.~\ref{fig:multiseed}). A variant without the super-resolution
 branch (J1) reaches $80.45\%\pm0.45$; paired McNemar tests per seed give $p=0.91$, $0.43$ and
-$0.64$, so the two are statistically indistinguishable on this data \cite{nguyen2026mfsrocr}.
+$0.64$, so the two are statistically indistinguishable on this data.
 MF-SR-OCR is served because it has the lowest seed-to-seed spread and because its super-resolved
 frames can be shown to reviewers. Whether those frames help reviewers is tested in RQ3. J1 needs
 $4.17\times$ fewer operations per track and remains available as a fallback through configuration.
 
-\textbf{Architecture.} Table~\ref{tab:arch} compares three options. A modular monolith fits one
-developer, one CPU host and one model that should be loaded once.
+\textbf{Architecture.} Table~\ref{tab:arch} compares three options. With one developer and one CPU
+host, and a model that should be loaded only once, a modular monolith is the simplest fit.
 
 \begin{table}[tbp]
 \centering
@@ -89,7 +89,7 @@ developer, one CPU host and one model that should be loaded once.
 \toprule
 Option & Strengths & Costs for this project \\
 \midrule
-\textbf{Modular monolith} (chosen) & One process loads the 29.6M-parameter model once; simple to test and deploy; module boundaries kept in code \cite{fowler_monolithfirst} & Scales as one unit; a split is possible later along the existing modules \\
+\textbf{Modular monolith} (chosen) & One process loads the 29.6M-parameter model once; simple to test and deploy; module boundaries kept in code & Scales as one unit; a split is possible later along the existing modules \\
 Microservices & Independent scaling and deployment & Network calls between services, several images to run and monitor; more than one developer can maintain in 12 weeks \\
 Serverless functions & No server to manage & Cold starts would reload the model; GPU-free functions with a 120\,MB model are slow to start; images would leave the site \\
 \bottomrule
@@ -116,18 +116,18 @@ MongoDB & Flexible documents & The data is relational (batch, prediction, review
 \end{table}
 
 \textbf{Backend, API style and frontend.} FastAPI \cite{fastapi} keeps the service in Python, so the
-API reuses the exact preprocessing of the training code; this is what makes the 999/999 parity
-possible. It also generates the OpenAPI description. REST with JSON fits browser clients and file
-uploads; errors follow RFC~9457 \cite{rfc9457}. gRPC would add a proxy layer for browsers without a
-clear gain at this load. Batch progress uses polling for now; Server-Sent Events are an option if
-polling becomes a cost. For the frontend, Gradio, Streamlit and React \cite{react} were compared in
+API reuses the exact preprocessing of the training code, and its output matches the offline model on
+all 999 validation tracks. FastAPI also generates the OpenAPI description. REST with JSON fits
+browser clients and file uploads; errors follow RFC~9457. gRPC would need a proxy layer for browsers
+and brings no clear gain at this load. Batch progress uses polling for now; Server-Sent Events are an option if
+polling becomes a cost. For the frontend, Gradio, Streamlit and React were compared in
 Week~1. React was chosen because the review screen needs custom interaction (suggestion buttons,
 per-character highlights) and the author has production experience with it. Its extra cost of two to
 three weeks is contained by freezing the interface at three screens after Week~8.
 
 \textbf{Deployment.} Docker Compose runs the whole stack on one host with one command; Kubernetes
 would add a control plane that a single CPU host does not need. Cloudflare Tunnel with Cloudflare
-Access \cite{cloudflare_tunnel} gives a public demo address without opening an inbound port and adds
+Access gives a public demo address without opening an inbound port and adds
 sign-in in front of an API that has no accounts of its own. Table~\ref{tab:stack} summarizes the
 stack.
 
@@ -145,7 +145,7 @@ Database & PostgreSQL 16, psycopg 3 pool & Text results only; no images \\
 Frontend & React, Vite, Tailwind CSS & Three screens, desktop and mobile \\
 Packaging & Docker, Docker Compose & Profiles for optional services \\
 Access & Cloudflare Tunnel and Access & Outbound-only connection, sign-in at the edge \\
-CI/CD & GitHub Actions \cite{github_actions}, GHCR & Lint, tests, scans, image build \\
+CI/CD & GitHub Actions, GHCR & Lint, tests, scans, image build \\
 \bottomrule
 \end{tabularx}
 \end{table}

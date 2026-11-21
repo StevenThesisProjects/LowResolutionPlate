@@ -1,8 +1,9 @@
 % =====================================================================
 %  Shared style for every diagram in the proposal.
 %  Each figure is a standalone TikZ file that \input's this preamble, so
-%  all diagrams use the same font family (Computer Modern, T1 -- identical
-%  to the LLNCS body text), the same sizes and the same palette.
+%  all diagrams use the same font family (Times New Roman, loaded from
+%  ../../fonts.tex exactly as in the body text), the same sizes and the
+%  same palette.
 %
 %  Font rule (do not change per figure):
 %    node text   \footnotesize  (8 pt)
@@ -12,12 +13,11 @@
 %  width) and included WITHOUT scaling, so the printed size is the same
 %  in every figure.
 % =====================================================================
-\usepackage[T1]{fontenc}
-\usepackage{amsmath,amssymb}
+\input{../../fonts}   % Times New Roman, same setup as main.tex
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,shapes.geometric,shapes.multipart,
-  fit,backgrounds,calc,shadows,patterns}
+  calc,patterns}
 
 % ---- palette ---------------------------------------------------------
 \definecolor{cBlue}{HTML}{0B4F8A}    % application / API
@@ -51,14 +51,11 @@
   ok/.style={base, draw=cGreen, fill=fGreen},
   bad/.style={base, draw=cRed, fill=fRed},
   ext/.style={base, draw=cGray, fill=fGray},
-  plain/.style={base, draw=none, fill=none},
   db/.style={cylinder, shape border rotate=90, aspect=0.22, draw=cPurple,
              fill=fPurple, line width=0.6pt, align=center, text=cInk,
              minimum height=9mm, font=\figfont},
   decision/.style={diamond, aspect=2.2, draw=cOrange, fill=fOrange,
                    line width=0.6pt, align=center, inner sep=1pt, text=cInk, font=\figfont},
-  actor/.style={draw=cInk, fill=fGray, line width=0.8pt, rounded corners=0pt,
-                align=center, inner sep=3pt, font=\figfont\bfseries},
   layer/.style={draw=cGray!60, fill=cGray!4, rounded corners=3pt, line width=0.5pt},
   layertitle/.style={font=\lblfont\bfseries, text=cGray, anchor=north west, inner sep=2pt},
   arr/.style={->, draw=cInk, line width=0.6pt},

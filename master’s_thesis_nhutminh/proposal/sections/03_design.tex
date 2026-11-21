@@ -1,8 +1,8 @@
 % =====================================================================
-\section{Proposed Solution and Engineering Design}
+\section{PROPOSED SOLUTION AND ENGINEERING DESIGN}
 % =====================================================================
 
-\subsection{High-Level System Architecture}
+\subsection{High-level system architecture}
 
 PlateReader LR is a containerized modular monolith with four layers (Fig.~\ref{fig:architecture}).
 Clients reach the service through a browser or through scripts. In the public demo, requests pass
@@ -16,21 +16,20 @@ Uploaded images stay in memory for the length of one request. Only text results 
 database, and super-resolved frames are returned in the response without being stored. This keeps the
 system within the dataset license.
 
-\fig{architecture.pdf}{High-level architecture. Solid arrows are calls; dashed arrows are background
+\fig{architecture.png}{High-level architecture. Solid arrows are calls; dashed arrows are background
 work or data copies.}{fig:architecture}
 
-The inference service runs MF-SR-OCR (Fig.~\ref{fig:model}). A spatial transformer
-\cite{jaderberg2015stn} straightens each frame, deformable convolutions \cite{zhu2019dcnv2} align
-the frames to the middle one, and a branch super-resolves them by a factor of two. A residual backbone
-with GroupNorm \cite{wu2018groupnorm} encodes each frame, attention fuses the five feature maps, and a
-two-layer BiLSTM with a CTC head \cite{graves2006ctc} reads the sequence over $T=32$ steps and 37
-classes. Training uses $\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$ with
-EMA weights \cite{tarvainen2017mean}. At inference, a beam search of width 16 keeps only prefixes
-that match one of the two plate layouts.
+The inference service runs MF-SR-OCR (Fig.~\ref{fig:model}). A spatial transformer straightens each
+frame, deformable convolutions align the frames to the middle one, and a branch super-resolves them
+by a factor of two. A residual backbone with GroupNorm encodes each frame, attention fuses the five
+feature maps, and a two-layer BiLSTM with a CTC head \cite{graves2006ctc} reads the sequence over
+$T=32$ steps and 37 classes. Training uses
+$\mathcal{L}=\mathcal{L}_{\mathrm{CTC}}+0.1\,\mathcal{L}_{\mathrm{SR}}$ with EMA weights. At
+inference, a beam search of width 16 keeps only prefixes that match one of the two plate layouts.
 
-\fig{model.pdf}{MF-SR-OCR recognition pipeline as served by the inference service.}{fig:model}
+\fig{model.png}{MF-SR-OCR recognition pipeline as served by the inference service.}{fig:model}
 
-\subsection{Core Component Design and Interfacing}
+\subsection{Core component Design and Interfacing}
 
 \textbf{Components.} Table~\ref{tab:components} lists the main components, their responsibility and
 where they live in the code.
@@ -69,10 +68,9 @@ $\tau=0.90$ is provisional; with it, 887 of 999 validation tracks are accepted a
 \textbf{Interfaces.} Clients talk to the service through REST over HTTP under \code{/api/v1}: multipart
 uploads in, JSON out, CSV for export, and one error format (RFC~9457). The 14 operations group into
 three resources (Fig.~\ref{fig:apimap}). The full OpenAPI 3.1 description and one page per endpoint
-are in the repository (\code{api-docs/}); the figures below show the contract and its behavior
-instead of reproducing that reference.
+are in the repository (\code{api-docs/}).
 
-\fig{apimap.pdf}{REST resource map of \code{/api/v1} with success status codes.}{fig:apimap}
+\fig{apimap.png}{REST resource map of \code{/api/v1} with success status codes.}{fig:apimap}
 
 Fig.~\ref{fig:seqsingle} shows a single-track request. Validation runs before any work, the forward
 pass runs in a thread pool under the model lock, and a database connection is borrowed only to insert
@@ -80,19 +78,19 @@ the result. Fig.~\ref{fig:seqbatch} shows a batch: the API answers \code{202 Acc
 single worker processes the job in chunks of four tracks, and the client polls for progress.
 Fig.~\ref{fig:states} gives the lifecycle of a batch job and of a prediction.
 
-\fig{seq_single.pdf}{Sequence of a single-track request (\code{POST /predictions}).}{fig:seqsingle}
+\fig{seq_single.png}{Sequence of a single-track request (\code{POST /predictions}).}{fig:seqsingle}
 
-\fig{seq_batch.pdf}{Sequence of an asynchronous batch job (\code{POST /batches}). The worker loop
+\fig{seq_batch.png}{Sequence of an asynchronous batch job (\code{POST /batches}). The worker loop
 and the client polling run in parallel.}{fig:seqbatch}
 
-\fig{states.pdf}{State machines of a batch job (a) and of a prediction (b).}{fig:states}
+\fig{states.png}{State machines of a batch job (a) and of a prediction (b).}{fig:states}
 
 \textbf{Data model.} The schema has three tables (Fig.~\ref{fig:erd}). The \code{reviews} table is
 append-only: a review is a new row, so two reviewers never overwrite each other, the model's original
 answer stays in \code{predictions.plate}, and model accuracy can still be computed after review.
 Batch statistics are counted at read time, so no counter row is shared between writers.
 
-\fig{erd.pdf}{Entity--relationship diagram (PostgreSQL 16). Filled diamonds mark the owning side of
+\fig{erd.png}{Entity--relationship diagram (PostgreSQL 16). Filled diamonds mark the owning side of
 an \code{ON DELETE CASCADE} relation.}{fig:erd}
 
 \textbf{Concurrent reads and writes.} Table~\ref{tab:concurrency} lists the six problems the mixed
@@ -117,19 +115,19 @@ Jobs stuck after a restart & On startup, jobs left \code{queued} or \code{runnin
 \end{tabularx}
 \end{table}
 
-\fig{concurrency.pdf}{Timing of a batch job, a single request (A), database writes and UI polling.
+\fig{concurrency.png}{Timing of a batch job, a single request (A), database writes and UI polling.
 The chunk length follows the measured 0.66\,s per track on CPU.}{fig:concurrency}
 
 \subsection{Software Engineering Methodology and DevOps Pipeline}
 
-\textbf{Methodology.} Work follows Kanban \cite{anderson2010kanban} with a weekly cadence
+\textbf{Methodology.} Work follows Kanban with a weekly cadence
 (Fig.~\ref{fig:kanban}). GitHub Issues hold the backlog, each item is sized to one week or less, at
 most two items are in progress, and each item goes through one branch and one pull request. The
 weekly report to the supervisor serves as the review and re-planning meeting. Kanban suits a single
 developer whose week mixes long GPU runs with short coding tasks, where fixed sprints would add
 ceremony without a team to coordinate.
 
-\fig{kanban.pdf}{Kanban board layout and working rules. Cards show example items around Week~3.}{fig:kanban}
+\fig{kanban.png}{Kanban board layout and working rules. Cards show example items around Week~3.}{fig:kanban}
 
 \textbf{Model validation protocol.} Model results follow fixed rules (Fig.~\ref{fig:protocol}). Every
 configuration is trained with three seeds; data splits are stored with SHA-256 hashes; the threshold
@@ -137,16 +135,16 @@ is chosen on validation data; and the sealed test set is used exactly once, afte
 configuration and $\tau$ are frozen. A parity check against the offline model is part of every
 release.
 
-\fig{protocol.pdf}{Data split (to scale) and model validation protocol.}{fig:protocol}
+\fig{protocol.png}{Data split (to scale) and model validation protocol.}{fig:protocol}
 
-\textbf{CI/CD.} GitHub Actions \cite{github_actions} will run the pipeline in Fig.~\ref{fig:cicd}.
+\textbf{CI/CD.} GitHub Actions will run the pipeline in Fig.~\ref{fig:cicd}.
 Every pull request runs static checks, unit tests, integration tests against a PostgreSQL service
 container, and security scans. A release tag adds a gate on the lab machine (parity and latency),
 builds and pushes the images, deploys them with Compose and runs a smoke test, with rollback to the
 previous tag if the smoke test fails. The workflows are scheduled for Weeks~3--4; until then the same
 checks are run by hand before each merge.
 
-\fig{cicd.pdf}{CI/CD pipeline on GitHub Actions.}{fig:cicd}
+\fig{cicd.png}{CI/CD pipeline on GitHub Actions.}{fig:cicd}
 
 \textbf{Deployment.} Docker Compose runs the stack on one Linux host without a GPU
 (Fig.~\ref{fig:deploy}). The database port is bound to \code{127.0.0.1}, the API container runs as a
@@ -154,4 +152,4 @@ non-root user with a 3\,GB memory limit, and the checkpoint is mounted read-only
 model is a configuration change. The tunnel and backup services sit in Compose profiles and start only
 when needed. The \code{web} service is added in Week~8.
 
-\fig{deploy.pdf}{Deployment view (Docker Compose on one CPU host).}{fig:deploy}
+\fig{deploy.png}{Deployment view (Docker Compose on one CPU host).}{fig:deploy}

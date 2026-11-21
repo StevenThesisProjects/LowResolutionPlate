@@ -1,5 +1,5 @@
 % =====================================================================
-\section{Introduction}
+\section{INTRODUCTION}
 % =====================================================================
 
 \subsection{Background}
@@ -20,11 +20,13 @@ high-resolution (HR) crops and the plate text. Plates follow two Brazilian layou
 and \code{LLLNLNN}, and a track counts as correct only when all seven characters match. With five
 to seven pixels of width per character, a single frame often leaves some glyphs ambiguous.
 
-The author's model MF-SR-OCR \cite{nguyen2026mfsrocr} restores and reads these tracks by combining
-the five frames. Today it exists as research code: training scripts, evaluation scripts and
-checkpoints. This capstone turns it into a web application that parking staff can use. The benchmark
-plates are Brazilian and the model is trained on them, so the system is built and evaluated on that
-domain. Vietnamese plates follow other layouts, often on two rows, and supporting them needs labeled
+The author's model MF-SR-OCR restores and reads these tracks by combining the five frames. The
+paper describing it is to be presented at the EAI FPT International Conference on Intelligent
+Systems and Advanced Technologies (EAI FISAT 2026), November 25--27, 2026, at FPT University,
+Ho Chi Minh City\footnote{\url{https://daihoc.fpt.edu.vn/hcm/hoi-nghi-fisat/}}. Today the
+model exists as research code: training scripts, evaluation scripts and checkpoints. This capstone
+turns it into a web application that parking staff can use. The benchmark plates are Brazilian and
+the model is trained on them, so the system is built and evaluated on that domain. Vietnamese plates follow other layouts, often on two rows, and supporting them needs labeled
 Vietnamese data; this is outside the present scope (Section~1.4).
 
 \textbf{Stakeholders.} Table~\ref{tab:stakeholders} lists who is affected and what each group needs.
@@ -48,15 +50,14 @@ Dataset owners (UFPR) & Images are used only for non-commercial academic work an
 \end{tabularx}
 \end{table}
 
-\fig{usecase.pdf}{Use cases in scope. Operators recognize, review and export; the administrator
+\fig{usecase.png}{Use cases in scope. Operators recognize, review and export; the administrator
 runs the stack; the ML engineer manages the model and the threshold $\tau$.}{fig:usecase}
 
-\subsection{Practical Problem Statement and User Pain-Point}
+\subsection{Practical problem statement and User pain-point}
 
 Parking staff currently have no tool that uses all the frames in which a vehicle appears, indicates
 which automatic readings are reliable, and helps them correct the others. Fig.~\ref{fig:workflow}
-compares the current workflow with the proposed one. The problem breaks down into five concrete
-pain points.
+compares the current workflow with the proposed one. The problem breaks down into five pain points.
 
 \begin{description}
   \item[P1. Accuracy.] On the 999 validation tracks, a single-frame CRNN reads $74.45\%$ of tracks
@@ -73,9 +74,9 @@ pain points.
         reviewers would wait behind the batch.
 \end{description}
 
-\fig{workflow.pdf}{Current workflow (a) and proposed workflow with confidence-based routing (b).}{fig:workflow}
+\fig{workflow.png}{Current workflow (a) and proposed workflow with confidence-based routing (b).}{fig:workflow}
 
-\subsection{Research Objectives and Questions}
+\subsection{Research Objectives / Questions}
 
 Table~\ref{tab:objectives} states the engineering objectives in SMART form. Week~1 starts on
 October 5, 2026.
@@ -111,8 +112,7 @@ Three research questions guide the evaluation.
 
 \subsection{Scope}
 
-Table~\ref{tab:scope} separates what will be built and tested from what is left out. The model is
-trained on Brazilian plates, so the system is described as working on that domain only.
+Table~\ref{tab:scope} separates what will be built and tested from what is left out.
 
 \begin{table}[tbp]
 \centering
@@ -120,23 +120,27 @@ trained on Brazilian plates, so the system is described as working on that domai
 \label{tab:scope}
 \begin{tabularx}{\textwidth}{@{}L L@{}}
 \toprule
-\textbf{In-scope components} & \textbf{Out-of-scope components} \\
+\textbf{In-Scope Components} & \textbf{Out-of-Scope Components} \\
 \midrule
-MF-SR-OCR inference with greedy and layout-constrained decoding &
-Plate detection and tracking in raw video (stretch goal only); gate hardware such as barriers, ticket machines or RFID readers \\
-Selective prediction: track confidence, threshold $\tau$, review queue &
-Non-Brazilian plates (10 Vietnamese plates tested qualitatively to document the limitation) \\
-FastAPI REST API: single track, ZIP batch, review, suggestions, CSV export &
-In-app user accounts (identity is delegated to Cloudflare Access) \\
-PostgreSQL storage of results and review history (text only, no images) &
-GPU or edge deployment, INT8 quantization, Kubernetes \\
-React web app with single-track, batch and review screens &
-Live camera streams and integration with police or VMS systems \\
-Docker Compose deployment on one CPU host, Cloudflare Tunnel, backups &
-Storing or publishing dataset images \\
-Automated tests, CI/CD pipeline, API and user documentation &
-New model research beyond a minimal ablation \\
-Roles: operator/reviewer, administrator, ML engineer & \\
+\cellitems{
+  \item MF-SR-OCR inference with greedy and layout-constrained decoding
+  \item Selective prediction: track confidence, threshold $\tau$, review queue
+  \item FastAPI REST API: single track, ZIP batch, review, suggestions, CSV export
+  \item PostgreSQL storage of results and review history (text only, no images)
+  \item React web app with single-track, batch and review screens
+  \item Docker Compose deployment on one CPU host, Cloudflare Tunnel, backups
+  \item Automated tests, CI/CD pipeline, API and user documentation
+  \item User roles: operator/reviewer, administrator, ML engineer}
+&
+\cellitems{
+  \item Plate detection and tracking in raw video (stretch goal only)
+  \item Gate hardware such as barriers, ticket machines or RFID readers
+  \item Non-Brazilian plates (10 Vietnamese plates tested qualitatively to document the limitation)
+  \item In-app user accounts (identity is delegated to Cloudflare Access, treated as a black box)
+  \item GPU or edge deployment, INT8 quantization, Kubernetes
+  \item Live camera streams and integration with police or VMS systems
+  \item Storing or publishing dataset images
+  \item New model research beyond a minimal ablation} \\
 \bottomrule
 \end{tabularx}
 \end{table}
