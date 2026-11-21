@@ -2,8 +2,9 @@
 %  MSE Applied Capstone Project Proposal -- PlateReader LR
 %  Springer LLNCS class (llncs.cls v2.24, included in this folder).
 %  Compile with XeLaTeX or tectonic (`tectonic main.tex`) so that every
-%  font is Times New Roman (see fonts.tex). No BibTeX run: the references
-%  are in sections/06_references.tex.
+%  font is Times New Roman (see fonts.tex). References: BibTeX with
+%  IEEEtranDOI.bst (IEEEtran.bst that also prints DOIs, in this folder),
+%  entries in refs.bib (tectonic and Overleaf run BibTeX automatically).
 %  Figures are 300-dpi PNGs in figures/, built from the TikZ sources in
 %  figures/src/ (run `sh build_figures.sh` after editing a source).
 %  Figures are included at their natural size, never scaled, so every
@@ -58,9 +59,20 @@
 \newcommand{\Plan}{\textcolor{plan}{Planned}}
 \newcommand{\Prog}{\textcolor{plan}{In progress}}
 
-% Numbered "6. REFERENCES" heading (IEEE [n] labels are set in 06_references.tex).
+% References: BibTeX with IEEEtran.bst (refs.bib). The numbered "6. REFERENCES"
+% heading comes from 06_references.tex, so LLNCS's own heading is removed,
+% and labels print as [n] instead of LLNCS's "n.".
 \makeatletter
 \patchcmd{\thebibliography}{\section*{\refname}}{}{}{}
+\newcommand{\ieee@biblabel}{\def\@biblabel##1{[##1]}}% runs after LLNCS's "n." label
+\patchcmd{\thebibliography}{\small}{\ieee@biblabel\small}{}%
+  {\PackageWarningNoLine{main}{Could not set [n] reference labels}}
+% \bstctlcite (from IEEEtran.cls) passes the IEEEtran.bst options in refs.bib.
+\def\bstctlcite{\@ifnextchar[{\@bstctlcite}{\@bstctlcite[@auxout]}}
+\def\@bstctlcite[#1]#2{\@bsphack\@for\@citeb:=#2\do{%
+  \edef\@citeb{\expandafter\@iden\@citeb}%
+  \if@filesw\immediate\write\csname #1\endcsname{\string\citation{\@citeb}}\fi}%
+  \@esphack}
 % Headings follow the MSE template: "1. INTRODUCTION", "1.1 Background".
 \def\@seccntformat#1{\csname the#1\endcsname\ifstrequal{#1}{section}{.}{}\quad}
 % Template header above the project title.
@@ -75,6 +87,7 @@
   \vspace{2pt}\end{minipage}}
 
 \begin{document}
+\bstctlcite{IEEEexample:BSTcontrol} % IEEE: more than 6 authors -> "et al."
 
 \title{\projecttitle}
 \titlerunning{Low-Resolution Plate Recognition for Parking Facilities}

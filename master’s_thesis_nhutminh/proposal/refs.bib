@@ -1,0 +1,186 @@
+% =====================================================================
+% refs.bib — MSE Capstone Proposal (PlateReader LR)
+% IEEE style via IEEEtran.bst; numbered in order of first citation.
+% Entries shared with the MF-SR-OCR paper are copied from
+% eai_fisat_2026_nhutminh/paperLatex/refs.bib.
+% =====================================================================
+
+% IEEE rule: more than six authors -> first author + "et al.".
+% Repeated authors are written out, not replaced by a dash.
+% (activated by \bstctlcite{IEEEexample:BSTcontrol} in main.tex)
+@IEEEtranBSTCTL{IEEEexample:BSTcontrol,
+  CTLuse_forced_etal       = "yes",
+  CTLmax_names_forced_etal = "6",
+  CTLnames_show_etal       = "1",
+  CTLdash_repeated_names   = "no"
+}
+
+% ---------------------------------------------------------------------
+% (A) LRLPR problem, benchmark, and dataset
+% ---------------------------------------------------------------------
+
+@inproceedings{laroca2018robust,
+  author    = {Laroca, Rayson and Severo, Evair and Zanlorensi, Luiz A. and Oliveira, Luiz S. and Gon{\c{c}}alves, Gabriel Resende and Schwartz, William Robson and Menotti, David},
+  title     = {A Robust Real-Time Automatic License Plate Recognition Based on the {YOLO} Detector},
+  booktitle = {2018 International Joint Conference on Neural Networks (IJCNN)},
+  pages     = {1--10},
+  year      = {2018},
+  doi       = {10.1109/IJCNN.2018.8489629}
+}
+
+@misc{laroca2026icpr,
+  author        = {Laroca, Rayson and Nascimento, Valfride and Kim, Donggun and Chung, Sanghyeok and Bae, Subin and Seo, Uihwan and Oh, Seungsang and Phung, Chi M. and Vo, Minh G. and Ye, Xingsong and Du, Yongkun and Su, Yuchen and Chen, Zhineng and Heo, Sunhee and Lee, Hyangwoo and Na, Kihyun and Nguyen, Khanh V. Vu and Pham, Sang T. and Phung, Duc N. N. and Le, Trong P. and Tran, Vy N. Vo and Menotti, David},
+  title         = {{ICPR} 2026 Competition on Low-Resolution License Plate Recognition},
+  howpublished  = {arXiv:2604.22506},
+  year          = {2026},
+  eprint        = {2604.22506},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  note          = {To appear in International Conference on Pattern Recognition (ICPR)}
+}
+
+@misc{icpr26license,
+  author = {{ICPR26-LRLPR Organizers}},
+  title  = {{ICPR26-LRLPR} Dataset: License Agreement},
+  year   = {2026},
+  url    = {https://icpr26lrlpr.github.io/license-agreement.pdf}
+}
+
+% ---------------------------------------------------------------------
+% (B) Existing ALPR products and low-resolution plate research
+% ---------------------------------------------------------------------
+
+@misc{openalpr,
+  author = {{OpenALPR Technology, Inc.}},
+  title  = {{OpenALPR}: Automatic License Plate Recognition Library},
+  url    = {https://github.com/openalpr/openalpr}
+}
+
+@misc{platerecognizer,
+  author = {{ParkPow}},
+  title  = {Plate Recognizer Snapshot {API} Documentation},
+  url    = {https://guides.platerecognizer.com/}
+}
+
+@article{nascimento2023attention,
+  author  = {Nascimento, Valfride and Laroca, Rayson and Lambert, Jorge A. and Schwartz, William Robson and Menotti, David},
+  title   = {Super-resolution of License Plate Images Using Attention Modules and Sub-pixel Convolution Layers},
+  journal = {Computers \& Graphics},
+  volume  = {113},
+  pages   = {69--76},
+  year    = {2023},
+  doi     = {10.1016/j.cag.2023.05.005}
+}
+
+@article{nascimento2025toward,
+  author  = {Nascimento, Valfride and Lima, Gabriel E. and Ribeiro, Rafael O. and Schwartz, William Robson and Laroca, Rayson and Menotti, David},
+  title   = {Toward Advancing License Plate Super-Resolution in Real-World Scenarios: A Dataset and Benchmark},
+  journal = {Journal of the Brazilian Computer Society},
+  volume  = {31},
+  number  = {1},
+  pages   = {435--449},
+  year    = {2025},
+  doi     = {10.5753/jbcs.2025.5159}
+}
+
+@article{na2025mflpr2,
+  author  = {Na, Kihyun and Oh, Junseok and Cho, Youngkwan and Kim, Bumjin and Cho, Sungmin and Choi, Jinyoung and Kim, Injung},
+  title   = {{MF-LPR}$^2$: Multi-Frame License Plate Image Restoration and Recognition using Optical Flow},
+  journal = {Computer Vision and Image Understanding},
+  volume  = {256},
+  pages   = {104361},
+  year    = {2025},
+  doi     = {10.1016/j.cviu.2025.104361}
+}
+
+% ---------------------------------------------------------------------
+% (C) OCR / sequence recognition
+% ---------------------------------------------------------------------
+
+@article{shi2017crnn,
+  author  = {Shi, Baoguang and Bai, Xiang and Yao, Cong},
+  title   = {An End-to-End Trainable Neural Network for Image-based Sequence Recognition and Its Application to Scene Text Recognition},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {39},
+  number  = {11},
+  pages   = {2298--2304},
+  year    = {2017},
+  doi     = {10.1109/TPAMI.2016.2646371}
+}
+
+@inproceedings{graves2006ctc,
+  author    = {Graves, Alex and Fern{\'a}ndez, Santiago and Gomez, Faustino and Schmidhuber, J{\"u}rgen},
+  title     = {Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks},
+  booktitle = {Proceedings of the 23rd International Conference on Machine Learning (ICML)},
+  pages     = {369--376},
+  year      = {2006},
+  doi       = {10.1145/1143844.1143891}
+}
+
+% ---------------------------------------------------------------------
+% (D) Selective prediction and ML systems engineering
+% ---------------------------------------------------------------------
+
+@inproceedings{geifman2017selective,
+  author    = {Geifman, Yonatan and El-Yaniv, Ran},
+  title     = {Selective Classification for Deep Neural Networks},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {30},
+  year      = {2017}
+}
+
+@inproceedings{sculley2015hidden,
+  author    = {Sculley, D. and others},
+  title     = {Hidden Technical Debt in Machine Learning Systems},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {28},
+  pages     = {2503--2511},
+  year      = {2015}
+}
+
+% ---------------------------------------------------------------------
+% (E) Database and backend documentation
+% ---------------------------------------------------------------------
+
+@misc{sqlite_lock,
+  author = {{SQLite Consortium}},
+  title  = {File Locking and Concurrency in {SQLite} Version 3},
+  url    = {https://www.sqlite.org/lockingv3.html}
+}
+
+@misc{postgres_mvcc,
+  author = {{PostgreSQL Global Development Group}},
+  title  = {{PostgreSQL} 16 Documentation, Chapter 13: Concurrency Control},
+  url    = {https://www.postgresql.org/docs/16/mvcc.html}
+}
+
+@misc{fastapi,
+  author = {Ram{\'i}rez, Sebasti{\'a}n},
+  title  = {{FastAPI} Documentation},
+  url    = {https://fastapi.tiangolo.com}
+}
+
+% ---------------------------------------------------------------------
+% (F) Evaluation: statistics and usability
+% ---------------------------------------------------------------------
+
+@article{mcnemar1947,
+  author  = {McNemar, Quinn},
+  title   = {Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages},
+  journal = {Psychometrika},
+  volume  = {12},
+  number  = {2},
+  pages   = {153--157},
+  year    = {1947},
+  doi     = {10.1007/BF02295996}
+}
+
+@incollection{brooke1996sus,
+  author    = {Brooke, John},
+  title     = {{SUS}: A `Quick and Dirty' Usability Scale},
+  booktitle = {Usability Evaluation in Industry},
+  publisher = {Taylor \& Francis},
+  address   = {London, U.K.},
+  pages     = {189--194},
+  year      = {1996}
+}
